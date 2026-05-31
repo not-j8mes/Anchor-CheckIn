@@ -44,6 +44,30 @@ router.post("/forms", async (req, res) => {
   }
 });
 
+router.get("/forms/by-slug/:embedSlug", async (req, res) => {
+  const { embedSlug } = req.params;
+  try {
+    const form = await db.select().from(formsTable).where(eq(formsTable.embedSlug, embedSlug)).limit(1);
+    if (!form[0]) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    const questions = await db
+      .select()
+      .from(questionsTable)
+      .where(eq(questionsTable.formId, form[0].id))
+      .orderBy(questionsTable.order);
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.formId, form[0].id));
+    res.json({ ...form[0], submissionCount: count, questions });
+  } catch (err) {
+    req.log.error({ err }, "Failed to get form by slug");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/forms/:formId", async (req, res) => {
   const { formId: formIdStr } = GetFormParams.parse(req.params);
   const formId = Number(formIdStr);

@@ -427,6 +427,83 @@ export const useCreateForm = <TError = ErrorType<unknown>,
       return useMutation(getCreateFormMutationOptions(options));
     }
 
+export const getGetFormBySlugUrl = (embedSlug: string,) => {
+
+
+
+
+  return `/api/forms/by-slug/${embedSlug}`
+}
+
+/**
+ * @summary Get a public form by its embed slug (no auth required)
+ */
+export const getFormBySlug = async (embedSlug: string, options?: RequestInit): Promise<FormWithQuestions> => {
+
+  return customFetch<FormWithQuestions>(getGetFormBySlugUrl(embedSlug),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFormBySlugQueryKey = (embedSlug: string,) => {
+    return [
+    `/api/forms/by-slug/${embedSlug}`
+    ] as const;
+    }
+
+
+export const getGetFormBySlugQueryOptions = <TData = Awaited<ReturnType<typeof getFormBySlug>>, TError = ErrorType<void>>(embedSlug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFormBySlug>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFormBySlugQueryKey(embedSlug);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFormBySlug>>> = ({ signal }) => getFormBySlug(embedSlug, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(embedSlug), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFormBySlug>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFormBySlugQueryResult = NonNullable<Awaited<ReturnType<typeof getFormBySlug>>>
+export type GetFormBySlugQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get a public form by its embed slug (no auth required)
+ */
+
+export function useGetFormBySlug<TData = Awaited<ReturnType<typeof getFormBySlug>>, TError = ErrorType<void>>(
+ embedSlug: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFormBySlug>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFormBySlugQueryOptions(embedSlug,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetFormUrl = (formId: number,) => {
 
 

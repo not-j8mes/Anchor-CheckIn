@@ -86,6 +86,37 @@ export const CreateFormBody = zod.object({
 
 
 /**
+ * @summary Get a public form by its embed slug (no auth required)
+ */
+export const GetFormBySlugParams = zod.object({
+  "embedSlug": zod.coerce.string()
+})
+
+export const GetFormBySlugResponse = zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "isPublic": zod.boolean(),
+  "embedSlug": zod.string().optional(),
+  "submissionCount": zod.number().optional(),
+  "createdAt": zod.string().optional(),
+  "questions": zod.array(zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "label": zod.string(),
+  "type": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']),
+  "required": zod.boolean(),
+  "order": zod.number(),
+  "placeholder": zod.string().nullish(),
+  "options": zod.string().nullish(),
+  "isChildField": zod.boolean().optional(),
+  "fieldKey": zod.string().nullish()
+}))
+})
+
+
+/**
  * @summary Get a form with its questions
  */
 export const GetFormParams = zod.object({

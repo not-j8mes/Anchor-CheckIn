@@ -103,6 +103,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/Form"
 
+  /forms/by-slug/{embedSlug}:
+    get:
+      operationId: getFormBySlug
+      tags: [forms]
+      summary: Get a public form by its embed slug (no auth required)
+      parameters:
+        - name: embedSlug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Form with questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormWithQuestions"
+        "404":
+          description: Not found
+
   /forms/{formId}:
     get:
       operationId: getForm
