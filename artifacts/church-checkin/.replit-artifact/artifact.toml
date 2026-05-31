@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Church Check-In"
+version = "1.0.0"
+id = "artifacts/church-checkin"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25969
+
+[services.development]
+run = "pnpm --filter @workspace/church-checkin run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/church-checkin", "run", "build" ]
+publicDir = "artifacts/church-checkin/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25969"
+BASE_PATH = "/"

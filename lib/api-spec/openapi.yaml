@@ -3,20 +3,36 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Church check-in and registration API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: organizations
+    description: Church/organization settings
+  - name: forms
+    description: Registration form management
+  - name: questions
+    description: Form questions
+  - name: registrations
+    description: Form registrations/submissions
+  - name: children
+    description: Child records
+  - name: checkins
+    description: Check-in operations
+  - name: labels
+    description: Label printing
+  - name: stats
+    description: Dashboard statistics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +40,433 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /organizations/current:
+    get:
+      operationId: getOrganization
+      tags: [organizations]
+      summary: Get current organization settings
+      responses:
+        "200":
+          description: Organization settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+    put:
+      operationId: updateOrganization
+      tags: [organizations]
+      summary: Update organization settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganizationInput"
+      responses:
+        "200":
+          description: Updated organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+
+  /forms:
+    get:
+      operationId: listForms
+      tags: [forms]
+      summary: List all registration forms
+      responses:
+        "200":
+          description: List of forms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Form"
+    post:
+      operationId: createForm
+      tags: [forms]
+      summary: Create a new registration form
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FormInput"
+      responses:
+        "201":
+          description: Created form
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Form"
+
+  /forms/{formId}:
+    get:
+      operationId: getForm
+      tags: [forms]
+      summary: Get a form with its questions
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Form with questions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormWithQuestions"
+        "404":
+          description: Not found
+    put:
+      operationId: updateForm
+      tags: [forms]
+      summary: Update a form
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FormInput"
+      responses:
+        "200":
+          description: Updated form
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Form"
+    delete:
+      operationId: deleteForm
+      tags: [forms]
+      summary: Delete a form
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /forms/{formId}/questions:
+    get:
+      operationId: listQuestions
+      tags: [questions]
+      summary: List questions for a form
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of questions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+    post:
+      operationId: createQuestion
+      tags: [questions]
+      summary: Add a question to a form
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "201":
+          description: Created question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+
+  /forms/{formId}/questions/reorder:
+    put:
+      operationId: reorderQuestions
+      tags: [questions]
+      summary: Reorder questions in a form
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderInput"
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Question"
+
+  /forms/{formId}/questions/{questionId}:
+    put:
+      operationId: updateQuestion
+      tags: [questions]
+      summary: Update a question
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuestionInput"
+      responses:
+        "200":
+          description: Updated question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Question"
+    delete:
+      operationId: deleteQuestion
+      tags: [questions]
+      summary: Delete a question
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /forms/{formId}/register:
+    post:
+      operationId: submitRegistration
+      tags: [registrations]
+      summary: Submit a registration (public endpoint for embedded forms)
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrationInput"
+      responses:
+        "201":
+          description: Registration submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Registration"
+
+  /forms/{formId}/registrations:
+    get:
+      operationId: listRegistrations
+      tags: [registrations]
+      summary: List registrations for a form
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of registrations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Registration"
+
+  /registrations/{registrationId}:
+    get:
+      operationId: getRegistration
+      tags: [registrations]
+      summary: Get a registration with answers
+      parameters:
+        - name: registrationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Registration with answers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationDetail"
+
+  /children:
+    get:
+      operationId: listChildren
+      tags: [children]
+      summary: List all children
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of children
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Child"
+
+  /children/{childId}:
+    get:
+      operationId: getChild
+      tags: [children]
+      summary: Get a child record
+      parameters:
+        - name: childId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Child record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Child"
+
+  /checkins:
+    get:
+      operationId: listCheckins
+      tags: [checkins]
+      summary: List today's check-ins
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of check-ins
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CheckIn"
+    post:
+      operationId: createCheckin
+      tags: [checkins]
+      summary: Check in a child
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckInInput"
+      responses:
+        "201":
+          description: Check-in record with label data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckInWithLabel"
+
+  /checkins/{checkinId}/checkout:
+    put:
+      operationId: checkoutChild
+      tags: [checkins]
+      summary: Check out a child
+      parameters:
+        - name: checkinId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated check-in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckIn"
+
+  /stats/dashboard:
+    get:
+      operationId: getDashboardStats
+      tags: [stats]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /stats/checkins-by-day:
+    get:
+      operationId: getCheckinsByDay
+      tags: [stats]
+      summary: Get check-in counts by day (last 30 days)
+      responses:
+        "200":
+          description: Check-ins per day
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DayCount"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +474,394 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    Organization:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        logoUrl:
+          type: ["string", "null"]
+        primaryColor:
+          type: string
+        headerText:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+
+    OrganizationInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        logoUrl:
+          type: string
+        primaryColor:
+          type: string
+        headerText:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        website:
+          type: string
+
+    Form:
+      type: object
+      required: [id, title, isActive, isPublic]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        isPublic:
+          type: boolean
+        embedSlug:
+          type: string
+        submissionCount:
+          type: integer
+        createdAt:
+          type: string
+
+    FormInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+        isPublic:
+          type: boolean
+
+    FormWithQuestions:
+      type: object
+      required: [id, title, isActive, isPublic, questions]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        isPublic:
+          type: boolean
+        embedSlug:
+          type: string
+        submissionCount:
+          type: integer
+        createdAt:
+          type: string
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+
+    Question:
+      type: object
+      required: [id, formId, label, type, required, order]
+      properties:
+        id:
+          type: integer
+        formId:
+          type: integer
+        label:
+          type: string
+        type:
+          type: string
+          enum: [text, textarea, select, multiselect, checkbox, date, phone, email, number]
+        required:
+          type: boolean
+        order:
+          type: integer
+        placeholder:
+          type: ["string", "null"]
+        options:
+          type: ["string", "null"]
+        isChildField:
+          type: boolean
+        fieldKey:
+          type: ["string", "null"]
+
+    QuestionInput:
+      type: object
+      required: [label, type, required, order]
+      properties:
+        label:
+          type: string
+        type:
+          type: string
+          enum: [text, textarea, select, multiselect, checkbox, date, phone, email, number]
+        required:
+          type: boolean
+        order:
+          type: integer
+        placeholder:
+          type: string
+        options:
+          type: string
+        isChildField:
+          type: boolean
+        fieldKey:
+          type: string
+
+    ReorderInput:
+      type: object
+      required: [questionIds]
+      properties:
+        questionIds:
+          type: array
+          items:
+            type: integer
+
+    Registration:
+      type: object
+      required: [id, formId, childFirstName, childLastName, createdAt]
+      properties:
+        id:
+          type: integer
+        formId:
+          type: integer
+        childFirstName:
+          type: string
+        childLastName:
+          type: string
+        childDateOfBirth:
+          type: ["string", "null"]
+        guardianName:
+          type: string
+        guardianPhone:
+          type: string
+        guardianEmail:
+          type: ["string", "null"]
+        allergies:
+          type: ["string", "null"]
+        specialNeeds:
+          type: ["string", "null"]
+        room:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    RegistrationDetail:
+      type: object
+      required: [id, formId, childFirstName, childLastName, createdAt, answers]
+      properties:
+        id:
+          type: integer
+        formId:
+          type: integer
+        childFirstName:
+          type: string
+        childLastName:
+          type: string
+        childDateOfBirth:
+          type: ["string", "null"]
+        guardianName:
+          type: string
+        guardianPhone:
+          type: string
+        guardianEmail:
+          type: ["string", "null"]
+        allergies:
+          type: ["string", "null"]
+        specialNeeds:
+          type: ["string", "null"]
+        room:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Answer"
+
+    RegistrationInput:
+      type: object
+      required: [childFirstName, childLastName, guardianName, guardianPhone, answers]
+      properties:
+        childFirstName:
+          type: string
+        childLastName:
+          type: string
+        childDateOfBirth:
+          type: string
+        guardianName:
+          type: string
+        guardianPhone:
+          type: string
+        guardianEmail:
+          type: string
+        allergies:
+          type: string
+        specialNeeds:
+          type: string
+        room:
+          type: string
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnswerInput"
+
+    Answer:
+      type: object
+      required: [id, questionId, questionLabel, value]
+      properties:
+        id:
+          type: integer
+        questionId:
+          type: integer
+        questionLabel:
+          type: string
+        value:
+          type: string
+
+    AnswerInput:
+      type: object
+      required: [questionId, value]
+      properties:
+        questionId:
+          type: integer
+        value:
+          type: string
+
+    Child:
+      type: object
+      required: [id, firstName, lastName]
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        dateOfBirth:
+          type: ["string", "null"]
+        guardianName:
+          type: string
+        guardianPhone:
+          type: string
+        guardianEmail:
+          type: ["string", "null"]
+        allergies:
+          type: ["string", "null"]
+        specialNeeds:
+          type: ["string", "null"]
+        room:
+          type: ["string", "null"]
+        lastCheckinAt:
+          type: ["string", "null"]
+        registrationId:
+          type: integer
+
+    CheckIn:
+      type: object
+      required: [id, childId, childFirstName, childLastName, checkinAt]
+      properties:
+        id:
+          type: integer
+        childId:
+          type: integer
+        childFirstName:
+          type: string
+        childLastName:
+          type: string
+        guardianName:
+          type: string
+        checkinAt:
+          type: string
+        checkoutAt:
+          type: ["string", "null"]
+        room:
+          type: ["string", "null"]
+        labelCode:
+          type: string
+        labelPrinted:
+          type: boolean
+
+    CheckInInput:
+      type: object
+      required: [registrationId]
+      properties:
+        registrationId:
+          type: integer
+        room:
+          type: string
+
+    CheckInWithLabel:
+      type: object
+      required: [checkin, labelData]
+      properties:
+        checkin:
+          $ref: "#/components/schemas/CheckIn"
+        labelData:
+          $ref: "#/components/schemas/LabelData"
+
+    LabelData:
+      type: object
+      required: [childName, labelCode, checkinDate]
+      properties:
+        childName:
+          type: string
+        guardianName:
+          type: string
+        labelCode:
+          type: string
+        checkinDate:
+          type: string
+        room:
+          type: ["string", "null"]
+        allergies:
+          type: ["string", "null"]
+        specialNeeds:
+          type: ["string", "null"]
+        organizationName:
+          type: string
+
+    DashboardStats:
+      type: object
+      required: [totalChildren, totalForms, totalRegistrations, checkedInToday, totalCheckins]
+      properties:
+        totalChildren:
+          type: integer
+        totalForms:
+          type: integer
+        totalRegistrations:
+          type: integer
+        checkedInToday:
+          type: integer
+        totalCheckins:
+          type: integer
+        recentRegistrations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Registration"
+
+    DayCount:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+        count:
+          type: integer
