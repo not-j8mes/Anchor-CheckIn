@@ -7,6 +7,8 @@ import { AppLayout } from "@/components/layout/AppLayout";
 
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
+import EventsPage from "@/pages/events";
+import EventDetail from "@/pages/events/detail";
 import FormsList from "@/pages/forms";
 import FormBuilder from "@/pages/forms/builder";
 import FormRegistrations from "@/pages/forms/registrations";
@@ -23,11 +25,17 @@ function Router() {
     <Switch>
       {/* Public Routes without sidebar */}
       <Route path="/register/:embedSlug" component={PublicRegistrationForm} />
-      
+
       {/* Kiosk Mode (clean layout, no sidebar) */}
       <Route path="/checkin" component={CheckinKiosk} />
 
       {/* Admin Routes with Sidebar */}
+      <Route path="/events/:id">
+        <AppLayout><EventDetail /></AppLayout>
+      </Route>
+      <Route path="/events">
+        <AppLayout><EventsPage /></AppLayout>
+      </Route>
       <Route path="/forms/:id/builder">
         <AppLayout><FormBuilder /></AppLayout>
       </Route>

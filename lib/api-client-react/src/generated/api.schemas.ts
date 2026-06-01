@@ -269,6 +269,70 @@ export interface DayCount {
   count: number;
 }
 
+export interface Event {
+  id: number;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  eventType: string;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+  status: string;
+  /** @nullable */
+  formId?: number | null;
+  /** @nullable */
+  formTitle?: string | null;
+  /** @nullable */
+  formEmbedSlug?: string | null;
+  registrationCount: number;
+  createdAt: string;
+}
+
+export interface EventWithForm {
+  id: number;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  eventType: string;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  endDate?: string | null;
+  status: string;
+  /** @nullable */
+  formId?: number | null;
+  /** @nullable */
+  formTitle?: string | null;
+  /** @nullable */
+  formEmbedSlug?: string | null;
+  registrationCount: number;
+  createdAt: string;
+  form?: FormWithQuestions | null;
+}
+
+export interface CreateEventInput {
+  name: string;
+  description?: string;
+  eventType: string;
+  startDate?: string;
+  endDate?: string;
+  status?: string;
+  formTitle: string;
+  formDescription?: string;
+  addDefaultQuestions?: boolean;
+}
+
+export interface UpdateEventInput {
+  name?: string;
+  description?: string;
+  eventType?: string;
+  startDate?: string;
+  endDate?: string;
+  status?: string;
+}
+
 export type ListChildrenParams = {
 search?: string;
 };

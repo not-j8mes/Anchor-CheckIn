@@ -103,6 +103,95 @@ paths:
               schema:
                 $ref: "#/components/schemas/Form"
 
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List all events
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create an event and its linked registration form
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventInput"
+      responses:
+        "201":
+          description: Created event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventWithForm"
+
+  /events/{eventId}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get an event with its linked form
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event with form
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventWithForm"
+        "404":
+          description: Not found
+    put:
+      operationId: updateEvent
+      tags: [events]
+      summary: Update an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEventInput"
+      responses:
+        "200":
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+    delete:
+      operationId: deleteEvent
+      tags: [events]
+      summary: Delete an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /forms/by-slug/{embedSlug}:
     get:
       operationId: getFormBySlug
@@ -886,3 +975,104 @@ components:
           type: string
         count:
           type: integer
+
+    Event:
+      type: object
+      required: [id, name, eventType, status, createdAt, registrationCount]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        eventType:
+          type: string
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        status:
+          type: string
+        formId:
+          type: ["integer", "null"]
+        formTitle:
+          type: ["string", "null"]
+        formEmbedSlug:
+          type: ["string", "null"]
+        registrationCount:
+          type: integer
+        createdAt:
+          type: string
+
+    EventWithForm:
+      type: object
+      required: [id, name, eventType, status, createdAt, registrationCount]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        eventType:
+          type: string
+        startDate:
+          type: ["string", "null"]
+        endDate:
+          type: ["string", "null"]
+        status:
+          type: string
+        formId:
+          type: ["integer", "null"]
+        formTitle:
+          type: ["string", "null"]
+        formEmbedSlug:
+          type: ["string", "null"]
+        registrationCount:
+          type: integer
+        createdAt:
+          type: string
+        form:
+          oneOf:
+            - $ref: "#/components/schemas/FormWithQuestions"
+            - type: "null"
+
+    CreateEventInput:
+      type: object
+      required: [name, eventType, formTitle]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        eventType:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        status:
+          type: string
+        formTitle:
+          type: string
+        formDescription:
+          type: string
+        addDefaultQuestions:
+          type: boolean
+
+    UpdateEventInput:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        eventType:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+        status:
+          type: string

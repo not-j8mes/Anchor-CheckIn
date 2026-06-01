@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   useListChildren,
   useCreateCheckin,
+  getListChildrenQueryKey,
   LabelData,
   Child,
 } from "@workspace/api-client-react";
@@ -158,9 +159,10 @@ export default function CheckinKiosk() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const childrenParams = { search: debouncedSearch || undefined };
   const { data: children, isLoading: searching } = useListChildren(
-    { search: debouncedSearch || undefined },
-    { query: { enabled: debouncedSearch.length > 1 } }
+    childrenParams,
+    { query: { enabled: debouncedSearch.length > 1, queryKey: getListChildrenQueryKey(childrenParams) } }
   );
 
   const { toast } = useToast();
@@ -184,7 +186,7 @@ export default function CheckinKiosk() {
       for (const child of selectedChildren) {
         const result = await createCheckin.mutateAsync({
           data: {
-            registrationId: child.registrationId,
+            registrationId: child.registrationId ?? child.id,
             room: child.room || undefined,
           },
         });

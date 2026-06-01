@@ -86,6 +86,127 @@ export const CreateFormBody = zod.object({
 
 
 /**
+ * @summary List all events
+ */
+export const ListEventsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "eventType": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "status": zod.string(),
+  "formId": zod.number().nullish(),
+  "formTitle": zod.string().nullish(),
+  "formEmbedSlug": zod.string().nullish(),
+  "registrationCount": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListEventsResponse = zod.array(ListEventsResponseItem)
+
+
+/**
+ * @summary Create an event and its linked registration form
+ */
+export const CreateEventBody = zod.object({
+  "name": zod.string(),
+  "description": zod.string().optional(),
+  "eventType": zod.string(),
+  "startDate": zod.string().optional(),
+  "endDate": zod.string().optional(),
+  "status": zod.string().optional(),
+  "formTitle": zod.string(),
+  "formDescription": zod.string().optional(),
+  "addDefaultQuestions": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Get an event with its linked form
+ */
+export const GetEventParams = zod.object({
+  "eventId": zod.coerce.number()
+})
+
+export const GetEventResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "eventType": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "status": zod.string(),
+  "formId": zod.number().nullish(),
+  "formTitle": zod.string().nullish(),
+  "formEmbedSlug": zod.string().nullish(),
+  "registrationCount": zod.number(),
+  "createdAt": zod.string(),
+  "form": zod.union([zod.object({
+  "id": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "isActive": zod.boolean(),
+  "isPublic": zod.boolean(),
+  "embedSlug": zod.string().optional(),
+  "submissionCount": zod.number().optional(),
+  "createdAt": zod.string().optional(),
+  "questions": zod.array(zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "label": zod.string(),
+  "type": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']),
+  "required": zod.boolean(),
+  "order": zod.number(),
+  "placeholder": zod.string().nullish(),
+  "options": zod.string().nullish(),
+  "isChildField": zod.boolean().optional(),
+  "fieldKey": zod.string().nullish()
+}))
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Update an event
+ */
+export const UpdateEventParams = zod.object({
+  "eventId": zod.coerce.number()
+})
+
+export const UpdateEventBody = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().optional(),
+  "eventType": zod.string().optional(),
+  "startDate": zod.string().optional(),
+  "endDate": zod.string().optional(),
+  "status": zod.string().optional()
+})
+
+export const UpdateEventResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "eventType": zod.string(),
+  "startDate": zod.string().nullish(),
+  "endDate": zod.string().nullish(),
+  "status": zod.string(),
+  "formId": zod.number().nullish(),
+  "formTitle": zod.string().nullish(),
+  "formEmbedSlug": zod.string().nullish(),
+  "registrationCount": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete an event
+ */
+export const DeleteEventParams = zod.object({
+  "eventId": zod.coerce.number()
+})
+
+
+/**
  * @summary Get a public form by its embed slug (no auth required)
  */
 export const GetFormBySlugParams = zod.object({

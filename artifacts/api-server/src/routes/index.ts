@@ -7,11 +7,13 @@ import registrationsRouter from "./registrations";
 import childrenRouter from "./children";
 import checkinsRouter from "./checkins";
 import statsRouter from "./stats";
+import eventsRouter from "./events";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(organizationsRouter);
+router.use(eventsRouter);
 router.use(formsRouter);
 router.use(questionsRouter);
 router.use(registrationsRouter);
