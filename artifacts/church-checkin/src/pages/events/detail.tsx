@@ -5,6 +5,8 @@ import {
   useListRegistrations,
   useListEventCheckins,
   useCheckoutChild,
+  useDeleteCheckin,
+  useUndoCheckout,
   getGetEventQueryKey,
   getListRegistrationsQueryKey,
   getListEventCheckinsQueryKey,
@@ -25,6 +27,7 @@ import {
   LogIn,
   LogOut,
   Loader2,
+  Undo2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -51,7 +54,10 @@ export default function EventDetail() {
   const eventId = parseInt(params.id || "0", 10);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [checkingOutId, setCheckingOutId] = useState<number | null>(null);
+  const [loadingId, setLoadingId] = useState<number | null>(null);
+
+  const invalidateCheckins = () =>
+    queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
 
   const { data: event, isLoading } = useGetEvent(eventId, {
     query: { enabled: !!eventId, queryKey: getGetEventQueryKey(eventId) },
@@ -66,15 +72,20 @@ export default function EventDetail() {
 
   const checkoutChild = useCheckoutChild({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
-        toast({ title: "Child checked out" });
-        setCheckingOutId(null);
-      },
-      onError: () => {
-        toast({ title: "Check-out failed", variant: "destructive" });
-        setCheckingOutId(null);
-      },
+      onSuccess: () => { invalidateCheckins(); toast({ title: "Child checked out" }); setLoadingId(null); },
+      onError: () => { toast({ title: "Check-out failed", variant: "destructive" }); setLoadingId(null); },
+    },
+  });
+  const deleteCheckin = useDeleteCheckin({
+    mutation: {
+      onSuccess: () => { invalidateCheckins(); toast({ title: "Check-in removed" }); setLoadingId(null); },
+      onError: () => { toast({ title: "Could not undo check-in", variant: "destructive" }); setLoadingId(null); },
+    },
+  });
+  const undoCheckout = useUndoCheckout({
+    mutation: {
+      onSuccess: () => { invalidateCheckins(); toast({ title: "Check-out reversed — child is checked in again" }); setLoadingId(null); },
+      onError: () => { toast({ title: "Could not undo check-out", variant: "destructive" }); setLoadingId(null); },
     },
   });
 
@@ -101,9 +112,7 @@ export default function EventDetail() {
     return (
       <div className="p-10 text-center">
         <p className="text-muted-foreground">Event not found.</p>
-        <Button asChild variant="link" className="mt-2">
-          <Link href="/events">Back to Events</Link>
-        </Button>
+        <Button asChild variant="link" className="mt-2"><Link href="/events">Back to Events</Link></Button>
       </div>
     );
   }
@@ -182,7 +191,7 @@ export default function EventDetail() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Tabs — main content */}
+        {/* Tabs */}
         <div className="md:col-span-2">
           <Tabs defaultValue="registrations">
             <TabsList className="w-full grid grid-cols-3 mb-4">
@@ -203,7 +212,7 @@ export default function EventDetail() {
               </TabsTrigger>
             </TabsList>
 
-            {/* ── Registrations tab ── */}
+            {/* ── Registrations ── */}
             <TabsContent value="registrations">
               <Card>
                 <CardContent className="p-0">
@@ -226,7 +235,7 @@ export default function EventDetail() {
                   ) : (
                     <div className="divide-y divide-border">
                       {registrations.map((reg) => (
-                        <div key={reg.id} className="px-5 py-3 flex items-center justify-between gap-4" data-testid={`reg-row-${reg.id}`}>
+                        <div key={reg.id} className="px-5 py-3 flex items-center justify-between gap-4">
                           <div>
                             <p className="font-medium">{reg.childFirstName} {reg.childLastName}</p>
                             <p className="text-sm text-muted-foreground">{reg.guardianName} · {reg.guardianPhone}</p>
@@ -243,7 +252,7 @@ export default function EventDetail() {
               </Card>
             </TabsContent>
 
-            {/* ── Checked In tab ── */}
+            {/* ── Checked In ── */}
             <TabsContent value="checked-in">
               <Card>
                 <CardContent className="p-0">
@@ -265,27 +274,27 @@ export default function EventDetail() {
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="text-right">
                               <p className="font-mono font-bold text-sm text-green-700 bg-green-50 px-2 py-0.5 rounded">{c.labelCode}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {format(new Date(c.checkinAt), "h:mm a")}
-                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(c.checkinAt), "h:mm a")}</p>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
-                              disabled={checkingOutId === c.id}
-                              onClick={() => {
-                                setCheckingOutId(c.id);
-                                checkoutChild.mutate({ checkinId: c.id });
-                              }}
-                            >
-                              {checkingOutId === c.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <LogOut className="w-3.5 h-3.5" />
-                              )}
-                              Check Out
-                            </Button>
+                            <div className="flex flex-col gap-1 items-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
+                                disabled={loadingId === c.id}
+                                onClick={() => { setLoadingId(c.id); checkoutChild.mutate({ checkinId: c.id }); }}
+                              >
+                                {loadingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                                Check Out
+                              </Button>
+                              <button
+                                type="button"
+                                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+                                onClick={() => { setLoadingId(c.id); deleteCheckin.mutate({ checkinId: c.id }); }}
+                              >
+                                <Undo2 className="w-3 h-3" /> Undo check-in
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -295,7 +304,7 @@ export default function EventDetail() {
               </Card>
             </TabsContent>
 
-            {/* ── Checked Out tab ── */}
+            {/* ── Checked Out ── */}
             <TabsContent value="checked-out">
               <Card>
                 <CardContent className="p-0">
@@ -314,11 +323,27 @@ export default function EventDetail() {
                             <p className="font-medium">{c.childFirstName} {c.childLastName}</p>
                             <p className="text-sm text-muted-foreground">{c.guardianName}{c.room ? ` · ${c.room}` : ""}</p>
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="font-mono text-sm text-muted-foreground">{c.labelCode}</p>
-                            <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
-                              <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
-                              {c.checkoutAt && <p className="text-amber-700 font-medium">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className="text-right">
+                              <p className="font-mono text-xs text-muted-foreground">{c.labelCode}</p>
+                              <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
+                                <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
+                                {c.checkoutAt && (
+                                  <p className="text-amber-700 font-medium">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1 items-end">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1 text-muted-foreground hover:text-primary hover:border-primary"
+                                disabled={loadingId === c.id}
+                                onClick={() => { setLoadingId(c.id); undoCheckout.mutate({ checkinId: c.id }); }}
+                              >
+                                {loadingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Undo2 className="w-3.5 h-3.5" />}
+                                Undo Checkout
+                              </Button>
                             </div>
                           </div>
                         </div>

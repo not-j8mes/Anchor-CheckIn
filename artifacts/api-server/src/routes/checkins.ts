@@ -177,6 +177,35 @@ router.post("/checkins", async (req, res) => {
   }
 });
 
+router.delete("/checkins/:checkinId", async (req, res) => {
+  const checkinId = parseInt(req.params.checkinId, 10);
+  if (isNaN(checkinId)) { res.status(400).json({ error: "Invalid checkinId" }); return; }
+  try {
+    await db.delete(checkinsTable).where(eq(checkinsTable.id, checkinId));
+    res.status(204).send();
+  } catch (err) {
+    req.log.error({ err }, "Failed to delete checkin");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.put("/checkins/:checkinId/undo-checkout", async (req, res) => {
+  const checkinId = parseInt(req.params.checkinId, 10);
+  if (isNaN(checkinId)) { res.status(400).json({ error: "Invalid checkinId" }); return; }
+  try {
+    const [updated] = await db
+      .update(checkinsTable)
+      .set({ checkoutAt: null })
+      .where(eq(checkinsTable.id, checkinId))
+      .returning();
+    if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+    res.json(serializeCheckin(updated));
+  } catch (err) {
+    req.log.error({ err }, "Failed to undo checkout");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.put("/checkins/:checkinId/checkout", async (req, res) => {
   const { checkinId: checkinIdStr } = CheckoutChildParams.parse(req.params);
   const checkinId = Number(checkinIdStr);

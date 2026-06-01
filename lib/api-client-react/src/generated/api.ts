@@ -2154,6 +2154,76 @@ export const useCreateCheckin = <TError = ErrorType<unknown>,
       return useMutation(getCreateCheckinMutationOptions(options));
     }
 
+export const getDeleteCheckinUrl = (checkinId: number,) => {
+
+
+
+
+  return `/api/checkins/${checkinId}`
+}
+
+/**
+ * @summary Delete a check-in record (undo an accidental check-in)
+ */
+export const deleteCheckin = async (checkinId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteCheckinUrl(checkinId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCheckinMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCheckin>>, TError,{checkinId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCheckin>>, TError,{checkinId: number}, TContext> => {
+
+const mutationKey = ['deleteCheckin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCheckin>>, {checkinId: number}> = (props) => {
+          const {checkinId} = props ?? {};
+
+          return  deleteCheckin(checkinId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCheckinMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCheckin>>>
+
+    export type DeleteCheckinMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a check-in record (undo an accidental check-in)
+ */
+export const useDeleteCheckin = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCheckin>>, TError,{checkinId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCheckin>>,
+        TError,
+        {checkinId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteCheckinMutationOptions(options));
+    }
+
 export const getCheckoutChildUrl = (checkinId: number,) => {
 
 
@@ -2222,6 +2292,76 @@ export const useCheckoutChild = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCheckoutChildMutationOptions(options));
+    }
+
+export const getUndoCheckoutUrl = (checkinId: number,) => {
+
+
+
+
+  return `/api/checkins/${checkinId}/undo-checkout`
+}
+
+/**
+ * @summary Undo a check-out (clear checkoutAt, restoring child to checked-in state)
+ */
+export const undoCheckout = async (checkinId: number, options?: RequestInit): Promise<CheckIn> => {
+
+  return customFetch<CheckIn>(getUndoCheckoutUrl(checkinId),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getUndoCheckoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoCheckout>>, TError,{checkinId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof undoCheckout>>, TError,{checkinId: number}, TContext> => {
+
+const mutationKey = ['undoCheckout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof undoCheckout>>, {checkinId: number}> = (props) => {
+          const {checkinId} = props ?? {};
+
+          return  undoCheckout(checkinId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UndoCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof undoCheckout>>>
+
+    export type UndoCheckoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Undo a check-out (clear checkoutAt, restoring child to checked-in state)
+ */
+export const useUndoCheckout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof undoCheckout>>, TError,{checkinId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof undoCheckout>>,
+        TError,
+        {checkinId: number},
+        TContext
+      > => {
+      return useMutation(getUndoCheckoutMutationOptions(options));
     }
 
 export const getGetDashboardStatsUrl = () => {

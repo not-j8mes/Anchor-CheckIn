@@ -213,7 +213,18 @@ router.delete("/events/:eventId", async (req, res) => {
     return;
   }
   try {
+    // Get the linked formId before deleting the event
+    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    const formId = event?.formId ?? null;
+
+    // Delete the event first (removes FK reference to form)
     await db.delete(eventsTable).where(eq(eventsTable.id, eventId));
+
+    // Then delete the linked form — cascades to questions, registrations, answers, check-ins
+    if (formId) {
+      await db.delete(formsTable).where(eq(formsTable.id, formId));
+    }
+
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete event");

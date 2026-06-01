@@ -574,11 +574,45 @@ paths:
               schema:
                 $ref: "#/components/schemas/CheckInWithLabel"
 
+  /checkins/{checkinId}:
+    delete:
+      operationId: deleteCheckin
+      tags: [checkins]
+      summary: Delete a check-in record (undo an accidental check-in)
+      parameters:
+        - name: checkinId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /checkins/{checkinId}/checkout:
     put:
       operationId: checkoutChild
       tags: [checkins]
       summary: Check out a child
+      parameters:
+        - name: checkinId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated check-in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckIn"
+
+  /checkins/{checkinId}/undo-checkout:
+    put:
+      operationId: undoCheckout
+      tags: [checkins]
+      summary: Undo a check-out (clear checkoutAt, restoring child to checked-in state)
       parameters:
         - name: checkinId
           in: path

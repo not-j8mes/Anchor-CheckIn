@@ -606,6 +606,14 @@ export const CreateCheckinBody = zod.object({
 
 
 /**
+ * @summary Delete a check-in record (undo an accidental check-in)
+ */
+export const DeleteCheckinParams = zod.object({
+  "checkinId": zod.coerce.number()
+})
+
+
+/**
  * @summary Check out a child
  */
 export const CheckoutChildParams = zod.object({
@@ -613,6 +621,27 @@ export const CheckoutChildParams = zod.object({
 })
 
 export const CheckoutChildResponse = zod.object({
+  "id": zod.number(),
+  "childId": zod.number(),
+  "childFirstName": zod.string(),
+  "childLastName": zod.string(),
+  "guardianName": zod.string().optional(),
+  "checkinAt": zod.string(),
+  "checkoutAt": zod.string().nullish(),
+  "room": zod.string().nullish(),
+  "labelCode": zod.string().optional(),
+  "labelPrinted": zod.boolean().optional()
+})
+
+
+/**
+ * @summary Undo a check-out (clear checkoutAt, restoring child to checked-in state)
+ */
+export const UndoCheckoutParams = zod.object({
+  "checkinId": zod.coerce.number()
+})
+
+export const UndoCheckoutResponse = zod.object({
   "id": zod.number(),
   "childId": zod.number(),
   "childFirstName": zod.string(),
