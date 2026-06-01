@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type ListCheckinsParams = {
-date?: string;
-formId?: number;
+export type BatchCheckinInputItemsItem = {
+  registrationId: number;
+  room?: string;
 };

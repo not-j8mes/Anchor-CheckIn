@@ -1,10 +1,46 @@
 import { Router } from "express";
-import { eq, ilike, or, desc } from "drizzle-orm";
+import { eq, desc, isNull } from "drizzle-orm";
 import { db, registrationsTable, checkinsTable } from "@workspace/db";
 import { GetChildParams } from "@workspace/api-zod";
-import { sql } from "drizzle-orm";
 
 const router = Router();
+
+async function buildChild(reg: typeof registrationsTable.$inferSelect) {
+  const lastCheckin = await db
+    .select()
+    .from(checkinsTable)
+    .where(eq(checkinsTable.registrationId, reg.id))
+    .orderBy(desc(checkinsTable.checkinAt))
+    .limit(1);
+
+  const activeCheckin = await db
+    .select()
+    .from(checkinsTable)
+    .where(eq(checkinsTable.registrationId, reg.id))
+    .orderBy(desc(checkinsTable.checkinAt))
+    .limit(10);
+
+  // Find a checkin with no checkout (currently checked in)
+  const active = activeCheckin.find((c) => c.checkoutAt === null) ?? null;
+
+  return {
+    id: reg.id,
+    firstName: reg.childFirstName,
+    lastName: reg.childLastName,
+    dateOfBirth: reg.childDateOfBirth,
+    guardianName: reg.guardianName,
+    guardianPhone: reg.guardianPhone,
+    guardianEmail: reg.guardianEmail,
+    allergies: reg.allergies,
+    specialNeeds: reg.specialNeeds,
+    room: reg.room,
+    lastCheckinAt: lastCheckin[0]?.checkinAt?.toISOString() ?? null,
+    registrationId: reg.id,
+    isCheckedIn: active !== null,
+    checkinId: active?.id ?? null,
+    activeCheckinLabelCode: active?.labelCode ?? null,
+  };
+}
 
 router.get("/children", async (req, res) => {
   const search = req.query.search as string | undefined;
@@ -14,31 +50,7 @@ router.get("/children", async (req, res) => {
       .from(registrationsTable)
       .orderBy(desc(registrationsTable.createdAt));
 
-    const children = await Promise.all(
-      regs.map(async (reg) => {
-        const lastCheckin = await db
-          .select({ checkinAt: checkinsTable.checkinAt })
-          .from(checkinsTable)
-          .where(eq(checkinsTable.registrationId, reg.id))
-          .orderBy(desc(checkinsTable.checkinAt))
-          .limit(1);
-
-        return {
-          id: reg.id,
-          firstName: reg.childFirstName,
-          lastName: reg.childLastName,
-          dateOfBirth: reg.childDateOfBirth,
-          guardianName: reg.guardianName,
-          guardianPhone: reg.guardianPhone,
-          guardianEmail: reg.guardianEmail,
-          allergies: reg.allergies,
-          specialNeeds: reg.specialNeeds,
-          room: reg.room,
-          lastCheckinAt: lastCheckin[0]?.checkinAt?.toISOString() ?? null,
-          registrationId: reg.id,
-        };
-      })
-    );
+    const children = await Promise.all(regs.map(buildChild));
 
     if (search) {
       const lower = search.toLowerCase();
@@ -46,7 +58,8 @@ router.get("/children", async (req, res) => {
         (c) =>
           c.firstName.toLowerCase().includes(lower) ||
           c.lastName.toLowerCase().includes(lower) ||
-          c.guardianName.toLowerCase().includes(lower)
+          c.guardianName.toLowerCase().includes(lower) ||
+          (c.guardianPhone && c.guardianPhone.replace(/\D/g, "").includes(lower.replace(/\D/g, "")))
       );
       res.json(filtered);
       return;
@@ -72,28 +85,7 @@ router.get("/children/:childId", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const r = reg[0];
-    const lastCheckin = await db
-      .select({ checkinAt: checkinsTable.checkinAt })
-      .from(checkinsTable)
-      .where(eq(checkinsTable.registrationId, r.id))
-      .orderBy(desc(checkinsTable.checkinAt))
-      .limit(1);
-
-    res.json({
-      id: r.id,
-      firstName: r.childFirstName,
-      lastName: r.childLastName,
-      dateOfBirth: r.childDateOfBirth,
-      guardianName: r.guardianName,
-      guardianPhone: r.guardianPhone,
-      guardianEmail: r.guardianEmail,
-      allergies: r.allergies,
-      specialNeeds: r.specialNeeds,
-      room: r.room,
-      lastCheckinAt: lastCheckin[0]?.checkinAt?.toISOString() ?? null,
-      registrationId: r.id,
-    });
+    res.json(await buildChild(reg[0]));
   } catch (err) {
     req.log.error({ err }, "Failed to get child");
     res.status(500).json({ error: "Internal server error" });

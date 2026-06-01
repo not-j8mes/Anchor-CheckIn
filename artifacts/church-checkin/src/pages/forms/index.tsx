@@ -1,102 +1,28 @@
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { useListForms, useCreateForm, getListFormsQueryKey } from "@workspace/api-client-react";
+import { Link } from "wouter";
+import { useListForms } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { ClipboardList, Plus, Settings, Users, Code, Activity, Globe } from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
+import { ClipboardList, Settings, Users, Code, Globe, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 
 export default function FormsList() {
   const { data: forms, isLoading } = useListForms();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [_, setLocation] = useLocation();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const createForm = useCreateForm({
-    mutation: {
-      onSuccess: (newForm) => {
-        setIsCreateOpen(false);
-        queryClient.invalidateQueries({ queryKey: getListFormsQueryKey() });
-        toast({ title: "Form created successfully" });
-        setLocation(`/forms/${newForm.id}/builder`);
-      },
-      onError: () => {
-        toast({ title: "Failed to create form", variant: "destructive" });
-      }
-    }
-  });
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-    createForm.mutate({ data: { title, description, isActive: true, isPublic: true } });
-  };
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto w-full space-y-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold text-foreground">Forms</h1>
-          <p className="text-muted-foreground mt-1">Manage registration and event forms</p>
+          <p className="text-muted-foreground mt-1">
+            Registration forms are created automatically when you create a new event.
+          </p>
         </div>
-
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Form
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <form onSubmit={handleCreate}>
-              <DialogHeader>
-                <DialogTitle>Create New Form</DialogTitle>
-                <DialogDescription>
-                  Start a new registration form for Sunday school, VBS, or an event.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Form Title</Label>
-                  <Input 
-                    id="title" 
-                    value={title} 
-                    onChange={(e) => setTitle(e.target.value)} 
-                    placeholder="e.g. Vacation Bible School 2024"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description (optional)</Label>
-                  <Textarea 
-                    id="description" 
-                    value={description} 
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Provide some details about this registration..."
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={createForm.isPending}>
-                  {createForm.isPending ? "Creating..." : "Create Form"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button asChild variant="outline">
+          <Link href="/events">
+            <Calendar className="w-4 h-4 mr-2" /> Go to Events
+          </Link>
+        </Button>
       </div>
 
       {isLoading ? (
@@ -159,17 +85,22 @@ export default function FormsList() {
           ))}
         </div>
       ) : (
-        <EmptyState 
-          title="No forms created yet"
-          description="Create your first form to start collecting registrations for Sunday school, VBS, or other children's events."
-          icon={<ClipboardList className="w-8 h-8" />}
-          action={
-            <Button onClick={() => setIsCreateOpen(true)} className="mt-2">
-              <Plus className="w-4 h-4 mr-2" />
-              Create First Form
+        <Card className="border-dashed">
+          <CardContent className="py-20 flex flex-col items-center text-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <ClipboardList className="w-8 h-8 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-xl font-serif font-bold">No forms yet</h3>
+              <p className="text-muted-foreground mt-1 max-w-sm">
+                Forms are created automatically when you create an event. Head to Events to get started.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/events">Go to Events</Link>
             </Button>
-          }
-        />
+          </CardContent>
+        </Card>
       )}
     </div>
   );

@@ -122,6 +122,27 @@ export const CreateEventBody = zod.object({
 
 
 /**
+ * @summary List all check-ins for an event
+ */
+export const ListEventCheckinsParams = zod.object({
+  "eventId": zod.coerce.number()
+})
+
+export const ListEventCheckinsResponseItem = zod.object({
+  "id": zod.number(),
+  "registrationId": zod.number(),
+  "childFirstName": zod.string(),
+  "childLastName": zod.string(),
+  "guardianName": zod.string(),
+  "room": zod.string().nullish(),
+  "labelCode": zod.string(),
+  "checkinAt": zod.string(),
+  "checkoutAt": zod.string().nullish()
+})
+export const ListEventCheckinsResponse = zod.array(ListEventCheckinsResponseItem)
+
+
+/**
  * @summary Get an event with its linked form
  */
 export const GetEventParams = zod.object({
@@ -507,7 +528,10 @@ export const ListChildrenResponseItem = zod.object({
   "specialNeeds": zod.string().nullish(),
   "room": zod.string().nullish(),
   "lastCheckinAt": zod.string().nullish(),
-  "registrationId": zod.number().optional()
+  "registrationId": zod.number().optional(),
+  "isCheckedIn": zod.boolean().optional(),
+  "checkinId": zod.number().nullish(),
+  "activeCheckinLabelCode": zod.string().nullish()
 })
 export const ListChildrenResponse = zod.array(ListChildrenResponseItem)
 
@@ -531,7 +555,21 @@ export const GetChildResponse = zod.object({
   "specialNeeds": zod.string().nullish(),
   "room": zod.string().nullish(),
   "lastCheckinAt": zod.string().nullish(),
-  "registrationId": zod.number().optional()
+  "registrationId": zod.number().optional(),
+  "isCheckedIn": zod.boolean().optional(),
+  "checkinId": zod.number().nullish(),
+  "activeCheckinLabelCode": zod.string().nullish()
+})
+
+
+/**
+ * @summary Check in multiple children with a shared family security code
+ */
+export const BatchCheckinBody = zod.object({
+  "items": zod.array(zod.object({
+  "registrationId": zod.number(),
+  "room": zod.string().optional()
+}))
 })
 
 
@@ -539,7 +577,8 @@ export const GetChildResponse = zod.object({
  * @summary List today's check-ins
  */
 export const ListCheckinsQueryParams = zod.object({
-  "date": zod.coerce.string().optional()
+  "date": zod.coerce.string().optional(),
+  "formId": zod.coerce.number().optional()
 })
 
 export const ListCheckinsResponseItem = zod.object({

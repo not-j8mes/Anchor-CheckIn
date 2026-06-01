@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import {
   useListChildren,
-  useCreateCheckin,
+  useBatchCheckin,
+  useCheckoutChild,
   getListChildrenQueryKey,
   LabelData,
   Child,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,11 +20,12 @@ import {
   UserCheck,
   Loader2,
   CheckCheck,
+  LogOut,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
 
-/** Group children by guardian name, returning an array of family groups */
+/** Group children by guardian name */
 function groupByFamily(children: Child[]): Array<{ guardian: string; children: Child[] }> {
   const map = new Map<string, Child[]>();
   for (const child of children) {
@@ -37,12 +40,17 @@ interface FamilyCardProps {
   guardian: string;
   children: Child[];
   onCheckinFamily: (selected: Child[]) => void;
-  isLoading: boolean;
+  onCheckoutChild: (child: Child) => void;
+  isCheckingIn: boolean;
+  checkingOutId: number | null;
 }
 
-function FamilyCard({ guardian, children, onCheckinFamily, isLoading }: FamilyCardProps) {
+function FamilyCard({ guardian, children, onCheckinFamily, onCheckoutChild, isCheckingIn, checkingOutId }: FamilyCardProps) {
+  const notCheckedIn = children.filter((c) => !c.isCheckedIn);
+  const alreadyCheckedIn = children.filter((c) => c.isCheckedIn);
+
   const [selected, setSelected] = useState<Set<number>>(
-    new Set(children.map((c) => c.id))
+    new Set(notCheckedIn.map((c) => c.id))
   );
 
   const toggleChild = (id: number) => {
@@ -54,16 +62,15 @@ function FamilyCard({ guardian, children, onCheckinFamily, isLoading }: FamilyCa
   };
 
   const toggleAll = () => {
-    if (selected.size === children.length) {
+    if (selected.size === notCheckedIn.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(children.map((c) => c.id)));
+      setSelected(new Set(notCheckedIn.map((c) => c.id)));
     }
   };
 
-  const selectedChildren = children.filter((c) => selected.has(c.id));
-  const allChecked = selected.size === children.length;
-  const noneChecked = selected.size === 0;
+  const selectedChildren = notCheckedIn.filter((c) => selected.has(c.id));
+  const allChecked = selected.size === notCheckedIn.length && notCheckedIn.length > 0;
 
   return (
     <Card className="overflow-hidden border-primary/20 shadow-md" data-testid={`family-card-${guardian}`}>
@@ -76,20 +83,56 @@ function FamilyCard({ guardian, children, onCheckinFamily, isLoading }: FamilyCa
             {children.length} {children.length === 1 ? "child" : "children"}
           </Badge>
         </div>
-        {children.length > 1 && (
-          <button
-            type="button"
-            onClick={toggleAll}
-            className="text-xs text-primary hover:underline font-medium"
-          >
+        {notCheckedIn.length > 1 && (
+          <button type="button" onClick={toggleAll} className="text-xs text-primary hover:underline font-medium">
             {allChecked ? "Deselect all" : "Select all"}
           </button>
         )}
       </div>
 
-      {/* Children list */}
       <CardContent className="p-0 divide-y divide-border">
-        {children.map((child) => {
+        {/* Children already checked in */}
+        {alreadyCheckedIn.map((child) => (
+          <div
+            key={child.id}
+            className="flex items-center gap-4 px-5 py-4 bg-green-50/50"
+            data-testid={`child-row-${child.id}`}
+          >
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center font-serif font-bold text-green-700 text-sm flex-shrink-0">
+              {child.firstName[0]}{child.lastName[0]}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-base flex items-center gap-2">
+                {child.firstName} {child.lastName}
+                <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
+              </div>
+              <div className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap">
+                {child.room && <span>{child.room}</span>}
+                {child.activeCheckinLabelCode && (
+                  <span className="font-mono font-bold text-green-700">Code: {child.activeCheckinLabelCode}</span>
+                )}
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-muted-foreground hover:text-destructive hover:border-destructive flex-shrink-0 gap-1"
+              disabled={checkingOutId === child.checkinId}
+              onClick={() => onCheckoutChild(child)}
+              data-testid={`button-checkout-${child.id}`}
+            >
+              {checkingOutId === child.checkinId ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <LogOut className="w-3.5 h-3.5" />
+              )}
+              Check Out
+            </Button>
+          </div>
+        ))}
+
+        {/* Children not yet checked in */}
+        {notCheckedIn.map((child) => {
           const isChecked = selected.has(child.id);
           return (
             <div
@@ -123,33 +166,33 @@ function FamilyCard({ guardian, children, onCheckinFamily, isLoading }: FamilyCa
                   )}
                 </div>
               </div>
-              {isChecked && (
-                <UserCheck className="w-4 h-4 text-primary flex-shrink-0" />
-              )}
+              {isChecked && <UserCheck className="w-4 h-4 text-primary flex-shrink-0" />}
             </div>
           );
         })}
       </CardContent>
 
-      {/* Check-in button */}
-      <div className="px-5 py-4 border-t border-border bg-background">
-        <Button
-          className="w-full h-12 text-base font-bold gap-2"
-          disabled={noneChecked || isLoading}
-          onClick={() => onCheckinFamily(selectedChildren)}
-          data-testid={`button-checkin-family-${guardian}`}
-        >
-          {isLoading ? (
-            <><Loader2 className="w-4 h-4 animate-spin" /> Checking in...</>
-          ) : (
-            <><CheckCheck className="w-5 h-5" />
-              Check In {selectedChildren.length > 1
-                ? `${selectedChildren.length} Children`
-                : selectedChildren[0]?.firstName || "Child"}
-            </>
-          )}
-        </Button>
-      </div>
+      {/* Check-in button — only shown if there are children to check in */}
+      {notCheckedIn.length > 0 && (
+        <div className="px-5 py-4 border-t border-border bg-background">
+          <Button
+            className="w-full h-12 text-base font-bold gap-2"
+            disabled={selectedChildren.length === 0 || isCheckingIn}
+            onClick={() => onCheckinFamily(selectedChildren)}
+            data-testid={`button-checkin-family-${guardian}`}
+          >
+            {isCheckingIn ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Checking in...</>
+            ) : (
+              <><CheckCheck className="w-5 h-5" />
+                Check In {selectedChildren.length > 1
+                  ? `${selectedChildren.length} Children`
+                  : selectedChildren[0]?.firstName || "Child"}
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }
@@ -158,6 +201,7 @@ export default function CheckinKiosk() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
 
   const childrenParams = { search: debouncedSearch || undefined };
   const { data: children, isLoading: searching } = useListChildren(
@@ -169,39 +213,42 @@ export default function CheckinKiosk() {
   const [collectedLabels, setCollectedLabels] = useState<LabelData[]>([]);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [checkingInGuardian, setCheckingInGuardian] = useState<string | null>(null);
+  const [checkingOutId, setCheckingOutId] = useState<number | null>(null);
 
-  const createCheckin = useCreateCheckin();
+  const batchCheckin = useBatchCheckin();
+  const checkoutChild = useCheckoutChild();
 
-  // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 250);
     return () => clearTimeout(timer);
   }, [search]);
 
+  const refreshResults = () => {
+    queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey(childrenParams) });
+  };
+
   const handleCheckinFamily = async (familyGuardian: string, selectedChildren: Child[]) => {
+    if (selectedChildren.length === 0) return;
     setCheckingInGuardian(familyGuardian);
-    const labels: LabelData[] = [];
-
     try {
-      for (const child of selectedChildren) {
-        const result = await createCheckin.mutateAsync({
-          data: {
-            registrationId: child.registrationId ?? child.id,
-            room: child.room || undefined,
-          },
-        });
-        labels.push(result.labelData);
-      }
+      const result = await batchCheckin.mutateAsync({
+        data: {
+          items: selectedChildren.map((c) => ({
+            registrationId: c.registrationId ?? c.id,
+            room: c.room ?? undefined,
+          })),
+        },
+      });
 
-      setCollectedLabels(labels);
+      setCollectedLabels(result.labels as LabelData[]);
       setPrintDialogOpen(true);
       setSearch("");
       setDebouncedSearch("");
 
       toast({
-        title: labels.length > 1
-          ? `${labels.length} children checked in for ${familyGuardian}`
-          : `${selectedChildren[0]?.firstName} checked in successfully!`,
+        title: result.labels.length > 1
+          ? `${result.labels.length} children checked in for ${familyGuardian}`
+          : `${selectedChildren[0]?.firstName} checked in!`,
       });
     } catch {
       toast({ title: "Check-in failed — please try again.", variant: "destructive" });
@@ -210,12 +257,25 @@ export default function CheckinKiosk() {
     }
   };
 
+  const handleCheckoutChild = async (child: Child) => {
+    if (!child.checkinId) return;
+    setCheckingOutId(child.checkinId);
+    try {
+      await checkoutChild.mutateAsync({ checkinId: child.checkinId });
+      toast({ title: `${child.firstName} checked out successfully.` });
+      refreshResults();
+    } catch {
+      toast({ title: "Check-out failed — please try again.", variant: "destructive" });
+    } finally {
+      setCheckingOutId(null);
+    }
+  };
+
   const families = children ? groupByFamily(children) : [];
   const showResults = debouncedSearch.length > 1;
 
   return (
     <div className="flex flex-col min-h-screen bg-muted/30">
-      {/* Header */}
       <div className="text-center pt-12 pb-6 px-4">
         <h1 className="text-5xl font-serif font-bold text-primary">Welcome!</h1>
         <p className="text-xl text-muted-foreground mt-2">
@@ -223,7 +283,6 @@ export default function CheckinKiosk() {
         </p>
       </div>
 
-      {/* Search bar */}
       <div className="px-4 md:px-8 max-w-4xl mx-auto w-full">
         <Card className="shadow-md overflow-hidden">
           <CardContent className="p-2">
@@ -252,7 +311,6 @@ export default function CheckinKiosk() {
         </Card>
       </div>
 
-      {/* Results */}
       <div className="px-4 md:px-8 max-w-4xl mx-auto w-full mt-6 pb-12">
         {showResults && (
           <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
@@ -275,20 +333,20 @@ export default function CheckinKiosk() {
               </Card>
             ) : (
               <>
-                {families.length > 0 && (
-                  <p className="text-sm text-muted-foreground font-medium px-1">
-                    {families.length === 1
-                      ? `1 family found · ${children?.length} ${children?.length === 1 ? "child" : "children"}`
-                      : `${families.length} families found · ${children?.length} children total`}
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground font-medium px-1">
+                  {families.length === 1
+                    ? `1 family found · ${children?.length} ${children?.length === 1 ? "child" : "children"}`
+                    : `${families.length} families found · ${children?.length} children total`}
+                </p>
                 {families.map((family) => (
                   <FamilyCard
                     key={family.guardian}
                     guardian={family.guardian}
                     children={family.children}
                     onCheckinFamily={(selected) => handleCheckinFamily(family.guardian, selected)}
-                    isLoading={checkingInGuardian === family.guardian}
+                    onCheckoutChild={handleCheckoutChild}
+                    isCheckingIn={checkingInGuardian === family.guardian}
+                    checkingOutId={checkingOutId}
                   />
                 ))}
               </>
@@ -296,7 +354,6 @@ export default function CheckinKiosk() {
           </div>
         )}
 
-        {/* Empty prompt */}
         {!showResults && (
           <div className="text-center pt-16 text-muted-foreground opacity-50">
             <Search className="w-16 h-16 mx-auto mb-4" />

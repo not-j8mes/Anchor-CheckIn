@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq, sql, desc } from "drizzle-orm";
-import { db, eventsTable, formsTable, questionsTable, registrationsTable } from "@workspace/db";
+import { eq, sql, desc, inArray } from "drizzle-orm";
+import { db, eventsTable, formsTable, questionsTable, registrationsTable, checkinsTable } from "@workspace/db";
 import { randomBytes } from "crypto";
 
 const router = Router();
@@ -110,6 +110,32 @@ router.post("/events", async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Failed to create event");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/events/:eventId/checkins", async (req, res) => {
+  const eventId = parseInt(req.params.eventId, 10);
+  if (isNaN(eventId)) { res.status(400).json({ error: "Invalid eventId" }); return; }
+  try {
+    const event = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    if (!event[0]) { res.status(404).json({ error: "Not found" }); return; }
+    if (!event[0].formId) { res.json([]); return; }
+
+    const regs = await db.select({ id: registrationsTable.id }).from(registrationsTable)
+      .where(eq(registrationsTable.formId, event[0].formId));
+    if (regs.length === 0) { res.json([]); return; }
+    const regIds = regs.map((r) => r.id);
+    const checkins = await db.select().from(checkinsTable)
+      .where(inArray(checkinsTable.registrationId, regIds))
+      .orderBy(desc(checkinsTable.checkinAt));
+    res.json(checkins.map((c) => ({
+      ...c,
+      checkinAt: c.checkinAt.toISOString(),
+      checkoutAt: c.checkoutAt?.toISOString() ?? null,
+    })));
+  } catch (err) {
+    req.log.error({ err }, "Failed to list event checkins");
     res.status(500).json({ error: "Internal server error" });
   }
 });

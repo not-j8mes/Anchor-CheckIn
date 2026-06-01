@@ -8,6 +8,9 @@
 
 export * from './answer';
 export * from './answerInput';
+export * from './batchCheckinInput';
+export * from './batchCheckinInputItemsItem';
+export * from './batchCheckinResult';
 export * from './checkIn';
 export * from './checkInInput';
 export * from './checkInWithLabel';
@@ -16,6 +19,7 @@ export * from './createEventInput';
 export * from './dashboardStats';
 export * from './dayCount';
 export * from './event';
+export * from './eventCheckin';
 export * from './eventWithForm';
 export * from './form';
 export * from './formInput';

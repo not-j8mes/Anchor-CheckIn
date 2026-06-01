@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq, gte, desc } from "drizzle-orm";
-import { db, checkinsTable, registrationsTable, organizationsTable } from "@workspace/db";
+import { eq, gte, desc, and, inArray } from "drizzle-orm";
+import { db, checkinsTable, registrationsTable, organizationsTable, formsTable } from "@workspace/db";
 import { CreateCheckinBody, CheckoutChildParams } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
 
@@ -10,14 +10,98 @@ function generateLabelCode(): string {
   return randomBytes(3).toString("hex").toUpperCase();
 }
 
+function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
+  return {
+    ...c,
+    childId: c.registrationId,
+    checkinAt: c.checkinAt.toISOString(),
+    checkoutAt: c.checkoutAt?.toISOString() ?? null,
+  };
+}
+
+// Batch check-in — must be registered BEFORE /checkins/:checkinId routes
+router.post("/checkins/batch", async (req, res) => {
+  const { items } = req.body as { items: Array<{ registrationId: number; room?: string }> };
+  if (!Array.isArray(items) || items.length === 0) {
+    res.status(400).json({ error: "items array is required" });
+    return;
+  }
+  try {
+    const sharedLabelCode = generateLabelCode();
+    const orgs = await db.select().from(organizationsTable).limit(1);
+    const orgName = orgs[0]?.name ?? "Church";
+
+    const checkins: ReturnType<typeof serializeCheckin>[] = [];
+    const labels: object[] = [];
+
+    for (const item of items) {
+      const reg = await db
+        .select()
+        .from(registrationsTable)
+        .where(eq(registrationsTable.id, item.registrationId))
+        .limit(1);
+      if (!reg[0]) continue;
+      const r = reg[0];
+
+      const [checkin] = await db
+        .insert(checkinsTable)
+        .values({
+          registrationId: item.registrationId,
+          childFirstName: r.childFirstName,
+          childLastName: r.childLastName,
+          guardianName: r.guardianName,
+          room: item.room ?? r.room ?? null,
+          labelCode: sharedLabelCode,
+          labelPrinted: false,
+        })
+        .returning();
+
+      checkins.push(serializeCheckin(checkin));
+      labels.push({
+        childName: `${r.childFirstName} ${r.childLastName}`,
+        guardianName: r.guardianName,
+        labelCode: sharedLabelCode,
+        checkinDate: checkin.checkinAt.toISOString(),
+        room: checkin.room,
+        allergies: r.allergies,
+        specialNeeds: r.specialNeeds,
+        organizationName: orgName,
+      });
+    }
+
+    res.status(201).json({ checkins, labels });
+  } catch (err) {
+    req.log.error({ err }, "Failed to batch check-in");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/checkins", async (req, res) => {
   const dateStr = req.query.date as string | undefined;
+  const formIdStr = req.query.formId as string | undefined;
   try {
     let checkins;
-    if (dateStr) {
+
+    if (formIdStr) {
+      // Get all registrations for this form, then get their check-ins
+      const formId = parseInt(formIdStr, 10);
+      const regs = await db
+        .select({ id: registrationsTable.id })
+        .from(registrationsTable)
+        .where(eq(registrationsTable.formId, formId));
+
+      if (regs.length === 0) {
+        res.json([]);
+        return;
+      }
+      const regIds = regs.map((r) => r.id);
+      checkins = await db
+        .select()
+        .from(checkinsTable)
+        .where(inArray(checkinsTable.registrationId, regIds))
+        .orderBy(desc(checkinsTable.checkinAt));
+    } else if (dateStr) {
       const date = new Date(dateStr);
-      const nextDay = new Date(date);
-      nextDay.setDate(nextDay.getDate() + 1);
       checkins = await db
         .select()
         .from(checkinsTable)
@@ -32,14 +116,8 @@ router.get("/checkins", async (req, res) => {
         .where(gte(checkinsTable.checkinAt, today))
         .orderBy(desc(checkinsTable.checkinAt));
     }
-    res.json(
-      checkins.map((c) => ({
-        ...c,
-        childId: c.registrationId,
-        checkinAt: c.checkinAt.toISOString(),
-        checkoutAt: c.checkoutAt?.toISOString() ?? null,
-      }))
-    );
+
+    res.json(checkins.map(serializeCheckin));
   } catch (err) {
     req.log.error({ err }, "Failed to list checkins");
     res.status(500).json({ error: "Internal server error" });
@@ -92,15 +170,7 @@ router.post("/checkins", async (req, res) => {
       organizationName: orgName,
     };
 
-    res.status(201).json({
-      checkin: {
-        ...checkin,
-        childId: checkin.registrationId,
-        checkinAt: checkin.checkinAt.toISOString(),
-        checkoutAt: null,
-      },
-      labelData,
-    });
+    res.status(201).json({ checkin: serializeCheckin(checkin), labelData });
   } catch (err) {
     req.log.error({ err }, "Failed to create checkin");
     res.status(500).json({ error: "Internal server error" });
@@ -120,12 +190,7 @@ router.put("/checkins/:checkinId/checkout", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    res.json({
-      ...updated,
-      childId: updated.registrationId,
-      checkinAt: updated.checkinAt.toISOString(),
-      checkoutAt: updated.checkoutAt?.toISOString() ?? null,
-    });
+    res.json(serializeCheckin(updated));
   } catch (err) {
     req.log.error({ err }, "Failed to checkout");
     res.status(500).json({ error: "Internal server error" });

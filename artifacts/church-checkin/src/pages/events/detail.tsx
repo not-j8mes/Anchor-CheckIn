@@ -1,13 +1,19 @@
 import { Link, useParams } from "wouter";
+import { useState } from "react";
 import {
   useGetEvent,
   useListRegistrations,
+  useListEventCheckins,
+  useCheckoutChild,
   getGetEventQueryKey,
   getListRegistrationsQueryKey,
+  getListEventCheckinsQueryKey,
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   Calendar,
@@ -16,6 +22,9 @@ import {
   ClipboardList,
   ExternalLink,
   Copy,
+  LogIn,
+  LogOut,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -41,15 +50,33 @@ export default function EventDetail() {
   const params = useParams<{ id: string }>();
   const eventId = parseInt(params.id || "0", 10);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [checkingOutId, setCheckingOutId] = useState<number | null>(null);
 
   const { data: event, isLoading } = useGetEvent(eventId, {
     query: { enabled: !!eventId, queryKey: getGetEventQueryKey(eventId) },
   });
   const regFormId = event?.formId ?? 0;
-  const { data: registrations, isLoading: regsLoading } = useListRegistrations(
-    regFormId,
-    { query: { enabled: !!event?.formId, queryKey: getListRegistrationsQueryKey(regFormId) } }
-  );
+  const { data: registrations, isLoading: regsLoading } = useListRegistrations(regFormId, {
+    query: { enabled: !!event?.formId, queryKey: getListRegistrationsQueryKey(regFormId) },
+  });
+  const { data: checkins, isLoading: checkinsLoading } = useListEventCheckins(eventId, {
+    query: { enabled: !!eventId, queryKey: getListEventCheckinsQueryKey(eventId) },
+  });
+
+  const checkoutChild = useCheckoutChild({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
+        toast({ title: "Child checked out" });
+        setCheckingOutId(null);
+      },
+      onError: () => {
+        toast({ title: "Check-out failed", variant: "destructive" });
+        setCheckingOutId(null);
+      },
+    },
+  });
 
   const copyEmbedCode = () => {
     if (!event?.formEmbedSlug) return;
@@ -85,6 +112,9 @@ export default function EventDetail() {
     ? `${window.location.origin}/register/${event.formEmbedSlug}`
     : null;
 
+  const checkedIn = checkins?.filter((c) => !c.checkoutAt) ?? [];
+  const checkedOut = checkins?.filter((c) => !!c.checkoutAt) ?? [];
+
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">
       {/* Header */}
@@ -97,14 +127,12 @@ export default function EventDetail() {
             <h1 className="text-3xl font-serif font-bold truncate">{event.name}</h1>
             {statusBadge(event.status)}
           </div>
-          <p className="text-muted-foreground mt-1">
-            {EVENT_TYPES[event.eventType] ?? event.eventType}
-          </p>
+          <p className="text-muted-foreground mt-1">{EVENT_TYPES[event.eventType] ?? event.eventType}</p>
         </div>
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-5 flex items-center gap-3">
             <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -116,6 +144,28 @@ export default function EventDetail() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+              <LogIn className="w-5 h-5 text-green-700" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{checkedIn.length}</p>
+              <p className="text-sm text-muted-foreground">Checked In</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+              <LogOut className="w-5 h-5 text-amber-700" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{checkedOut.length}</p>
+              <p className="text-sm text-muted-foreground">Checked Out</p>
+            </div>
+          </CardContent>
+        </Card>
         {event.startDate && (
           <Card>
             <CardContent className="p-5 flex items-center gap-3">
@@ -123,25 +173,8 @@ export default function EventDetail() {
                 <Calendar className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-base font-semibold">
-                  {format(new Date(event.startDate + "T00:00:00"), "MMM d, yyyy")}
-                </p>
-                <p className="text-sm text-muted-foreground">Start Date</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        {event.endDate && (
-          <Card>
-            <CardContent className="p-5 flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-base font-semibold">
-                  {format(new Date(event.endDate + "T00:00:00"), "MMM d, yyyy")}
-                </p>
-                <p className="text-sm text-muted-foreground">End Date</p>
+                <p className="text-base font-semibold">{format(new Date(event.startDate + "T00:00:00"), "MMM d")}</p>
+                <p className="text-sm text-muted-foreground">Starts</p>
               </div>
             </CardContent>
           </Card>
@@ -149,54 +182,157 @@ export default function EventDetail() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Registrations table */}
+        {/* Tabs — main content */}
         <div className="md:col-span-2">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <ClipboardList className="w-5 h-5 text-primary" /> Registrations
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {regsLoading ? (
-                <div className="p-8 text-center text-muted-foreground">Loading...</div>
-              ) : !registrations?.length ? (
-                <div className="p-10 text-center text-muted-foreground">
-                  <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p>No registrations yet.</p>
-                  {registrationUrl && (
-                    <p className="text-sm mt-1">
-                      Share the{" "}
-                      <a href={registrationUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                        registration form
-                      </a>{" "}
-                      to get started.
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="divide-y divide-border">
-                  {registrations.map((reg) => (
-                    <div key={reg.id} className="px-5 py-3 flex items-center justify-between gap-4" data-testid={`reg-row-${reg.id}`}>
-                      <div>
-                        <p className="font-medium">{reg.childFirstName} {reg.childLastName}</p>
-                        <p className="text-sm text-muted-foreground">{reg.guardianName} · {reg.guardianPhone}</p>
-                      </div>
-                      <div className="text-right text-sm text-muted-foreground flex-shrink-0">
-                        {reg.room && <p className="font-medium text-foreground">{reg.room}</p>}
-                        {format(new Date(reg.createdAt), "MMM d")}
-                      </div>
+          <Tabs defaultValue="registrations">
+            <TabsList className="w-full grid grid-cols-3 mb-4">
+              <TabsTrigger value="registrations" className="gap-1.5">
+                <ClipboardList className="w-4 h-4" />
+                Registrations
+                <Badge variant="secondary" className="text-xs ml-1">{registrations?.length ?? 0}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="checked-in" className="gap-1.5">
+                <LogIn className="w-4 h-4" />
+                Checked In
+                <Badge variant="secondary" className="text-xs ml-1">{checkedIn.length}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="checked-out" className="gap-1.5">
+                <LogOut className="w-4 h-4" />
+                Checked Out
+                <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* ── Registrations tab ── */}
+            <TabsContent value="registrations">
+              <Card>
+                <CardContent className="p-0">
+                  {regsLoading ? (
+                    <div className="p-8 text-center text-muted-foreground">Loading...</div>
+                  ) : !registrations?.length ? (
+                    <div className="p-10 text-center text-muted-foreground">
+                      <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                      <p>No registrations yet.</p>
+                      {registrationUrl && (
+                        <p className="text-sm mt-1">
+                          Share the{" "}
+                          <a href={registrationUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                            registration form
+                          </a>{" "}
+                          to get started.
+                        </p>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {registrations.map((reg) => (
+                        <div key={reg.id} className="px-5 py-3 flex items-center justify-between gap-4" data-testid={`reg-row-${reg.id}`}>
+                          <div>
+                            <p className="font-medium">{reg.childFirstName} {reg.childLastName}</p>
+                            <p className="text-sm text-muted-foreground">{reg.guardianName} · {reg.guardianPhone}</p>
+                          </div>
+                          <div className="text-right text-sm text-muted-foreground flex-shrink-0">
+                            {reg.room && <p className="font-medium text-foreground">{reg.room}</p>}
+                            {format(new Date(reg.createdAt), "MMM d")}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* ── Checked In tab ── */}
+            <TabsContent value="checked-in">
+              <Card>
+                <CardContent className="p-0">
+                  {checkinsLoading ? (
+                    <div className="p-8 text-center text-muted-foreground">Loading...</div>
+                  ) : !checkedIn.length ? (
+                    <div className="p-10 text-center text-muted-foreground">
+                      <LogIn className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                      <p>No one is checked in yet.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {checkedIn.map((c) => (
+                        <div key={c.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                          <div>
+                            <p className="font-medium">{c.childFirstName} {c.childLastName}</p>
+                            <p className="text-sm text-muted-foreground">{c.guardianName}{c.room ? ` · ${c.room}` : ""}</p>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className="text-right">
+                              <p className="font-mono font-bold text-sm text-green-700 bg-green-50 px-2 py-0.5 rounded">{c.labelCode}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {format(new Date(c.checkinAt), "h:mm a")}
+                              </p>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
+                              disabled={checkingOutId === c.id}
+                              onClick={() => {
+                                setCheckingOutId(c.id);
+                                checkoutChild.mutate({ checkinId: c.id });
+                              }}
+                            >
+                              {checkingOutId === c.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <LogOut className="w-3.5 h-3.5" />
+                              )}
+                              Check Out
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* ── Checked Out tab ── */}
+            <TabsContent value="checked-out">
+              <Card>
+                <CardContent className="p-0">
+                  {checkinsLoading ? (
+                    <div className="p-8 text-center text-muted-foreground">Loading...</div>
+                  ) : !checkedOut.length ? (
+                    <div className="p-10 text-center text-muted-foreground">
+                      <LogOut className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                      <p>No check-outs recorded yet.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {checkedOut.map((c) => (
+                        <div key={c.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                          <div>
+                            <p className="font-medium">{c.childFirstName} {c.childLastName}</p>
+                            <p className="text-sm text-muted-foreground">{c.guardianName}{c.room ? ` · ${c.room}` : ""}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-mono text-sm text-muted-foreground">{c.labelCode}</p>
+                            <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
+                              <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
+                              {c.checkoutAt && <p className="text-amber-700 font-medium">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
-        {/* Sidebar info */}
+        {/* Sidebar */}
         <div className="space-y-4">
-          {/* Registration form links */}
           {event.formId && (
             <Card>
               <CardHeader className="pb-3">
@@ -228,7 +364,6 @@ export default function EventDetail() {
             </Card>
           )}
 
-          {/* Description */}
           {event.description && (
             <Card>
               <CardHeader className="pb-3">
@@ -240,7 +375,6 @@ export default function EventDetail() {
             </Card>
           )}
 
-          {/* Check-in link */}
           <Button asChild className="w-full">
             <Link href="/checkin">
               <CheckSquare className="w-4 h-4 mr-2" /> Go to Check-In Kiosk

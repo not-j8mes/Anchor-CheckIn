@@ -20,6 +20,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  BatchCheckinInput,
+  BatchCheckinResult,
   CheckIn,
   CheckInInput,
   CheckInWithLabel,
@@ -28,6 +30,7 @@ import type {
   DashboardStats,
   DayCount,
   Event,
+  EventCheckin,
   EventWithForm,
   Form,
   FormInput,
@@ -578,6 +581,83 @@ export const useCreateEvent = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreateEventMutationOptions(options));
     }
+
+export const getListEventCheckinsUrl = (eventId: number,) => {
+
+
+
+
+  return `/api/events/${eventId}/checkins`
+}
+
+/**
+ * @summary List all check-ins for an event
+ */
+export const listEventCheckins = async (eventId: number, options?: RequestInit): Promise<EventCheckin[]> => {
+
+  return customFetch<EventCheckin[]>(getListEventCheckinsUrl(eventId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEventCheckinsQueryKey = (eventId: number,) => {
+    return [
+    `/api/events/${eventId}/checkins`
+    ] as const;
+    }
+
+
+export const getListEventCheckinsQueryOptions = <TData = Awaited<ReturnType<typeof listEventCheckins>>, TError = ErrorType<unknown>>(eventId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEventCheckins>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEventCheckinsQueryKey(eventId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEventCheckins>>> = ({ signal }) => listEventCheckins(eventId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(eventId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEventCheckins>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEventCheckinsQueryResult = NonNullable<Awaited<ReturnType<typeof listEventCheckins>>>
+export type ListEventCheckinsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all check-ins for an event
+ */
+
+export function useListEventCheckins<TData = Awaited<ReturnType<typeof listEventCheckins>>, TError = ErrorType<unknown>>(
+ eventId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEventCheckins>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEventCheckinsQueryOptions(eventId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetEventUrl = (eventId: number,) => {
 
@@ -1847,6 +1927,77 @@ export function useGetChild<TData = Awaited<ReturnType<typeof getChild>>, TError
 
 
 
+
+export const getBatchCheckinUrl = () => {
+
+
+
+
+  return `/api/checkins/batch`
+}
+
+/**
+ * @summary Check in multiple children with a shared family security code
+ */
+export const batchCheckin = async (batchCheckinInput: BatchCheckinInput, options?: RequestInit): Promise<BatchCheckinResult> => {
+
+  return customFetch<BatchCheckinResult>(getBatchCheckinUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      batchCheckinInput,)
+  }
+);}
+
+
+
+
+export const getBatchCheckinMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof batchCheckin>>, TError,{data: BodyType<BatchCheckinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof batchCheckin>>, TError,{data: BodyType<BatchCheckinInput>}, TContext> => {
+
+const mutationKey = ['batchCheckin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof batchCheckin>>, {data: BodyType<BatchCheckinInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  batchCheckin(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BatchCheckinMutationResult = NonNullable<Awaited<ReturnType<typeof batchCheckin>>>
+    export type BatchCheckinMutationBody = BodyType<BatchCheckinInput>
+    export type BatchCheckinMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Check in multiple children with a shared family security code
+ */
+export const useBatchCheckin = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof batchCheckin>>, TError,{data: BodyType<BatchCheckinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof batchCheckin>>,
+        TError,
+        {data: BodyType<BatchCheckinInput>},
+        TContext
+      > => {
+      return useMutation(getBatchCheckinMutationOptions(options));
+    }
 
 export const getListCheckinsUrl = (params?: ListCheckinsParams,) => {
   const normalizedParams = new URLSearchParams();

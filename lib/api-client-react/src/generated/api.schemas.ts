@@ -214,6 +214,11 @@ export interface Child {
   /** @nullable */
   lastCheckinAt?: string | null;
   registrationId?: number;
+  isCheckedIn?: boolean;
+  /** @nullable */
+  checkinId?: number | null;
+  /** @nullable */
+  activeCheckinLabelCode?: string | null;
 }
 
 export interface CheckIn {
@@ -262,6 +267,34 @@ export interface DashboardStats {
   checkedInToday: number;
   totalCheckins: number;
   recentRegistrations?: Registration[];
+}
+
+export type BatchCheckinInputItemsItem = {
+  registrationId: number;
+  room?: string;
+};
+
+export interface BatchCheckinInput {
+  items: BatchCheckinInputItemsItem[];
+}
+
+export interface BatchCheckinResult {
+  checkins: CheckIn[];
+  labels: LabelData[];
+}
+
+export interface EventCheckin {
+  id: number;
+  registrationId: number;
+  childFirstName: string;
+  childLastName: string;
+  guardianName: string;
+  /** @nullable */
+  room?: string | null;
+  labelCode: string;
+  checkinAt: string;
+  /** @nullable */
+  checkoutAt?: string | null;
 }
 
 export interface DayCount {
@@ -339,5 +372,6 @@ search?: string;
 
 export type ListCheckinsParams = {
 date?: string;
+formId?: number;
 };
 

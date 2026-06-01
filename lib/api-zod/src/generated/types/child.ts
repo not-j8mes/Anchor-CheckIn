@@ -25,4 +25,9 @@ export interface Child {
   /** @nullable */
   lastCheckinAt?: string | null;
   registrationId?: number;
+  isCheckedIn?: boolean;
+  /** @nullable */
+  checkinId?: number | null;
+  /** @nullable */
+  activeCheckinLabelCode?: string | null;
 }

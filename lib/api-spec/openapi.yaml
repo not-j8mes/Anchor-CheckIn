@@ -135,6 +135,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventWithForm"
 
+  /events/{eventId}/checkins:
+    get:
+      operationId: listEventCheckins
+      tags: [events]
+      summary: List all check-ins for an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event check-ins
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventCheckin"
+
   /events/{eventId}:
     get:
       operationId: getEvent
@@ -493,6 +514,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/Child"
 
+  /checkins/batch:
+    post:
+      operationId: batchCheckin
+      tags: [checkins]
+      summary: Check in multiple children with a shared family security code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchCheckinInput"
+      responses:
+        "201":
+          description: Batch check-in result with shared labels
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchCheckinResult"
+
   /checkins:
     get:
       operationId: listCheckins
@@ -503,6 +543,10 @@ paths:
           in: query
           schema:
             type: string
+        - name: formId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: List of check-ins
@@ -883,6 +927,12 @@ components:
           type: ["string", "null"]
         registrationId:
           type: integer
+        isCheckedIn:
+          type: boolean
+        checkinId:
+          type: ["integer", "null"]
+        activeCheckinLabelCode:
+          type: ["string", "null"]
 
     CheckIn:
       type: object
@@ -966,6 +1016,57 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Registration"
+
+    BatchCheckinInput:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [registrationId]
+            properties:
+              registrationId:
+                type: integer
+              room:
+                type: string
+
+    BatchCheckinResult:
+      type: object
+      required: [checkins, labels]
+      properties:
+        checkins:
+          type: array
+          items:
+            $ref: "#/components/schemas/CheckIn"
+        labels:
+          type: array
+          items:
+            $ref: "#/components/schemas/LabelData"
+
+    EventCheckin:
+      type: object
+      required: [id, registrationId, childFirstName, childLastName, guardianName, labelCode, checkinAt]
+      properties:
+        id:
+          type: integer
+        registrationId:
+          type: integer
+        childFirstName:
+          type: string
+        childLastName:
+          type: string
+        guardianName:
+          type: string
+        room:
+          type: ["string", "null"]
+        labelCode:
+          type: string
+        checkinAt:
+          type: string
+        checkoutAt:
+          type: ["string", "null"]
 
     DayCount:
       type: object
