@@ -8,6 +8,7 @@ import childrenRouter from "./children";
 import checkinsRouter from "./checkins";
 import statsRouter from "./stats";
 import eventsRouter from "./events";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(registrationsRouter);
 router.use(childrenRouter);
 router.use(checkinsRouter);
 router.use(statsRouter);
+router.use(adminRouter);
 
 export default router;

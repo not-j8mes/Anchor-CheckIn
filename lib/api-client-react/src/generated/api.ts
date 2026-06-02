@@ -2364,6 +2364,76 @@ export const useUndoCheckout = <TError = ErrorType<unknown>,
       return useMutation(getUndoCheckoutMutationOptions(options));
     }
 
+export const getResetAllDataUrl = () => {
+
+
+
+
+  return `/api/admin/reset`
+}
+
+/**
+ * @summary Delete all events, forms, registrations, check-ins, and children
+ */
+export const resetAllData = async ( options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getResetAllDataUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getResetAllDataMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetAllData>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetAllData>>, TError,void, TContext> => {
+
+const mutationKey = ['resetAllData'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetAllData>>, void> = () => {
+
+
+          return  resetAllData(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetAllDataMutationResult = NonNullable<Awaited<ReturnType<typeof resetAllData>>>
+
+    export type ResetAllDataMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete all events, forms, registrations, check-ins, and children
+ */
+export const useResetAllData = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetAllData>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetAllData>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getResetAllDataMutationOptions(options));
+    }
+
 export const getGetDashboardStatsUrl = () => {
 
 

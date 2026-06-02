@@ -627,6 +627,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/CheckIn"
 
+  /admin/reset:
+    delete:
+      operationId: resetAllData
+      tags: [admin]
+      summary: Delete all events, forms, registrations, check-ins, and children
+      responses:
+        "204":
+          description: All data deleted
+
   /stats/dashboard:
     get:
       operationId: getDashboardStats
