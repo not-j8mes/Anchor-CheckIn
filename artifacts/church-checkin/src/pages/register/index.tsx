@@ -122,7 +122,7 @@ export default function PublicRegistrationForm() {
 
   if (!form || !form.isActive) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+      <div className="flex-1 min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <h1 className="text-2xl font-bold font-serif mb-2">Form Unavailable</h1>
         <p className="text-muted-foreground">This registration form is currently closed or does not exist.</p>
       </div>
@@ -197,8 +197,15 @@ export default function PublicRegistrationForm() {
     }
   };
 
+  const handleReset = () => {
+    setIsSubmitted(false);
+    setParentData({});
+    setChildren([{}]);
+    setSubmitError(null);
+  };
+
   return (
-    <div className="min-h-screen bg-muted/20 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="flex-1 min-h-screen bg-muted/20 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto space-y-6">
 
         {/* Organization Header */}
@@ -217,9 +224,9 @@ export default function PublicRegistrationForm() {
         </div>
 
         {isSubmitted ? (
-          <Card className="shadow-xl overflow-hidden text-center py-12">
+          <Card className="shadow-xl overflow-hidden text-center py-14">
             <CardContent className="flex flex-col items-center justify-center space-y-4">
-              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
               <h2 className="text-3xl font-serif font-bold">Registration Complete!</h2>
@@ -228,6 +235,15 @@ export default function PublicRegistrationForm() {
                   ? `Thank you! ${children.length} children have been registered successfully.`
                   : "Thank you for registering. We look forward to seeing you!"}
               </p>
+              <Button
+                size="lg"
+                variant="outline"
+                className="mt-4 gap-2 h-12 text-base"
+                onClick={handleReset}
+              >
+                <Plus className="w-4 h-4" />
+                Register Another Child
+              </Button>
             </CardContent>
           </Card>
         ) : (
