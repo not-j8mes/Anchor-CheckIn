@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   useListEvents,
   useCreateEvent,
@@ -120,6 +120,7 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
   const [step, setStep] = useState(1);
   const [state, setState] = useState<WizardState>(WIZARD_DEFAULTS);
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const createEvent = useCreateEvent();
 
   const update = (key: keyof WizardState, value: string | boolean) =>
@@ -162,10 +163,11 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           toast({ title: `"${state.name}" event created!` });
           handleClose();
           onCreated();
+          navigate(`/events/${data.id}?tab=form`);
         },
         onError: () => {
           toast({ title: "Failed to create event", variant: "destructive" });

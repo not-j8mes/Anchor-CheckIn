@@ -11,7 +11,6 @@ import {
 import { useGetOrganization } from "@workspace/api-client-react";
 import {
   LayoutDashboard,
-  ClipboardList,
   Users,
   CheckSquare,
   Settings,
@@ -28,7 +27,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Events", href: "/events", icon: CalendarDays },
     { name: "Check-In Kiosk", href: "/checkin", icon: CheckSquare },
-    { name: "Forms", href: "/forms", icon: ClipboardList },
     { name: "Children", href: "/children", icon: Users },
   ];
 

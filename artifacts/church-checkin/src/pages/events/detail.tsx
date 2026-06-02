@@ -1,4 +1,4 @@
-import { Link, useParams } from "wouter";
+import { Link, useParams, useSearch } from "wouter";
 import { useState } from "react";
 import {
   useGetEvent,
@@ -28,9 +28,11 @@ import {
   LogOut,
   Loader2,
   Undo2,
+  FileEdit,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { FormBuilderPanel } from "@/components/forms/FormBuilderPanel";
 
 const EVENT_TYPES: Record<string, string> = {
   vbs: "Vacation Bible School (VBS)",
@@ -52,9 +54,13 @@ function statusBadge(status: string) {
 export default function EventDetail() {
   const params = useParams<{ id: string }>();
   const eventId = parseInt(params.id || "0", 10);
+  const search = useSearch();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loadingId, setLoadingId] = useState<number | null>(null);
+
+  const initialTab = new URLSearchParams(search).get("tab") ?? "registrations";
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   const invalidateCheckins = () =>
     queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
@@ -123,6 +129,7 @@ export default function EventDetail() {
 
   const checkedIn = checkins?.filter((c) => !c.checkoutAt) ?? [];
   const checkedOut = checkins?.filter((c) => !!c.checkoutAt) ?? [];
+  const isFormTab = activeTab === "form";
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">
@@ -190,25 +197,29 @@ export default function EventDetail() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Tabs */}
-        <div className="md:col-span-2">
-          <Tabs defaultValue="registrations">
-            <TabsList className="w-full grid grid-cols-3 mb-4">
-              <TabsTrigger value="registrations" className="gap-1.5">
-                <ClipboardList className="w-4 h-4" />
-                Registrations
+      {/* Tabs — full width when Form Builder is active, 2/3 + sidebar otherwise */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className={`grid grid-cols-1 gap-8 ${!isFormTab ? "md:grid-cols-3" : ""}`}>
+          <div className={!isFormTab ? "md:col-span-2" : ""}>
+            <TabsList className="w-full grid grid-cols-4 mb-4">
+              <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm">
+                <ClipboardList className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Registrations</span>
                 <Badge variant="secondary" className="text-xs ml-1">{registrations?.length ?? 0}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="checked-in" className="gap-1.5">
-                <LogIn className="w-4 h-4" />
-                Checked In
+              <TabsTrigger value="checked-in" className="gap-1.5 text-xs sm:text-sm">
+                <LogIn className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Checked In</span>
                 <Badge variant="secondary" className="text-xs ml-1">{checkedIn.length}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="checked-out" className="gap-1.5">
-                <LogOut className="w-4 h-4" />
-                Checked Out
+              <TabsTrigger value="checked-out" className="gap-1.5 text-xs sm:text-sm">
+                <LogOut className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Checked Out</span>
                 <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
+                <FileEdit className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline">Form Builder</span>
               </TabsTrigger>
             </TabsList>
 
@@ -353,60 +364,78 @@ export default function EventDetail() {
                 </CardContent>
               </Card>
             </TabsContent>
-          </Tabs>
-        </div>
 
-        {/* Sidebar */}
-        <div className="space-y-4">
-          {event.formId && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Registration Form</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm font-medium">{event.formTitle}</p>
-                {registrationUrl && (
-                  <>
-                    <a
-                      href={registrationUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+            {/* ── Form Builder ── */}
+            <TabsContent value="form">
+              {event.formId ? (
+                <FormBuilderPanel formId={event.formId} />
+              ) : (
+                <Card>
+                  <CardContent className="p-10 text-center text-muted-foreground">
+                    No registration form is linked to this event.
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </div>
+
+          {/* Sidebar — hidden when Form Builder tab is active */}
+          {!isFormTab && (
+            <div className="space-y-4">
+              {event.formId && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Registration Form</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm font-medium">{event.formTitle}</p>
+                    {registrationUrl && (
+                      <>
+                        <a
+                          href={registrationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-sm text-primary hover:underline"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" /> Open public form
+                        </a>
+                        <Button variant="outline" size="sm" className="w-full" onClick={copyEmbedCode}>
+                          <Copy className="w-3.5 h-3.5 mr-1.5" /> Copy embed code
+                        </Button>
+                      </>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setActiveTab("form")}
                     >
-                      <ExternalLink className="w-3.5 h-3.5" /> Open public form
-                    </a>
-                    <Button variant="outline" size="sm" className="w-full" onClick={copyEmbedCode}>
-                      <Copy className="w-3.5 h-3.5 mr-1.5" /> Copy embed code
+                      <FileEdit className="w-3.5 h-3.5 mr-1.5" /> Edit form questions
                     </Button>
-                  </>
-                )}
-                <Button asChild variant="outline" size="sm" className="w-full">
-                  <Link href={`/forms/${event.formId}/builder`}>
-                    <CheckSquare className="w-3.5 h-3.5 mr-1.5" /> Edit form questions
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+                  </CardContent>
+                </Card>
+              )}
 
-          {event.description && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">About this Event</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{event.description}</p>
-              </CardContent>
-            </Card>
-          )}
+              {event.description && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">About this Event</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">{event.description}</p>
+                  </CardContent>
+                </Card>
+              )}
 
-          <Button asChild className="w-full">
-            <Link href="/checkin">
-              <CheckSquare className="w-4 h-4 mr-2" /> Go to Check-In Kiosk
-            </Link>
-          </Button>
+              <Button asChild className="w-full">
+                <Link href="/checkin">
+                  <CheckSquare className="w-4 h-4 mr-2" /> Go to Check-In Kiosk
+                </Link>
+              </Button>
+            </div>
+          )}
         </div>
-      </div>
+      </Tabs>
     </div>
   );
 }
