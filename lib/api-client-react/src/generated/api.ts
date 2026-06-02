@@ -35,6 +35,8 @@ import type {
   Form,
   FormInput,
   FormWithQuestions,
+  GetCheckinsByDayParams,
+  GetDashboardStatsParams,
   HealthStatus,
   ListCheckinsParams,
   ListChildrenParams,
@@ -2434,20 +2436,27 @@ export const useResetAllData = <TError = ErrorType<unknown>,
       return useMutation(getResetAllDataMutationOptions(options));
     }
 
-export const getGetDashboardStatsUrl = () => {
+export const getGetDashboardStatsUrl = (params?: GetDashboardStatsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/stats/dashboard`
+  return stringifiedParams.length > 0 ? `/api/stats/dashboard?${stringifiedParams}` : `/api/stats/dashboard`
 }
 
 /**
  * @summary Get dashboard statistics
  */
-export const getDashboardStats = async ( options?: RequestInit): Promise<DashboardStats> => {
+export const getDashboardStats = async (params?: GetDashboardStatsParams, options?: RequestInit): Promise<DashboardStats> => {
 
-  return customFetch<DashboardStats>(getGetDashboardStatsUrl(),
+  return customFetch<DashboardStats>(getGetDashboardStatsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2460,23 +2469,23 @@ export const getDashboardStats = async ( options?: RequestInit): Promise<Dashboa
 
 
 
-export const getGetDashboardStatsQueryKey = () => {
+export const getGetDashboardStatsQueryKey = (params?: GetDashboardStatsParams,) => {
     return [
-    `/api/stats/dashboard`
+    `/api/stats/dashboard`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetDashboardStatsQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardStats>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardStatsQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardStats>>, TError = ErrorType<unknown>>(params?: GetDashboardStatsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardStatsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardStatsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardStats>>> = ({ signal }) => getDashboardStats({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardStats>>> = ({ signal }) => getDashboardStats(params, { signal, ...requestOptions });
 
 
 
@@ -2494,11 +2503,11 @@ export type GetDashboardStatsQueryError = ErrorType<unknown>
  */
 
 export function useGetDashboardStats<TData = Awaited<ReturnType<typeof getDashboardStats>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetDashboardStatsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardStats>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardStatsQueryOptions(options)
+  const queryOptions = getGetDashboardStatsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2511,20 +2520,27 @@ export function useGetDashboardStats<TData = Awaited<ReturnType<typeof getDashbo
 
 
 
-export const getGetCheckinsByDayUrl = () => {
+export const getGetCheckinsByDayUrl = (params?: GetCheckinsByDayParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/stats/checkins-by-day`
+  return stringifiedParams.length > 0 ? `/api/stats/checkins-by-day?${stringifiedParams}` : `/api/stats/checkins-by-day`
 }
 
 /**
  * @summary Get check-in counts by day (last 30 days)
  */
-export const getCheckinsByDay = async ( options?: RequestInit): Promise<DayCount[]> => {
+export const getCheckinsByDay = async (params?: GetCheckinsByDayParams, options?: RequestInit): Promise<DayCount[]> => {
 
-  return customFetch<DayCount[]>(getGetCheckinsByDayUrl(),
+  return customFetch<DayCount[]>(getGetCheckinsByDayUrl(params),
   {
     ...options,
     method: 'GET'
@@ -2537,23 +2553,23 @@ export const getCheckinsByDay = async ( options?: RequestInit): Promise<DayCount
 
 
 
-export const getGetCheckinsByDayQueryKey = () => {
+export const getGetCheckinsByDayQueryKey = (params?: GetCheckinsByDayParams,) => {
     return [
-    `/api/stats/checkins-by-day`
+    `/api/stats/checkins-by-day`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetCheckinsByDayQueryOptions = <TData = Awaited<ReturnType<typeof getCheckinsByDay>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCheckinsByDay>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetCheckinsByDayQueryOptions = <TData = Awaited<ReturnType<typeof getCheckinsByDay>>, TError = ErrorType<unknown>>(params?: GetCheckinsByDayParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCheckinsByDay>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetCheckinsByDayQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetCheckinsByDayQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCheckinsByDay>>> = ({ signal }) => getCheckinsByDay({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCheckinsByDay>>> = ({ signal }) => getCheckinsByDay(params, { signal, ...requestOptions });
 
 
 
@@ -2571,11 +2587,11 @@ export type GetCheckinsByDayQueryError = ErrorType<unknown>
  */
 
 export function useGetCheckinsByDay<TData = Awaited<ReturnType<typeof getCheckinsByDay>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCheckinsByDay>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetCheckinsByDayParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCheckinsByDay>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetCheckinsByDayQueryOptions(options)
+  const queryOptions = getGetCheckinsByDayQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

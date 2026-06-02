@@ -658,6 +658,10 @@ export const UndoCheckoutResponse = zod.object({
 /**
  * @summary Get dashboard statistics
  */
+export const GetDashboardStatsQueryParams = zod.object({
+  "eventId": zod.coerce.number().optional()
+})
+
 export const GetDashboardStatsResponse = zod.object({
   "totalChildren": zod.number(),
   "totalForms": zod.number(),
@@ -684,6 +688,10 @@ export const GetDashboardStatsResponse = zod.object({
 /**
  * @summary Get check-in counts by day (last 30 days)
  */
+export const GetCheckinsByDayQueryParams = zod.object({
+  "eventId": zod.coerce.number().optional()
+})
+
 export const GetCheckinsByDayResponseItem = zod.object({
   "date": zod.string(),
   "count": zod.number()

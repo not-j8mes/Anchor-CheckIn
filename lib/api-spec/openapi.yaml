@@ -641,6 +641,11 @@ paths:
       operationId: getDashboardStats
       tags: [stats]
       summary: Get dashboard statistics
+      parameters:
+        - name: eventId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Dashboard stats
@@ -654,6 +659,11 @@ paths:
       operationId: getCheckinsByDay
       tags: [stats]
       summary: Get check-in counts by day (last 30 days)
+      parameters:
+        - name: eventId
+          in: query
+          schema:
+            type: integer
       responses:
         "200":
           description: Check-ins per day

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "wouter";
 import {
   useListChildren,
   useBatchCheckin,
@@ -23,6 +24,7 @@ import {
   CheckCheck,
   LogOut,
   Undo2,
+  LayoutDashboard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
@@ -97,7 +99,6 @@ function FamilyCard({
       </div>
 
       <CardContent className="p-0 divide-y divide-border">
-        {/* Already checked-in children */}
         {alreadyCheckedIn.map((child) => (
           <div key={child.id} className="flex items-center gap-4 px-5 py-4 bg-green-50/50" data-testid={`child-row-${child.id}`}>
             <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center font-serif font-bold text-green-700 text-sm flex-shrink-0">
@@ -143,7 +144,6 @@ function FamilyCard({
           </div>
         ))}
 
-        {/* Children not yet checked in */}
         {notCheckedIn.map((child) => {
           const isChecked = selected.has(child.id);
           return (
@@ -295,92 +295,105 @@ export default function CheckinKiosk() {
   const showResults = debouncedSearch.length > 1;
 
   return (
-    <div className="flex flex-col min-h-screen bg-muted/30">
-      <div className="text-center pt-12 pb-6 px-4">
-        <h1 className="text-5xl font-serif font-bold text-primary">Welcome!</h1>
-        <p className="text-xl text-muted-foreground mt-2">
-          Search by child name, guardian name, or phone number.
-        </p>
+    <div className="flex flex-col flex-1 min-h-screen bg-muted/30">
+      {/* Top bar with back button */}
+      <div className="flex items-center justify-between px-6 py-3 bg-background border-b border-border shadow-sm">
+        <Link href="/">
+          <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+            <LayoutDashboard className="w-4 h-4" />
+            Dashboard
+          </Button>
+        </Link>
+        <span className="text-sm font-medium text-muted-foreground">Check-In Kiosk</span>
+        <div className="w-28" />
       </div>
 
-      <div className="px-4 md:px-8 max-w-4xl mx-auto w-full">
-        <Card className="shadow-md overflow-hidden">
-          <CardContent className="p-2">
-            <div className="relative">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-8 h-8 text-muted-foreground pointer-events-none" />
-              <Input
-                ref={inputRef}
-                autoFocus
-                placeholder="Type family name or phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-20 text-3xl h-24 rounded-lg bg-muted/20 border-transparent focus-visible:ring-primary font-serif placeholder:text-muted-foreground/50"
-                data-testid="input-checkin-search"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => { setSearch(""); setDebouncedSearch(""); }}
-                  className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors text-2xl font-light"
-                >
-                  ×
-                </button>
+      {/* Main centered content */}
+      <div className="flex flex-col flex-1 items-center w-full">
+        <div className="text-center pt-10 pb-6 px-4">
+          <h1 className="text-5xl font-serif font-bold text-primary">Welcome!</h1>
+          <p className="text-xl text-muted-foreground mt-2">
+            Search by child name, guardian name, or phone number.
+          </p>
+        </div>
+
+        <div className="px-4 md:px-8 w-full max-w-2xl">
+          <Card className="shadow-md overflow-hidden">
+            <CardContent className="p-2">
+              <div className="relative">
+                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-8 h-8 text-muted-foreground pointer-events-none" />
+                <Input
+                  ref={inputRef}
+                  autoFocus
+                  placeholder="Type family name or phone..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-20 text-3xl h-24 rounded-lg bg-muted/20 border-transparent focus-visible:ring-primary font-serif placeholder:text-muted-foreground/50"
+                  data-testid="input-checkin-search"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearch(""); setDebouncedSearch(""); }}
+                    className="absolute right-6 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors text-2xl font-light"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="px-4 md:px-8 w-full max-w-2xl mt-6 pb-12">
+          {showResults ? (
+            <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
+              {searching ? (
+                <div className="flex items-center justify-center py-16 gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <span className="text-lg text-muted-foreground">Searching...</span>
+                </div>
+              ) : families.length === 0 ? (
+                <Card className="shadow-sm">
+                  <CardContent className="py-16 text-center">
+                    <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-40" />
+                    <p className="text-2xl text-muted-foreground font-serif mb-2">
+                      No matches for "{debouncedSearch}"
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      Try a different name, or register the family first.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground font-medium px-1">
+                    {families.length === 1
+                      ? `1 family found · ${children?.length} ${children?.length === 1 ? "child" : "children"}`
+                      : `${families.length} families found · ${children?.length} children total`}
+                  </p>
+                  {families.map((family) => (
+                    <FamilyCard
+                      key={family.guardian}
+                      guardian={family.guardian}
+                      children={family.children}
+                      onCheckinFamily={(selected) => handleCheckinFamily(family.guardian, selected)}
+                      onCheckoutChild={handleCheckoutChild}
+                      onUndoCheckin={handleUndoCheckin}
+                      isCheckingIn={checkingInGuardian === family.guardian}
+                      loadingCheckinId={loadingCheckinId}
+                    />
+                  ))}
+                </>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="px-4 md:px-8 max-w-4xl mx-auto w-full mt-6 pb-12">
-        {showResults && (
-          <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
-            {searching ? (
-              <div className="flex items-center justify-center py-16 gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <span className="text-lg text-muted-foreground">Searching...</span>
-              </div>
-            ) : families.length === 0 ? (
-              <Card className="shadow-sm">
-                <CardContent className="py-16 text-center">
-                  <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-40" />
-                  <p className="text-2xl text-muted-foreground font-serif mb-2">
-                    No matches for "{debouncedSearch}"
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    Try a different name, or register the family first.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <p className="text-sm text-muted-foreground font-medium px-1">
-                  {families.length === 1
-                    ? `1 family found · ${children?.length} ${children?.length === 1 ? "child" : "children"}`
-                    : `${families.length} families found · ${children?.length} children total`}
-                </p>
-                {families.map((family) => (
-                  <FamilyCard
-                    key={family.guardian}
-                    guardian={family.guardian}
-                    children={family.children}
-                    onCheckinFamily={(selected) => handleCheckinFamily(family.guardian, selected)}
-                    onCheckoutChild={handleCheckoutChild}
-                    onUndoCheckin={handleUndoCheckin}
-                    isCheckingIn={checkingInGuardian === family.guardian}
-                    loadingCheckinId={loadingCheckinId}
-                  />
-                ))}
-              </>
-            )}
-          </div>
-        )}
-
-        {!showResults && (
-          <div className="text-center pt-16 text-muted-foreground opacity-50">
-            <Search className="w-16 h-16 mx-auto mb-4" />
-            <p className="text-xl font-serif">Start typing to find a family</p>
-          </div>
-        )}
+          ) : (
+            <div className="text-center pt-16 text-muted-foreground opacity-50">
+              <Search className="w-16 h-16 mx-auto mb-4" />
+              <p className="text-xl font-serif">Start typing to find a family</p>
+            </div>
+          )}
+        </div>
       </div>
 
       <LabelPrintDialog

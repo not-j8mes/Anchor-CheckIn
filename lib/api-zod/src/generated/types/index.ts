@@ -24,6 +24,8 @@ export * from './eventWithForm';
 export * from './form';
 export * from './formInput';
 export * from './formWithQuestions';
+export * from './getCheckinsByDayParams';
+export * from './getDashboardStatsParams';
 export * from './healthStatus';
 export * from './labelData';
 export * from './listCheckinsParams';

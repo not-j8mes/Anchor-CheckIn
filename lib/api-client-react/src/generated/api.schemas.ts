@@ -375,3 +375,11 @@ date?: string;
 formId?: number;
 };
 
+export type GetDashboardStatsParams = {
+eventId?: number;
+};
+
+export type GetCheckinsByDayParams = {
+eventId?: number;
+};
+
