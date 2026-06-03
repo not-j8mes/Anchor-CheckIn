@@ -18,7 +18,9 @@ description: New form_fields + participants/guardians tables alongside legacy qu
 - `event_id`, `participant_id`, `guardian_id`, `submitted_at`
 
 ## System key format
-`<entity>.<attribute>` — e.g. `participant.first_name`, `guardian.full_name`, `participant.allergies`
+Flat snake_case identifiers — e.g. `child_first_name`, `guardian_phone`, `allergies`.
+NOT dot-notation like `participant.first_name` (that was the old pre-library format, now migrated away).
+The full catalog and dbColumn mappings live in `artifacts/church-checkin/src/lib/systemFields.ts`.
 
 ## API behavior
 - All form GET endpoints (`/forms/:id`, `/forms/by-slug/:slug`, `/events/:id`) return BOTH `questions` (legacy) and `formFields` (new) arrays.

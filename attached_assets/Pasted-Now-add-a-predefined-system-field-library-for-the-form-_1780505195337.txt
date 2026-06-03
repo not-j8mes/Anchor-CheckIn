@@ -1,0 +1,40 @@
+Now add a predefined system field library for the form builder.
+
+Create system field definitions with:
+- internal key
+- display label
+- field type
+- category
+- database mapping
+
+Add these system fields:
+
+Child / Participant:
+- Child First Name: child_first_name, short text, maps to participants.first_name
+- Child Last Name: child_last_name, short text, maps to participants.last_name
+- Date of Birth: date_of_birth, date, maps to participants.date_of_birth
+- Gender: gender, dropdown, maps to participants.gender
+- Grade: grade, short text, maps to participants.grade
+- Allergies: allergies, long text, maps to participants.allergies
+- Medical Notes: medical_notes, long text, maps to participants.medical_notes
+- Special Needs / Accommodations: special_needs, long text, maps to participants.special_needs
+- General Notes: notes, long text, maps to participants.notes
+
+Parent / Guardian:
+- Parent/Guardian First Name: guardian_first_name, short text, maps to guardians.first_name
+- Parent/Guardian Last Name: guardian_last_name, short text, maps to guardians.last_name
+- Parent/Guardian Email: guardian_email, email, maps to guardians.email
+- Parent/Guardian Phone: guardian_phone, phone, maps to guardians.phone
+- Secondary Parent/Guardian Name: secondary_guardian_name, short text
+- Secondary Parent/Guardian Phone: secondary_guardian_phone, phone
+
+Emergency / Safety:
+- Emergency Contact Name: emergency_contact_name, short text, maps to emergency_contacts.name
+- Emergency Contact Phone: emergency_contact_phone, phone, maps to emergency_contacts.phone
+- Emergency Contact Relationship: emergency_contact_relationship, short text, maps to emergency_contacts.relationship
+- Authorized Pickup Names: authorized_pickup_names, long text
+- Unauthorized Pickup Notes: unauthorized_pickup_notes, long text
+- Photo Permission: photo_permission, yes/no
+- Medical Permission: medical_permission, yes/no
+
+These system field internal keys should be stable and should not change even if the admin edits the display label.

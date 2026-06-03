@@ -16,16 +16,20 @@ const DEFAULT_QUESTIONS = [
   { label: "Special Needs or Accommodations", type: "textarea", required: false, order: 7, isChildField: true, fieldKey: "specialNeeds", placeholder: "Describe any special needs..." },
 ];
 
-/** New-architecture defaults — one system field per DEFAULT_QUESTIONS entry */
+/**
+ * Default form_fields seeded for every new event.
+ * system_key values are stable identifiers — they match SYSTEM_FIELDS in the
+ * frontend's systemFields.ts library and must not change.
+ */
 const DEFAULT_FORM_FIELDS = [
-  { fieldKind: "system", systemKey: "participant.first_name",   label: "Child's First Name",               fieldType: "text",     required: true,  sortOrder: 0, placeholder: "Enter first name",                         options: null },
-  { fieldKind: "system", systemKey: "participant.last_name",    label: "Child's Last Name",                fieldType: "text",     required: true,  sortOrder: 1, placeholder: "Enter last name",                          options: null },
-  { fieldKind: "system", systemKey: "participant.date_of_birth",label: "Date of Birth",                    fieldType: "date",     required: true,  sortOrder: 2, placeholder: null,                                       options: null },
-  { fieldKind: "system", systemKey: "guardian.full_name",       label: "Parent/Guardian Name",             fieldType: "text",     required: true,  sortOrder: 3, placeholder: "Full name",                                options: null },
-  { fieldKind: "system", systemKey: "guardian.phone",           label: "Phone Number",                     fieldType: "phone",    required: true,  sortOrder: 4, placeholder: "(555) 000-0000",                           options: null },
-  { fieldKind: "system", systemKey: "guardian.email",           label: "Email Address",                    fieldType: "email",    required: false, sortOrder: 5, placeholder: "email@example.com",                        options: null },
-  { fieldKind: "system", systemKey: "participant.allergies",    label: "Allergies or Medical Notes",       fieldType: "textarea", required: false, sortOrder: 6, placeholder: "List any allergies or medical conditions...", options: null },
-  { fieldKind: "system", systemKey: "participant.special_needs",label: "Special Needs or Accommodations",  fieldType: "textarea", required: false, sortOrder: 7, placeholder: "Describe any special needs...",             options: null },
+  { fieldKind: "system", systemKey: "child_first_name",    label: "Child First Name",                    fieldType: "text",     required: true,  sortOrder: 0, placeholder: "Enter first name",                          options: null },
+  { fieldKind: "system", systemKey: "child_last_name",     label: "Child Last Name",                     fieldType: "text",     required: true,  sortOrder: 1, placeholder: "Enter last name",                           options: null },
+  { fieldKind: "system", systemKey: "date_of_birth",       label: "Date of Birth",                       fieldType: "date",     required: true,  sortOrder: 2, placeholder: null,                                        options: null },
+  { fieldKind: "system", systemKey: "guardian_first_name", label: "Parent / Guardian First Name",        fieldType: "text",     required: true,  sortOrder: 3, placeholder: "First name",                                options: null },
+  { fieldKind: "system", systemKey: "guardian_phone",      label: "Parent / Guardian Phone",             fieldType: "phone",    required: true,  sortOrder: 4, placeholder: "(555) 000-0000",                            options: null },
+  { fieldKind: "system", systemKey: "guardian_email",      label: "Parent / Guardian Email",             fieldType: "email",    required: false, sortOrder: 5, placeholder: "email@example.com",                         options: null },
+  { fieldKind: "system", systemKey: "allergies",           label: "Allergies or Medical Notes",          fieldType: "textarea", required: false, sortOrder: 6, placeholder: "List any allergies or medical conditions…",  options: null },
+  { fieldKind: "system", systemKey: "special_needs",       label: "Special Needs / Accommodations",      fieldType: "textarea", required: false, sortOrder: 7, placeholder: "Describe any special needs or accommodations…", options: null },
 ] as const;
 
 async function buildEventRow(event: typeof eventsTable.$inferSelect) {
