@@ -13,6 +13,8 @@ export interface Event {
   description?: string | null;
   eventType: string;
   /** @nullable */
+  registrationType?: string | null;
+  /** @nullable */
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;

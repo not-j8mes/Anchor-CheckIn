@@ -1,0 +1,91 @@
+Update the New Event creation flow so the admin first chooses what kind of registration they need.
+
+When clicking “New Event,” show a popup titled:
+
+“What kind of registration do you need?”
+
+Subtitle:
+“Choose the setup that best matches this event. You can customize the form after it is created.”
+
+Show three selectable cards:
+
+1. Child Check-In
+   Description: For kids programs where parents register children and staff check children in and out securely.
+   Feature bullets:
+
+* Child profiles
+* Guardian and pickup info
+* Check-in/check-out
+
+2. Family or Group
+   Description: For events where one person registers multiple people, such as a family, couple, team, or group.
+   Feature bullets:
+
+* Primary contact
+* Add additional people
+* Grouped registration
+
+3. Individual
+   Description: For events where each person signs up for themselves.
+   Feature bullets:
+
+* Simple signup
+* One person per registration
+* Optional attendance tracking
+
+Add a registration_type field to the event record with these values:
+
+* child_checkin
+* family_group
+* individual
+
+Update the New Event modal to use a 3-step flow:
+
+Step 1: Choose Registration Type
+Step 2: Event Details
+Step 3: Registration Setup
+
+Step 2 should use the existing event detail fields:
+
+* Event Name
+* Event Category
+* Description
+* Start Date
+* End Date
+* Status
+
+Step 3 should ask how registration should be set up:
+
+* Create a registration form automatically
+* Start from a template
+* Start with a blank form
+* Enable check-in for this event
+
+Set good defaults based on registration type:
+
+For Child Check-In:
+
+* Create a registration form automatically: on
+* Enable check-in: on
+
+For Family or Group:
+
+* Create a registration form automatically: on
+* Enable check-in: optional/off by default
+* Allow additional people: on
+
+For Individual:
+
+* Create a registration form automatically: on
+* Enable check-in: optional/off by default
+* Allow additional people: off by default
+
+Show the selected registration type as a badge on the event card and event details page.
+
+Badge labels:
+
+* child_checkin = Child Check-In
+* family_group = Family / Group
+* individual = Individual
+
+Do not remove existing event creation functionality. Keep the design clean, modern, and easy for a non-technical admin to understand.

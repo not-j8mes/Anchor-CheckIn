@@ -10,6 +10,7 @@ export interface CreateEventInput {
   name: string;
   description?: string;
   eventType: string;
+  registrationType?: string;
   startDate?: string;
   endDate?: string;
   status?: string;

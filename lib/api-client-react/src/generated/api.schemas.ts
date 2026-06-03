@@ -387,6 +387,8 @@ export interface Event {
   description?: string | null;
   eventType: string;
   /** @nullable */
+  registrationType?: string | null;
+  /** @nullable */
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;
@@ -408,6 +410,8 @@ export interface EventWithForm {
   description?: string | null;
   eventType: string;
   /** @nullable */
+  registrationType?: string | null;
+  /** @nullable */
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;
@@ -427,6 +431,7 @@ export interface CreateEventInput {
   name: string;
   description?: string;
   eventType: string;
+  registrationType?: string;
   startDate?: string;
   endDate?: string;
   status?: string;
@@ -439,6 +444,7 @@ export interface UpdateEventInput {
   name?: string;
   description?: string;
   eventType?: string;
+  registrationType?: string;
   startDate?: string;
   endDate?: string;
   status?: string;

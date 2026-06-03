@@ -1323,6 +1323,8 @@ components:
           type: ["string", "null"]
         eventType:
           type: string
+        registrationType:
+          type: ["string", "null"]
         startDate:
           type: ["string", "null"]
         endDate:
@@ -1352,6 +1354,8 @@ components:
           type: ["string", "null"]
         eventType:
           type: string
+        registrationType:
+          type: ["string", "null"]
         startDate:
           type: ["string", "null"]
         endDate:
@@ -1383,6 +1387,8 @@ components:
           type: string
         eventType:
           type: string
+        registrationType:
+          type: string
         startDate:
           type: string
         endDate:
@@ -1404,6 +1410,8 @@ components:
         description:
           type: string
         eventType:
+          type: string
+        registrationType:
           type: string
         startDate:
           type: string

@@ -8,6 +8,7 @@ export const eventsTable = pgTable("events", {
   name: text("name").notNull(),
   description: text("description"),
   eventType: text("event_type").notNull().default("general"),
+  registrationType: text("registration_type"),
   startDate: text("start_date"),
   endDate: text("end_date"),
   status: text("status").notNull().default("upcoming"),

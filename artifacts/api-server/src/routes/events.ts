@@ -85,7 +85,7 @@ router.get("/events", async (req, res) => {
 });
 
 router.post("/events", async (req, res) => {
-  const { name, description, eventType, startDate, endDate, status, formTitle, formDescription, addDefaultQuestions } = req.body;
+  const { name, description, eventType, registrationType, startDate, endDate, status, formTitle, formDescription, addDefaultQuestions } = req.body;
 
   if (!name || !eventType || !formTitle) {
     res.status(400).json({ error: "name, eventType, and formTitle are required" });
@@ -122,6 +122,7 @@ router.post("/events", async (req, res) => {
         name,
         description: description || null,
         eventType,
+        registrationType: registrationType || null,
         startDate: startDate || null,
         endDate: endDate || null,
         status: status || "upcoming",
@@ -213,7 +214,7 @@ router.put("/events/:eventId", async (req, res) => {
     res.status(400).json({ error: "Invalid eventId" });
     return;
   }
-  const { name, description, eventType, startDate, endDate, status } = req.body;
+  const { name, description, eventType, registrationType, startDate, endDate, status } = req.body;
   try {
     const [updated] = await db
       .update(eventsTable)
@@ -221,6 +222,7 @@ router.put("/events/:eventId", async (req, res) => {
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
         ...(eventType !== undefined && { eventType }),
+        ...(registrationType !== undefined && { registrationType }),
         ...(startDate !== undefined && { startDate }),
         ...(endDate !== undefined && { endDate }),
         ...(status !== undefined && { status }),

@@ -46,11 +46,14 @@ import {
   Plus,
   Calendar,
   Users,
+  User,
+  Baby,
   ArrowRight,
   Trash2,
   Pencil,
   CheckSquare,
   ChevronRight,
+  Check,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -71,11 +74,46 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "Completed" },
 ];
 
+const REGISTRATION_TYPES = [
+  {
+    value: "child_checkin",
+    label: "Child Check-In",
+    Icon: Baby,
+    description: "For kids programs where parents register children and staff check children in and out securely.",
+    features: ["Child profiles", "Guardian and pickup info", "Check-in / check-out"],
+    defaultCheckin: true,
+  },
+  {
+    value: "family_group",
+    label: "Family or Group",
+    Icon: Users,
+    description: "For events where one person registers multiple people, such as a family, couple, team, or group.",
+    features: ["Primary contact", "Add additional people", "Grouped registration"],
+    defaultCheckin: false,
+  },
+  {
+    value: "individual",
+    label: "Individual",
+    Icon: User,
+    description: "For events where each person signs up for themselves.",
+    features: ["Simple signup", "One person per registration", "Optional attendance tracking"],
+    defaultCheckin: false,
+  },
+];
+
 function statusBadge(status: string) {
   if (status === "active") return <Badge className="bg-green-100 text-green-800 border-green-200">Active</Badge>;
   if (status === "upcoming") return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Upcoming</Badge>;
   if (status === "completed") return <Badge variant="secondary">Completed</Badge>;
   return <Badge variant="outline">{status}</Badge>;
+}
+
+function registrationTypeBadge(type?: string | null) {
+  if (!type) return null;
+  if (type === "child_checkin") return <Badge className="bg-purple-100 text-purple-800 border-purple-200">Child Check-In</Badge>;
+  if (type === "family_group") return <Badge className="bg-teal-100 text-teal-800 border-teal-200">Family / Group</Badge>;
+  if (type === "individual") return <Badge className="bg-slate-100 text-slate-700 border-slate-200">Individual</Badge>;
+  return null;
 }
 
 function eventTypeLabel(type: string) {
@@ -85,20 +123,24 @@ function eventTypeLabel(type: string) {
 // ─── Create Event Wizard ────────────────────────────────────────────────────
 
 interface WizardState {
-  // Step 1: event details
+  // Step 1: registration type
+  registrationType: string;
+  // Step 2: event details
   name: string;
   description: string;
   eventType: string;
   startDate: string;
   endDate: string;
   status: string;
-  // Step 2: form setup
+  // Step 3: form setup
   formTitle: string;
   formDescription: string;
   addDefaultQuestions: boolean;
+  enableCheckin: boolean;
 }
 
 const WIZARD_DEFAULTS: WizardState = {
+  registrationType: "",
   name: "",
   description: "",
   eventType: "general",
@@ -108,6 +150,7 @@ const WIZARD_DEFAULTS: WizardState = {
   formTitle: "",
   formDescription: "",
   addDefaultQuestions: true,
+  enableCheckin: false,
 };
 
 interface CreateEventWizardProps {
@@ -131,16 +174,25 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
     setTimeout(() => { setStep(1); setState(WIZARD_DEFAULTS); }, 300);
   };
 
-  const handleStep1Next = () => {
+  const handleSelectType = (typeValue: string) => {
+    const chosen = REGISTRATION_TYPES.find((t) => t.value === typeValue);
+    setState((prev) => ({
+      ...prev,
+      registrationType: typeValue,
+      enableCheckin: chosen?.defaultCheckin ?? false,
+    }));
+    setStep(2);
+  };
+
+  const handleStep2Next = () => {
     if (!state.name.trim()) {
       toast({ title: "Event name is required", variant: "destructive" });
       return;
     }
-    // Pre-fill form title based on event name
     if (!state.formTitle) {
       setState((prev) => ({ ...prev, formTitle: `${state.name} Registration` }));
     }
-    setStep(2);
+    setStep(3);
   };
 
   const handleCreate = () => {
@@ -154,6 +206,7 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
           name: state.name,
           description: state.description || undefined,
           eventType: state.eventType,
+          registrationType: state.registrationType || undefined,
           startDate: state.startDate || undefined,
           endDate: state.endDate || undefined,
           status: state.status,
@@ -176,37 +229,73 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
     );
   };
 
+  const stepTitles: Record<number, React.ReactNode> = {
+    1: <><Calendar className="w-5 h-5 text-primary" /> What kind of registration do you need?</>,
+    2: <><Calendar className="w-5 h-5 text-primary" /> Event Details</>,
+    3: <><CheckSquare className="w-5 h-5 text-primary" /> Registration Setup</>,
+  };
+
+  const stepDescriptions: Record<number, string> = {
+    1: "Choose the setup that best matches this event. You can customize the form after it is created.",
+    2: "Step 2 of 3 — Fill in the event details.",
+    3: "Step 3 of 3 — Set up the registration form for this event.",
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg" aria-describedby={undefined}>
+      <DialogContent className={step === 1 ? "max-w-2xl" : "max-w-lg"} aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-serif text-xl">
-            {step === 1 ? (
-              <><Calendar className="w-5 h-5 text-primary" /> New Event — Details</>
-            ) : (
-              <><CheckSquare className="w-5 h-5 text-primary" /> New Event — Registration Form</>
-            )}
+            {stepTitles[step]}
           </DialogTitle>
-          <DialogDescription>
-            {step === 1
-              ? "Step 1 of 2 — Fill in the event details."
-              : "Step 2 of 2 — Set up the registration form for this event."}
-          </DialogDescription>
+          <DialogDescription>{stepDescriptions[step]}</DialogDescription>
         </DialogHeader>
 
-        {/* Step indicator */}
-        <div className="flex gap-2 pt-1">
-          {[1, 2].map((n) => (
-            <div
-              key={n}
-              className={`h-1.5 flex-1 rounded-full transition-colors ${
-                n <= step ? "bg-primary" : "bg-muted"
-              }`}
-            />
-          ))}
-        </div>
+        {/* Step indicator — only steps 2 and 3 show the bar */}
+        {step > 1 && (
+          <div className="flex gap-2 pt-1">
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className={`h-1.5 flex-1 rounded-full transition-colors ${
+                  n <= step ? "bg-primary" : "bg-muted"
+                }`}
+              />
+            ))}
+          </div>
+        )}
 
-        {step === 1 ? (
+        {/* ── Step 1: Registration Type Picker ── */}
+        {step === 1 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-2">
+            {REGISTRATION_TYPES.map(({ value, label, Icon, description, features }) => (
+              <button
+                key={value}
+                type="button"
+                data-testid={`reg-type-${value}`}
+                onClick={() => handleSelectType(value)}
+                className="group text-left rounded-xl border-2 border-border bg-background p-4 hover:border-primary hover:bg-primary/5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
+                  <Icon className="w-5 h-5 text-primary" />
+                </div>
+                <p className="font-semibold text-foreground text-sm mb-1">{label}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed mb-3">{description}</p>
+                <ul className="space-y-1">
+                  {features.map((f) => (
+                    <li key={f} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Check className="w-3 h-3 text-primary flex-shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Step 2: Event Details ── */}
+        {step === 2 && (
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label>Event Name <span className="text-destructive">*</span></Label>
@@ -219,7 +308,7 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Event Type <span className="text-destructive">*</span></Label>
+              <Label>Event Category</Label>
               <Select value={state.eventType} onValueChange={(v) => update("eventType", v)}>
                 <SelectTrigger data-testid="select-event-type">
                   <SelectValue />
@@ -270,11 +359,11 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
               </Select>
             </div>
           </div>
-        ) : (
+        )}
+
+        {/* ── Step 3: Registration Setup ── */}
+        {step === 3 && (
           <div className="space-y-4 py-2">
-            <div className="rounded-lg bg-muted/50 border border-border p-4 text-sm text-muted-foreground">
-              A registration form will be created and linked to this event. Families will use this form to sign up their children.
-            </div>
             <div className="space-y-1.5">
               <Label>Form Title <span className="text-destructive">*</span></Label>
               <Input
@@ -286,41 +375,70 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
             <div className="space-y-1.5">
               <Label>Form Description</Label>
               <Textarea
-                placeholder="What families will see at the top of the form..."
+                placeholder="What registrants will see at the top of the form..."
                 rows={2}
                 value={state.formDescription}
                 onChange={(e) => update("formDescription", e.target.value)}
               />
             </div>
-            <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
-              <Switch
-                id="default-questions"
-                checked={state.addDefaultQuestions}
-                onCheckedChange={(v) => update("addDefaultQuestions", v)}
-              />
-              <div>
-                <Label htmlFor="default-questions" className="cursor-pointer font-medium">
-                  Include standard questions
-                </Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Adds child name, date of birth, guardian contact, allergies, and special needs fields automatically.
-                </p>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Form fields</Label>
+              <div className="space-y-2">
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
+                  <Switch
+                    id="default-questions"
+                    checked={state.addDefaultQuestions}
+                    onCheckedChange={(v) => update("addDefaultQuestions", v)}
+                  />
+                  <div>
+                    <Label htmlFor="default-questions" className="cursor-pointer font-medium text-sm">
+                      Start from template
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {state.registrationType === "child_checkin"
+                        ? "Includes child name, DOB, guardian, emergency contact, allergies, and more."
+                        : state.registrationType === "family_group"
+                        ? "Includes primary contact and fields for adding family members."
+                        : "Includes name, contact info, and basic attendee fields."}
+                      {" "}Turn off to start with a blank form.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
+                  <Switch
+                    id="enable-checkin"
+                    checked={state.enableCheckin}
+                    onCheckedChange={(v) => update("enableCheckin", v)}
+                  />
+                  <div>
+                    <Label htmlFor="enable-checkin" className="cursor-pointer font-medium text-sm">
+                      Enable check-in for this event
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Allow staff to check attendees in and out and print name labels.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         )}
 
         <DialogFooter className="gap-2">
-          {step === 1 ? (
+          {step === 1 && (
+            <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          )}
+          {step === 2 && (
             <>
-              <Button variant="outline" onClick={handleClose}>Cancel</Button>
-              <Button onClick={handleStep1Next} data-testid="button-wizard-next">
+              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+              <Button onClick={handleStep2Next} data-testid="button-wizard-next">
                 Next <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </>
-          ) : (
+          )}
+          {step === 3 && (
             <>
-              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+              <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
               <Button
                 onClick={handleCreate}
                 disabled={createEvent.isPending}
@@ -512,6 +630,7 @@ export default function EventsPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-lg font-serif font-bold truncate">{event.name}</h3>
                         {statusBadge(event.status)}
+                        {registrationTypeBadge(event.registrationType)}
                       </div>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {eventTypeLabel(event.eventType)}
