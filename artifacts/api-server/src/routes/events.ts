@@ -17,17 +17,11 @@ const DEFAULT_QUESTIONS = [
 ];
 
 /**
- * Default Kids Program Registration template — seeded for every new event.
- * system_key values are stable identifiers that match SYSTEM_FIELDS in the
- * frontend's systemFields.ts library and must not change.
- *
- * Required:  Child First/Last Name, Date of Birth, Guardian First/Last Name,
- *            Guardian Phone, Emergency Contact Name & Phone.
- * Optional:  Guardian Email, Allergies, Medical Notes, Special Needs,
- *            Authorized Pickup Names, Photo Permission, Medical Permission.
+ * Template: Child Check-In
+ * For kids programs — child profiles, guardian info, emergency contacts, safety.
  */
-const DEFAULT_FORM_FIELDS = [
-  // ── Required fields ────────────────────────────────────────────────────────
+const TEMPLATE_CHILD_CHECKIN = [
+  // ── Required ───────────────────────────────────────────────────────────────
   { fieldKind: "system", systemKey: "child_first_name",          label: "Child First Name",                     fieldType: "text",     required: true,  sortOrder: 0,  placeholder: "Enter first name",                              options: null },
   { fieldKind: "system", systemKey: "child_last_name",           label: "Child Last Name",                      fieldType: "text",     required: true,  sortOrder: 1,  placeholder: "Enter last name",                               options: null },
   { fieldKind: "system", systemKey: "date_of_birth",             label: "Date of Birth",                        fieldType: "date",     required: true,  sortOrder: 2,  placeholder: null,                                            options: null },
@@ -36,7 +30,7 @@ const DEFAULT_FORM_FIELDS = [
   { fieldKind: "system", systemKey: "guardian_phone",            label: "Parent / Guardian Phone",              fieldType: "phone",    required: true,  sortOrder: 5,  placeholder: "(555) 000-0000",                                options: null },
   { fieldKind: "system", systemKey: "emergency_contact_name",    label: "Emergency Contact Name",               fieldType: "text",     required: true,  sortOrder: 6,  placeholder: "Full name",                                     options: null },
   { fieldKind: "system", systemKey: "emergency_contact_phone",   label: "Emergency Contact Phone",              fieldType: "phone",    required: true,  sortOrder: 7,  placeholder: "(555) 000-0000",                                options: null },
-  // ── Optional fields ────────────────────────────────────────────────────────
+  // ── Optional ───────────────────────────────────────────────────────────────
   { fieldKind: "system", systemKey: "guardian_email",            label: "Parent / Guardian Email",              fieldType: "email",    required: false, sortOrder: 8,  placeholder: "email@example.com",                             options: null },
   { fieldKind: "system", systemKey: "allergies",                 label: "Allergies",                            fieldType: "textarea", required: false, sortOrder: 9,  placeholder: "List any food, medication, or environmental allergies…", options: null },
   { fieldKind: "system", systemKey: "medical_notes",             label: "Medical Notes",                        fieldType: "textarea", required: false, sortOrder: 10, placeholder: "Any diagnoses, medications, or medical considerations…",  options: null },
@@ -45,6 +39,43 @@ const DEFAULT_FORM_FIELDS = [
   { fieldKind: "system", systemKey: "photo_permission",          label: "Photo Permission",                     fieldType: "select",   required: false, sortOrder: 13, placeholder: null,                                            options: "Yes,No" },
   { fieldKind: "system", systemKey: "medical_permission",        label: "Medical Permission",                   fieldType: "select",   required: false, sortOrder: 14, placeholder: null,                                            options: "Yes,No" },
 ] as const;
+
+/**
+ * Template: Family or Group Registration
+ * One registrant covers multiple people. allowAdditionalPeople enabled on the form.
+ */
+const TEMPLATE_FAMILY_GROUP = [
+  // ── Required ───────────────────────────────────────────────────────────────
+  { fieldKind: "system", systemKey: "participant_first_name",    label: "First Name",                           fieldType: "text",     required: true,  sortOrder: 0,  placeholder: "Enter first name",                              options: null },
+  { fieldKind: "system", systemKey: "participant_last_name",     label: "Last Name",                            fieldType: "text",     required: true,  sortOrder: 1,  placeholder: "Enter last name",                               options: null },
+  { fieldKind: "system", systemKey: "participant_email",         label: "Email",                                fieldType: "email",    required: true,  sortOrder: 2,  placeholder: "email@example.com",                             options: null },
+  { fieldKind: "system", systemKey: "participant_phone",         label: "Phone",                                fieldType: "phone",    required: true,  sortOrder: 3,  placeholder: "(555) 000-0000",                                options: null },
+  // ── Optional ───────────────────────────────────────────────────────────────
+  { fieldKind: "system", systemKey: "dietary_restrictions",      label: "Dietary Restrictions",                 fieldType: "textarea", required: false, sortOrder: 4,  placeholder: "List any dietary restrictions or food allergies…", options: null },
+  { fieldKind: "system", systemKey: "accessibility_needs",       label: "Accessibility Needs",                  fieldType: "textarea", required: false, sortOrder: 5,  placeholder: "Describe any accessibility requirements…",        options: null },
+  { fieldKind: "custom", systemKey: null,                        label: "Notes",                                fieldType: "textarea", required: false, sortOrder: 6,  placeholder: "Anything else we should know…",                  options: null },
+] as const;
+
+/**
+ * Template: Individual Registration
+ * Each person registers themselves. Simple signup, no group linking.
+ */
+const TEMPLATE_INDIVIDUAL = [
+  // ── Required ───────────────────────────────────────────────────────────────
+  { fieldKind: "system", systemKey: "participant_first_name",    label: "First Name",                           fieldType: "text",     required: true,  sortOrder: 0,  placeholder: "Enter first name",                              options: null },
+  { fieldKind: "system", systemKey: "participant_last_name",     label: "Last Name",                            fieldType: "text",     required: true,  sortOrder: 1,  placeholder: "Enter last name",                               options: null },
+  { fieldKind: "system", systemKey: "participant_email",         label: "Email",                                fieldType: "email",    required: true,  sortOrder: 2,  placeholder: "email@example.com",                             options: null },
+  { fieldKind: "system", systemKey: "participant_phone",         label: "Phone",                                fieldType: "phone",    required: true,  sortOrder: 3,  placeholder: "(555) 000-0000",                                options: null },
+  // ── Optional ───────────────────────────────────────────────────────────────
+  { fieldKind: "system", systemKey: "dietary_restrictions",      label: "Dietary Restrictions",                 fieldType: "textarea", required: false, sortOrder: 4,  placeholder: "List any dietary restrictions or food allergies…", options: null },
+  { fieldKind: "system", systemKey: "accessibility_needs",       label: "Accessibility Needs",                  fieldType: "textarea", required: false, sortOrder: 5,  placeholder: "Describe any accessibility requirements…",        options: null },
+] as const;
+
+function getFormTemplate(registrationType?: string | null) {
+  if (registrationType === "family_group") return TEMPLATE_FAMILY_GROUP;
+  if (registrationType === "individual") return TEMPLATE_INDIVIDUAL;
+  return TEMPLATE_CHILD_CHECKIN; // child_checkin or no type
+}
 
 async function buildEventRow(event: typeof eventsTable.$inferSelect) {
   let formTitle: string | null = null;
@@ -101,18 +132,22 @@ router.post("/events", async (req, res) => {
         description: formDescription || null,
         isActive: true,
         isPublic: true,
+        allowAdditionalPeople: registrationType === "family_group",
         embedSlug,
       })
       .returning();
 
     if (addDefaultQuestions !== false) {
-      // Legacy questions table (backward compat)
-      await db.insert(questionsTable).values(
-        DEFAULT_QUESTIONS.map((q) => ({ ...q, formId: form.id, options: null }))
-      );
-      // New form_fields table
+      // Legacy questions table (backward compat — only seed for child_checkin / no type)
+      if (!registrationType || registrationType === "child_checkin") {
+        await db.insert(questionsTable).values(
+          DEFAULT_QUESTIONS.map((q) => ({ ...q, formId: form.id, options: null }))
+        );
+      }
+      // New form_fields table — use the right template for the registration type
+      const template = getFormTemplate(registrationType);
       await db.insert(formFieldsTable).values(
-        DEFAULT_FORM_FIELDS.map((f) => ({ ...f, formId: form.id }))
+        template.map((f) => ({ ...f, formId: form.id }))
       );
     }
 

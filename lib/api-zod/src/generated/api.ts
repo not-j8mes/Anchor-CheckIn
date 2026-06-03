@@ -67,6 +67,7 @@ export const ListFormsResponseItem = zod.object({
   "description": zod.string().nullish(),
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
+  "allowAdditionalPeople": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -81,7 +82,8 @@ export const CreateFormBody = zod.object({
   "title": zod.string(),
   "description": zod.string().optional(),
   "isActive": zod.boolean().optional(),
-  "isPublic": zod.boolean().optional()
+  "isPublic": zod.boolean().optional(),
+  "allowAdditionalPeople": zod.boolean().optional()
 })
 
 
@@ -171,6 +173,7 @@ export const GetEventResponse = zod.object({
   "description": zod.string().nullish(),
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
+  "allowAdditionalPeople": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -257,6 +260,7 @@ export const GetFormBySlugResponse = zod.object({
   "description": zod.string().nullish(),
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
+  "allowAdditionalPeople": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -300,6 +304,7 @@ export const GetFormResponse = zod.object({
   "description": zod.string().nullish(),
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
+  "allowAdditionalPeople": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -341,7 +346,8 @@ export const UpdateFormBody = zod.object({
   "title": zod.string(),
   "description": zod.string().optional(),
   "isActive": zod.boolean().optional(),
-  "isPublic": zod.boolean().optional()
+  "isPublic": zod.boolean().optional(),
+  "allowAdditionalPeople": zod.boolean().optional()
 })
 
 export const UpdateFormResponse = zod.object({
@@ -350,6 +356,7 @@ export const UpdateFormResponse = zod.object({
   "description": zod.string().nullish(),
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
+  "allowAdditionalPeople": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()

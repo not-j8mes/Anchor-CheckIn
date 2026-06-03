@@ -860,6 +860,8 @@ components:
           type: boolean
         isPublic:
           type: boolean
+        allowAdditionalPeople:
+          type: boolean
         embedSlug:
           type: string
         submissionCount:
@@ -879,6 +881,8 @@ components:
           type: boolean
         isPublic:
           type: boolean
+        allowAdditionalPeople:
+          type: boolean
 
     FormWithQuestions:
       type: object
@@ -893,6 +897,8 @@ components:
         isActive:
           type: boolean
         isPublic:
+          type: boolean
+        allowAdditionalPeople:
           type: boolean
         embedSlug:
           type: string

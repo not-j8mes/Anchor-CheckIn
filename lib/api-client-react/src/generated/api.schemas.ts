@@ -43,6 +43,7 @@ export interface Form {
   description?: string | null;
   isActive: boolean;
   isPublic: boolean;
+  allowAdditionalPeople?: boolean;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;
@@ -53,6 +54,7 @@ export interface FormInput {
   description?: string;
   isActive?: boolean;
   isPublic?: boolean;
+  allowAdditionalPeople?: boolean;
 }
 
 export type QuestionType = typeof QuestionType[keyof typeof QuestionType];
@@ -132,6 +134,7 @@ export interface FormWithQuestions {
   description?: string | null;
   isActive: boolean;
   isPublic: boolean;
+  allowAdditionalPeople?: boolean;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;

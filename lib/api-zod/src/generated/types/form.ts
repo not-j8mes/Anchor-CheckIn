@@ -13,6 +13,7 @@ export interface Form {
   description?: string | null;
   isActive: boolean;
   isPublic: boolean;
+  allowAdditionalPeople?: boolean;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;

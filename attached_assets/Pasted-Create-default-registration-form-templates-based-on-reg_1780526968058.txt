@@ -1,0 +1,146 @@
+Create default registration form templates based on registration_type.
+
+When an event is created, automatically create a form using the correct template unless the admin chooses a blank form.
+
+Template 1: Child Check-In
+
+Required fields:
+
+* Child First Name
+* Child Last Name
+* Date of Birth
+* Parent/Guardian First Name
+* Parent/Guardian Last Name
+* Parent/Guardian Phone
+* Emergency Contact Name
+* Emergency Contact Phone
+
+Optional fields:
+
+* Parent/Guardian Email
+* Allergies
+* Medical Notes
+* Special Needs / Accommodations
+* Authorized Pickup Names
+* Photo Permission
+* Medical Permission
+
+Template 2: Family or Group
+
+Required fields:
+
+* Primary Registrant First Name
+* Primary Registrant Last Name
+* Primary Registrant Email
+* Primary Registrant Phone
+
+Additional people section:
+
+* First Name
+* Last Name
+* Adult or Child
+* Notes
+
+Optional fields:
+
+* Dietary Restrictions
+* Accessibility Needs
+* Notes
+
+Template 3: Individual
+
+Required fields:
+
+* First Name
+* Last Name
+* Email
+* Phone
+
+Optional fields:
+
+* Dietary Restrictions
+* Accessibility Needs
+* Notes
+
+Admins should be able to customize these templates after the event is created.
+
+Add support for additional people on registration forms.
+
+In form settings, add a toggle:
+
+Allow additional people on this registration
+
+When enabled:
+
+* The public registration form should let the registrant add another person
+* Each additional person should have first name and last name fields by default
+* The admin can choose which fields apply to additional people
+* Additional people should be linked to the same registration group
+
+Use this for Family or Group Registration events by default.
+
+For Individual Registration events, this should be off by default but the admin can turn it on.
+
+For Child Check-In events, use child registration logic instead of generic additional people.
+
+Update public registration form submission logic.
+
+When a registration form is submitted:
+
+1. Read all system field responses.
+2. Create or update a participant record using participant system fields.
+3. Create or update a guardian record using guardian system fields when guardian fields are present.
+4. Link the participant and guardian in participant_guardians when applicable.
+5. Save emergency contact information to emergency_contacts when present.
+6. Create a registration record linking the participant, guardian, form, and event.
+7. Save all custom question answers to registration_custom_answers.
+8. If the form allows additional people, create participant records and registrations for each additional person and link them under the same registration_group.
+
+Do not save system field answers only as generic custom responses.
+
+System field answers must map to the correct database fields.
+
+Custom question answers should be saved with the registration only.
+
+Update check-in settings and behavior based on registration_type.
+
+For Child Check-In events:
+
+* Check-in/check-out should be enabled by default
+* Show child safety options
+* Show pickup code option
+* Show label printing option
+* Show authorized pickup fields
+* Show guardian information during check-in/check-out
+* Show allergy and medical warnings clearly
+
+For Family or Group events:
+
+* Check-in should be optional
+* Allow check-in by whole group or by individual person
+* Do not show pickup code by default
+* Do not require guardian or child safety fields by default
+
+For Individual events:
+
+* Check-in should be optional
+* Check-in should be simple: checked in / checked out
+* Do not show guardian, pickup, or child safety settings
+
+Add a Preview Form button to the form builder.
+
+The preview should render:
+
+* Organization name if available
+* Event/program name
+* Form title
+* Description
+* System fields
+* Custom questions
+* Additional people section if enabled
+* Required indicators
+* Submit button
+
+The preview should not submit real data.
+
+Make sure all changes work with existing events and existing registration forms as much as possible.

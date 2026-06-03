@@ -11,4 +11,5 @@ export interface FormInput {
   description?: string;
   isActive?: boolean;
   isPublic?: boolean;
+  allowAdditionalPeople?: boolean;
 }

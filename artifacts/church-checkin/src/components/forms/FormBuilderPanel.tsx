@@ -48,6 +48,9 @@ import {
   MessageSquare,
   Search,
   CheckCircle2,
+  Eye,
+  Users,
+  ChevronDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -87,7 +90,7 @@ const CATEGORY_DISPLAY_LABELS: Record<SystemFieldCategory, string> = {
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
-type ModalMode = "none" | "system-picker" | "field-editor";
+type ModalMode = "none" | "system-picker" | "field-editor" | "preview";
 
 interface FormBuilderPanelProps {
   formId: number;
@@ -215,6 +218,7 @@ export function FormBuilderPanel({ formId }: FormBuilderPanelProps) {
     description: "",
     isActive: true,
     isPublic: true,
+    allowAdditionalPeople: false,
   });
 
   useEffect(() => {
@@ -224,6 +228,7 @@ export function FormBuilderPanel({ formId }: FormBuilderPanelProps) {
         description: form.description ?? "",
         isActive: form.isActive,
         isPublic: form.isPublic,
+        allowAdditionalPeople: form.allowAdditionalPeople ?? false,
       });
     }
   }, [form]);
@@ -399,6 +404,14 @@ export function FormBuilderPanel({ formId }: FormBuilderPanelProps) {
           <div className="flex items-center gap-2">
             <Button
               size="sm"
+              variant="ghost"
+              onClick={() => setModalMode("preview")}
+            >
+              <Eye className="w-4 h-4 mr-1.5" />
+              Preview
+            </Button>
+            <Button
+              size="sm"
               onClick={() => {
                 setSystemSearch("");
                 setModalMode("system-picker");
@@ -502,6 +515,19 @@ export function FormBuilderPanel({ formId }: FormBuilderPanelProps) {
               <Switch
                 checked={formSettings.isPublic}
                 onCheckedChange={(c) => setFormSettings((p) => ({ ...p, isPublic: c }))}
+              />
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <Label className="text-sm flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                  Additional People
+                </Label>
+                <p className="text-xs text-muted-foreground">Allow registering multiple people</p>
+              </div>
+              <Switch
+                checked={formSettings.allowAdditionalPeople}
+                onCheckedChange={(c) => setFormSettings((p) => ({ ...p, allowAdditionalPeople: c }))}
               />
             </div>
           </CardContent>
@@ -764,6 +790,173 @@ export function FormBuilderPanel({ formId }: FormBuilderPanelProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Preview Form dialog ───────────────────────────────────────────────── */}
+      <Dialog
+        open={modalMode === "preview"}
+        onOpenChange={(open) => !open && setModalMode("none")}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-4 h-4 text-primary" />
+              Form Preview
+            </DialogTitle>
+            <DialogDescription>
+              This is how your form looks to registrants. Preview only — no data will be saved.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Form preview body */}
+          <div className="rounded-xl border border-border bg-background overflow-hidden">
+            {/* Form header */}
+            <div className="bg-primary/5 border-b border-border px-6 py-5">
+              <h2 className="text-xl font-serif font-bold text-foreground">
+                {formSettings.title || "Untitled Form"}
+              </h2>
+              {formSettings.description && (
+                <p className="mt-1.5 text-sm text-muted-foreground">{formSettings.description}</p>
+              )}
+            </div>
+
+            {/* Fields */}
+            <div className="px-6 py-5 space-y-5">
+              {!fields || fields.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic text-center py-6">
+                  No fields added yet.
+                </p>
+              ) : (
+                fields.map((field) => (
+                  <PreviewField key={field.id} field={field} />
+                ))
+              )}
+
+              {/* Additional people section */}
+              {formSettings.allowAdditionalPeople && (
+                <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Additional People</span>
+                    <span className="text-xs text-muted-foreground">(optional)</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Registrants can add more people to this registration.
+                  </p>
+                  <button
+                    type="button"
+                    disabled
+                    className="text-sm text-primary flex items-center gap-1.5 opacity-60"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add another person
+                  </button>
+                </div>
+              )}
+
+              {/* Submit button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium opacity-60 cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  Submit Registration
+                </button>
+                <p className="text-xs text-center text-muted-foreground mt-2">
+                  Submit button is disabled in preview mode
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setModalMode("none")}>
+              Close Preview
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── Preview field renderer ──────────────────────────────────────────────────
+
+function PreviewField({ field }: { field: FormField }) {
+  const label = (
+    <div className="flex items-center gap-1.5 mb-1.5">
+      <span className="text-sm font-medium text-foreground">{field.label}</span>
+      {field.required && <span className="text-destructive text-xs font-bold">*</span>}
+    </div>
+  );
+
+  const inputClass =
+    "w-full h-9 rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground cursor-not-allowed";
+  const textareaClass =
+    "w-full rounded-md border border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed resize-none";
+
+  const placeholder = field.placeholder || "";
+
+  if (field.fieldType === "textarea") {
+    return (
+      <div>
+        {label}
+        <textarea disabled rows={3} placeholder={placeholder} className={textareaClass} />
+      </div>
+    );
+  }
+
+  if (field.fieldType === "select") {
+    const opts = field.options ? field.options.split(",").map((o) => o.trim()) : [];
+    return (
+      <div>
+        {label}
+        <div className={`${inputClass} flex items-center justify-between`}>
+          <span>{opts[0] ?? "Select an option…"}</span>
+          <ChevronDown className="w-4 h-4 opacity-50" />
+        </div>
+      </div>
+    );
+  }
+
+  if (field.fieldType === "multiselect") {
+    const opts = field.options ? field.options.split(",").map((o) => o.trim()) : [];
+    return (
+      <div>
+        {label}
+        <div className="flex flex-wrap gap-2">
+          {opts.slice(0, 4).map((opt) => (
+            <label key={opt} className="flex items-center gap-1.5 text-sm text-muted-foreground cursor-not-allowed">
+              <input type="checkbox" disabled className="rounded" />
+              {opt}
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (field.fieldType === "checkbox") {
+    return (
+      <div className="flex items-center gap-2">
+        <input type="checkbox" disabled className="rounded" />
+        <span className="text-sm text-foreground">{field.label}</span>
+        {field.required && <span className="text-destructive text-xs font-bold">*</span>}
+      </div>
+    );
+  }
+
+  const inputType =
+    field.fieldType === "email" ? "email"
+    : field.fieldType === "phone" ? "tel"
+    : field.fieldType === "date" ? "date"
+    : field.fieldType === "number" ? "number"
+    : "text";
+
+  return (
+    <div>
+      {label}
+      <input disabled type={inputType} placeholder={placeholder} className={inputClass} />
     </div>
   );
 }
