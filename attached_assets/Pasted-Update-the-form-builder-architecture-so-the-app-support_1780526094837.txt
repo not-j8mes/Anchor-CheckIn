@@ -1,0 +1,210 @@
+Update the form builder architecture so the app supports two types of form fields:
+
+1. System Fields
+   These are predefined fields that map directly to important database characteristics for a participant, child, guardian, emergency contact, medical information, and pickup permissions.
+
+2. Custom Questions
+   These are event-specific questions created by the admin. They should be saved only with that registration, not as permanent participant profile fields.
+
+Update the database/data model to support this structure.
+
+Create or update these tables/models:
+
+participants:
+
+* id
+* first_name
+* last_name
+* date_of_birth
+* gender
+* grade
+* allergies
+* medical_notes
+* special_needs
+* notes
+* created_at
+* updated_at
+
+guardians:
+
+* id
+* first_name
+* last_name
+* email
+* phone
+* created_at
+* updated_at
+
+participant_guardians:
+
+* id
+* participant_id
+* guardian_id
+* relationship
+* is_primary
+* can_pick_up
+
+emergency_contacts:
+
+* id
+* participant_id
+* name
+* phone
+* relationship
+
+forms:
+
+* id
+* event_id
+* title
+* description
+* active
+* public
+* allow_additional_people
+* created_at
+* updated_at
+
+form_fields:
+
+* id
+* form_id
+* field_kind
+* system_key
+* label
+* field_type
+* placeholder
+* required
+* sort_order
+* options
+* created_at
+* updated_at
+
+registrations:
+
+* id
+* event_id
+* form_id
+* participant_id
+* guardian_id
+* registration_group_id
+* submitted_at
+* created_at
+* updated_at
+
+registration_custom_answers:
+
+* id
+* registration_id
+* form_field_id
+* question_label
+* answer_value
+
+registration_groups:
+
+* id
+* event_id
+* form_id
+* primary_registrant_id
+* group_name
+* submitted_at
+* created_at
+* updated_at
+
+Use field_kind to distinguish between:
+
+* system
+* custom
+
+Add a predefined system field library for the form builder.
+
+Each system field should have:
+
+* internal key
+* display label
+* field type
+* category
+* database mapping
+
+System fields:
+
+Child / Participant:
+
+* Child First Name: child_first_name, short text, maps to participants.first_name
+* Child Last Name: child_last_name, short text, maps to participants.last_name
+* Date of Birth: date_of_birth, date, maps to participants.date_of_birth
+* Gender: gender, dropdown, maps to participants.gender
+* Grade: grade, short text, maps to participants.grade
+* Allergies: allergies, long text, maps to participants.allergies
+* Medical Notes: medical_notes, long text, maps to participants.medical_notes
+* Special Needs / Accommodations: special_needs, long text, maps to participants.special_needs
+* General Notes: notes, long text, maps to participants.notes
+
+Parent / Guardian:
+
+* Parent/Guardian First Name: guardian_first_name, short text, maps to guardians.first_name
+* Parent/Guardian Last Name: guardian_last_name, short text, maps to guardians.last_name
+* Parent/Guardian Email: guardian_email, email, maps to guardians.email
+* Parent/Guardian Phone: guardian_phone, phone, maps to guardians.phone
+* Secondary Parent/Guardian Name: secondary_guardian_name, short text
+* Secondary Parent/Guardian Phone: secondary_guardian_phone, phone
+
+Emergency / Safety:
+
+* Emergency Contact Name: emergency_contact_name, short text, maps to emergency_contacts.name
+* Emergency Contact Phone: emergency_contact_phone, phone, maps to emergency_contacts.phone
+* Emergency Contact Relationship: emergency_contact_relationship, short text, maps to emergency_contacts.relationship
+* Authorized Pickup Names: authorized_pickup_names, long text
+* Unauthorized Pickup Notes: unauthorized_pickup_notes, long text
+* Photo Permission: photo_permission, yes/no
+* Medical Permission: medical_permission, yes/no
+
+Individual / Adult:
+
+* First Name: participant_first_name, short text, maps to participants.first_name
+* Last Name: participant_last_name, short text, maps to participants.last_name
+* Email: participant_email, email
+* Phone: participant_phone, phone
+* Dietary Restrictions: dietary_restrictions, long text
+* Accessibility Needs: accessibility_needs, long text
+
+System field internal keys should be stable and should not change even if the admin edits the display label.
+
+Update the form builder UI so admins can add two types of fields:
+
+* Add System Field
+* Add Custom Question
+
+Replace the current generic “Add Question” flow with these two options.
+
+When clicking Add System Field:
+
+* Show a searchable list of predefined system fields
+* Group them by Child / Participant, Parent / Guardian, Emergency / Safety, and Individual / Adult
+* Allow the admin to add one to the form
+* Prevent the same system field from being added twice to the same form
+* If already added, show “Already added”
+
+When clicking Add Custom Question:
+
+* Show the current field editor with label, field type, required toggle, placeholder, and options if needed
+
+In the field list, display system fields differently from custom questions.
+
+System field example:
+Child First Name
+System Field · Child Profile · Required
+
+Custom question example:
+T-Shirt Size
+Custom Question · Dropdown · Required
+
+Use these terms throughout the form builder:
+
+* “System Field” for fields that save to participant, guardian, emergency contact, or safety database records
+* “Custom Question” for event-specific questions
+* “Child Profile” for participant fields on kids forms
+* “Guardian Info” for parent/guardian fields
+* “Safety Info” for allergies, medical notes, emergency contacts, and pickup permissions
+* “Additional People” for family/group registrations
+
+Do not remove existing app functionality. Update carefully and make sure the app still runs.

@@ -72,7 +72,18 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   number: "Number",
 };
 
-const CATEGORY_ORDER: SystemFieldCategory[] = ["participant", "guardian", "emergency_safety"];
+const CATEGORY_ORDER: SystemFieldCategory[] = ["participant", "guardian", "emergency_safety", "individual"];
+
+/**
+ * Friendly display labels shown in the field card subtitle and picker group headers.
+ * These are UI-only — the underlying system_key and category values are unchanged.
+ */
+const CATEGORY_DISPLAY_LABELS: Record<SystemFieldCategory, string> = {
+  participant: "Child Profile",
+  guardian: "Guardian Info",
+  emergency_safety: "Safety Info",
+  individual: "Individual / Adult",
+};
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -100,7 +111,7 @@ function FieldCard({ field, index, total, onEdit, onDelete, onMove }: FieldCardP
   const subtitle = isSystem
     ? [
         "System Field",
-        sysDef ? SYSTEM_FIELD_CATEGORIES[sysDef.category] : "System",
+        sysDef ? CATEGORY_DISPLAY_LABELS[sysDef.category] : "System",
         field.required ? "Required" : "Optional",
       ].join(" · ")
     : [
@@ -547,7 +558,7 @@ export function FormBuilderPanel({ formId }: FormBuilderPanelProps) {
               return (
                 <div key={category}>
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                    {SYSTEM_FIELD_CATEGORIES[category]}
+                    {CATEGORY_DISPLAY_LABELS[category]}
                   </p>
                   <div className="space-y-1">
                     {defsInCategory.map((def) => {

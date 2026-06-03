@@ -12,6 +12,7 @@ export const SYSTEM_FIELD_CATEGORIES = {
   participant: "Child / Participant",
   guardian: "Parent / Guardian",
   emergency_safety: "Emergency / Safety",
+  individual: "Individual / Adult",
 } as const;
 
 export type SystemFieldCategory = keyof typeof SYSTEM_FIELD_CATEGORIES;
@@ -240,6 +241,59 @@ const EMERGENCY_SAFETY_FIELDS: SystemFieldDef[] = [
   },
 ];
 
+// ─── Individual / Adult fields ─────────────────────────────────────────────────
+
+const INDIVIDUAL_FIELDS: SystemFieldDef[] = [
+  {
+    key: "participant_first_name",
+    label: "First Name",
+    fieldType: "text",
+    category: "individual",
+    dbColumn: "participants.first_name",
+    placeholder: "Enter first name",
+  },
+  {
+    key: "participant_last_name",
+    label: "Last Name",
+    fieldType: "text",
+    category: "individual",
+    dbColumn: "participants.last_name",
+    placeholder: "Enter last name",
+  },
+  {
+    key: "participant_email",
+    label: "Email",
+    fieldType: "email",
+    category: "individual",
+    dbColumn: null,
+    placeholder: "email@example.com",
+  },
+  {
+    key: "participant_phone",
+    label: "Phone",
+    fieldType: "phone",
+    category: "individual",
+    dbColumn: null,
+    placeholder: "(555) 000-0000",
+  },
+  {
+    key: "dietary_restrictions",
+    label: "Dietary Restrictions",
+    fieldType: "textarea",
+    category: "individual",
+    dbColumn: null,
+    placeholder: "List any dietary restrictions or food allergies…",
+  },
+  {
+    key: "accessibility_needs",
+    label: "Accessibility Needs",
+    fieldType: "textarea",
+    category: "individual",
+    dbColumn: null,
+    placeholder: "Describe any accessibility requirements or accommodations needed…",
+  },
+];
+
 // ─── Aggregated catalog ────────────────────────────────────────────────────────
 
 /** Full ordered list of all system field definitions. */
@@ -247,6 +301,7 @@ export const SYSTEM_FIELDS: SystemFieldDef[] = [
   ...PARTICIPANT_FIELDS,
   ...GUARDIAN_FIELDS,
   ...EMERGENCY_SAFETY_FIELDS,
+  ...INDIVIDUAL_FIELDS,
 ];
 
 /** Lookup map: system_key → SystemFieldDef */

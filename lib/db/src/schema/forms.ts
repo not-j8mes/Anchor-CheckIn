@@ -8,6 +8,7 @@ export const formsTable = pgTable("forms", {
   description: text("description"),
   isActive: boolean("is_active").notNull().default(true),
   isPublic: boolean("is_public").notNull().default(true),
+  allowAdditionalPeople: boolean("allow_additional_people").notNull().default(false),
   embedSlug: text("embed_slug").notNull().unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

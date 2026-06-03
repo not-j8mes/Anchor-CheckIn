@@ -1,10 +1,26 @@
-import { pgTable, serial, text, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { formsTable } from "./forms";
 import { eventsTable } from "./events";
 import { participantsTable, guardiansTable } from "./participants";
 import { formFieldsTable } from "./form_fields";
+
+/**
+ * registration_groups — a single submission that covers multiple people.
+ * Used for family/group registration types.
+ */
+export const registrationGroupsTable = pgTable("registration_groups", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").references(() => eventsTable.id, { onDelete: "set null" }),
+  formId: integer("form_id").references(() => formsTable.id, { onDelete: "cascade" }),
+  /** ID of the registration record that is the primary registrant (no FK to avoid circular dep). */
+  primaryRegistrantId: integer("primary_registrant_id"),
+  groupName: text("group_name"),
+  submittedAt: timestamp("submitted_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
 
 export const registrationsTable = pgTable("registrations", {
   id: serial("id").primaryKey(),
@@ -19,6 +35,10 @@ export const registrationsTable = pgTable("registrations", {
   guardianId: integer("guardian_id").references(() => guardiansTable.id, {
     onDelete: "set null",
   }),
+  registrationGroupId: integer("registration_group_id").references(
+    () => registrationGroupsTable.id,
+    { onDelete: "set null" }
+  ),
   // Legacy flat columns — kept for backward compatibility
   childFirstName: text("child_first_name").notNull(),
   childLastName: text("child_last_name").notNull(),
@@ -67,9 +87,16 @@ export const insertAnswerSchema = createInsertSchema(answersTable).omit({ id: tr
 export const insertRegistrationCustomAnswerSchema = createInsertSchema(
   registrationCustomAnswersTable
 ).omit({ id: true });
+export const insertRegistrationGroupSchema = createInsertSchema(registrationGroupsTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
 
 export type InsertRegistration = z.infer<typeof insertRegistrationSchema>;
 export type Registration = typeof registrationsTable.$inferSelect;
 export type InsertAnswer = z.infer<typeof insertAnswerSchema>;
 export type Answer = typeof answersTable.$inferSelect;
 export type RegistrationCustomAnswer = typeof registrationCustomAnswersTable.$inferSelect;
+export type RegistrationGroup = typeof registrationGroupsTable.$inferSelect;
+export type InsertRegistrationGroup = z.infer<typeof insertRegistrationGroupSchema>;
