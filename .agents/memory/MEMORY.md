@@ -1,2 +1,3 @@
 - [API server zod imports](api-server-zod-imports.md) — api-server routes must import zod validators from @workspace/api-zod, never directly from zod/v4 (esbuild can't resolve the subpath).
 - [Form fields architecture](form-fields-architecture.md) — new form_fields table coexists with legacy questions; system fields mapped via system_key, custom fields store answers in registration_custom_answers.
+- [Registration submit architecture](registration-submit-architecture.md) — POST /forms/:formId/register now takes `{fields:[{fieldId,value}]}`; server routes to participant/guardian/emergency_contact tables via SYSTEM_KEY_MAP.

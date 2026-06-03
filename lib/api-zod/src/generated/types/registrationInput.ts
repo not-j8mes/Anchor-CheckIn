@@ -5,17 +5,10 @@
  * Church check-in and registration API
  * OpenAPI spec version: 0.1.0
  */
-import type { AnswerInput } from './answerInput';
+import type { FieldSubmission } from './fieldSubmission';
 
 export interface RegistrationInput {
-  childFirstName: string;
-  childLastName: string;
-  childDateOfBirth?: string;
-  guardianName: string;
-  guardianPhone: string;
-  guardianEmail?: string;
-  allergies?: string;
-  specialNeeds?: string;
-  room?: string;
-  answers: AnswerInput[];
+  /** One entry per form field submitted. System fields are routed to the appropriate participant/guardian/emergency_contact columns server-side. Custom question answers are stored in registration_custom_answers.
+   */
+  fields: FieldSubmission[];
 }

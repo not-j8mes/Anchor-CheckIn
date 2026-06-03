@@ -5,6 +5,7 @@ import {
   useSubmitRegistration,
   getGetFormBySlugQueryKey,
   getFormBySlug,
+  type FormField,
 } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,26 +13,47 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CheckCircle2, Plus, Trash2, User, Users } from "lucide-react";
+import { SYSTEM_FIELDS_BY_KEY } from "@/lib/systemFields";
 
-type ChildData = Record<number, string>;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function QuestionField({
-  q,
+/**
+ * Returns true when this form field should go in the "Parent / Guardian" section
+ * rather than the per-child section.
+ */
+function isGuardianField(field: FormField): boolean {
+  if (field.fieldKind !== "system" || !field.systemKey) return false;
+  const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
+  return def?.category === "guardian" || def?.category === "emergency_safety";
+}
+
+// ─── Field renderer ───────────────────────────────────────────────────────────
+
+function FieldInput({
+  field,
   value,
   onChange,
 }: {
-  q: { id: number; label: string; type: string; required: boolean; placeholder?: string | null; options?: string | null };
+  field: FormField;
   value: string;
   onChange: (v: string) => void;
 }) {
-  if (q.type === "textarea") {
+  const { fieldType, placeholder, options, required, label } = field;
+
+  if (fieldType === "textarea") {
     return (
       <Textarea
-        required={q.required}
-        placeholder={q.placeholder || ""}
+        required={required}
+        placeholder={placeholder ?? ""}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="resize-y"
@@ -39,14 +61,15 @@ function QuestionField({
       />
     );
   }
-  if (q.type === "select" && q.options) {
+
+  if ((fieldType === "select" || fieldType === "multiselect") && options) {
     return (
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger>
-          <SelectValue placeholder={q.placeholder || "Select an option"} />
+          <SelectValue placeholder={placeholder ?? "Select an option"} />
         </SelectTrigger>
         <SelectContent>
-          {q.options.split(",").map((opt) => (
+          {options.split(",").map((opt) => (
             <SelectItem key={opt.trim()} value={opt.trim()}>
               {opt.trim()}
             </SelectItem>
@@ -55,37 +78,48 @@ function QuestionField({
       </Select>
     );
   }
-  if (q.type === "checkbox") {
+
+  if (fieldType === "checkbox") {
     return (
       <div className="flex items-center space-x-2 mt-2">
         <Checkbox
-          id={`q-${q.id}`}
+          id={`field-${field.id}`}
           checked={value === "true"}
           onCheckedChange={(c) => onChange(c ? "true" : "")}
         />
-        <Label htmlFor={`q-${q.id}`} className="text-sm font-normal text-muted-foreground cursor-pointer">
-          {q.placeholder || "Yes, I agree"}
+        <Label
+          htmlFor={`field-${field.id}`}
+          className="text-sm font-normal text-muted-foreground cursor-pointer"
+        >
+          {placeholder ?? label}
         </Label>
       </div>
     );
   }
+
   return (
     <Input
       type={
-        q.type === "date" ? "date" :
-        q.type === "email" ? "email" :
-        q.type === "number" ? "number" :
-        q.type === "phone" ? "tel" :
-        "text"
+        fieldType === "date"
+          ? "date"
+          : fieldType === "email"
+            ? "email"
+            : fieldType === "number"
+              ? "number"
+              : fieldType === "phone"
+                ? "tel"
+                : "text"
       }
-      required={q.required}
-      placeholder={q.placeholder || ""}
+      required={required}
+      placeholder={placeholder ?? ""}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="h-11 text-base"
     />
   );
 }
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PublicRegistrationForm() {
   const params = useParams<{ embedSlug: string }>();
@@ -100,11 +134,11 @@ export default function PublicRegistrationForm() {
     retry: false,
   });
 
-  // Parent/guardian answers — keyed by questionId
-  const [parentData, setParentData] = useState<ChildData>({});
+  // Guardian/family answers — keyed by formField.id (same values shared across all children)
+  const [guardianAnswers, setGuardianAnswers] = useState<Record<number, string>>({});
 
-  // Each child has its own answer map
-  const [children, setChildren] = useState<ChildData[]>([{}]);
+  // Per-child answers — one Record<fieldId, string> per child
+  const [childrenAnswers, setChildrenAnswers] = useState<Record<number, string>[]>([{}]);
 
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -124,32 +158,35 @@ export default function PublicRegistrationForm() {
     return (
       <div className="flex-1 min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <h1 className="text-2xl font-bold font-serif mb-2">Form Unavailable</h1>
-        <p className="text-muted-foreground">This registration form is currently closed or does not exist.</p>
+        <p className="text-muted-foreground">
+          This registration form is currently closed or does not exist.
+        </p>
       </div>
     );
   }
 
-  // Split questions: child-specific vs parent/family
-  const childQuestions = form.questions.filter((q) => q.isChildField);
-  const parentQuestions = form.questions.filter((q) => !q.isChildField);
+  // ── Prefer formFields (new system); fall back to empty if none configured ──
+  const formFields: FormField[] = form.formFields ?? [];
 
-  const handleParentChange = (qId: number, value: string) => {
-    setParentData((prev) => ({ ...prev, [qId]: value }));
+  const guardianFields = formFields.filter(isGuardianField);
+  const childFields = formFields.filter((f) => !isGuardianField(f));
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleGuardianChange = (fieldId: number, value: string) => {
+    setGuardianAnswers((prev) => ({ ...prev, [fieldId]: value }));
   };
 
-  const handleChildChange = (childIndex: number, qId: number, value: string) => {
-    setChildren((prev) => {
+  const handleChildChange = (childIndex: number, fieldId: number, value: string) => {
+    setChildrenAnswers((prev) => {
       const next = [...prev];
-      next[childIndex] = { ...next[childIndex], [qId]: value };
+      next[childIndex] = { ...next[childIndex], [fieldId]: value };
       return next;
     });
   };
 
-  const addChild = () => setChildren((prev) => [...prev, {}]);
-
-  const removeChild = (index: number) => {
-    setChildren((prev) => prev.filter((_, i) => i !== index));
-  };
+  const addChild = () => setChildrenAnswers((prev) => [...prev, {}]);
+  const removeChild = (index: number) =>
+    setChildrenAnswers((prev) => prev.filter((_, i) => i !== index));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,37 +194,19 @@ export default function PublicRegistrationForm() {
     setSubmitError(null);
     setIsSubmitting(true);
 
-    const findParentValue = (key: string) => {
-      const q = parentQuestions.find((q) => q.fieldKey === key);
-      return q ? parentData[q.id] ?? "" : "";
-    };
-
     try {
-      for (const childAnswers of children) {
-        const findChildValue = (key: string) => {
-          const q = childQuestions.find((q) => q.fieldKey === key);
-          return q ? childAnswers[q.id] ?? "" : "";
-        };
+      for (const childAnswerMap of childrenAnswers) {
+        // Build fields array: guardian answers (shared) + child answers (per-child)
+        const fields: { fieldId: number; value: string }[] = [];
 
-        const answers = [
-          ...parentQuestions.map((q) => ({ questionId: q.id, value: parentData[q.id] ?? "" })),
-          ...childQuestions.map((q) => ({ questionId: q.id, value: childAnswers[q.id] ?? "" })),
-        ];
+        for (const gf of guardianFields) {
+          fields.push({ fieldId: gf.id, value: guardianAnswers[gf.id] ?? "" });
+        }
+        for (const cf of childFields) {
+          fields.push({ fieldId: cf.id, value: childAnswerMap[cf.id] ?? "" });
+        }
 
-        await submitRegistration.mutateAsync({
-          formId: form.id,
-          data: {
-            childFirstName: findChildValue("childFirstName"),
-            childLastName: findChildValue("childLastName"),
-            childDateOfBirth: findChildValue("childDateOfBirth") || undefined,
-            guardianName: findParentValue("guardianName"),
-            guardianPhone: findParentValue("guardianPhone"),
-            guardianEmail: findParentValue("guardianEmail") || undefined,
-            allergies: findChildValue("allergies") || findParentValue("allergies") || undefined,
-            specialNeeds: findChildValue("specialNeeds") || findParentValue("specialNeeds") || undefined,
-            answers,
-          },
-        });
+        await submitRegistration.mutateAsync({ formId: form.id, data: { fields } });
       }
       setIsSubmitted(true);
     } catch {
@@ -199,22 +218,22 @@ export default function PublicRegistrationForm() {
 
   const handleReset = () => {
     setIsSubmitted(false);
-    setParentData({});
-    setChildren([{}]);
+    setGuardianAnswers({});
+    setChildrenAnswers([{}]);
     setSubmitError(null);
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 min-h-screen bg-muted/20 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto space-y-6">
-
-        {/* Organization Header */}
+        {/* Org header */}
         <div className="text-center space-y-3 mb-8">
           {org?.logoUrl ? (
             <img src={org.logoUrl} alt={org.name} className="h-20 mx-auto object-contain" />
           ) : (
             <div className="w-20 h-20 mx-auto bg-primary text-primary-foreground rounded-full flex items-center justify-center font-serif text-3xl font-bold">
-              {org?.name?.charAt(0) || "C"}
+              {org?.name?.charAt(0) ?? "C"}
             </div>
           )}
           <h1 className="text-3xl font-serif font-bold text-foreground">{org?.name}</h1>
@@ -231,8 +250,8 @@ export default function PublicRegistrationForm() {
               </div>
               <h2 className="text-3xl font-serif font-bold">Registration Complete!</h2>
               <p className="text-muted-foreground text-lg max-w-md">
-                {children.length > 1
-                  ? `Thank you! ${children.length} children have been registered successfully.`
+                {childrenAnswers.length > 1
+                  ? `Thank you! ${childrenAnswers.length} children have been registered successfully.`
                   : "Thank you for registering. We look forward to seeing you!"}
               </p>
               <Button
@@ -247,9 +266,12 @@ export default function PublicRegistrationForm() {
             </CardContent>
           </Card>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6" data-testid="registration-form">
-
-            {/* Form Title */}
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-6"
+            data-testid="registration-form"
+          >
+            {/* Form title */}
             <div className="text-center pb-2">
               <h2 className="text-2xl font-serif font-bold text-foreground">{form.title}</h2>
               {form.description && (
@@ -257,24 +279,26 @@ export default function PublicRegistrationForm() {
               )}
             </div>
 
-            {/* Parent / Guardian Information */}
-            {parentQuestions.length > 0 && (
+            {/* Parent / Guardian section */}
+            {guardianFields.length > 0 && (
               <Card className="shadow-sm overflow-hidden">
                 <div className="bg-primary px-6 py-4 flex items-center gap-2">
                   <User className="w-5 h-5 text-primary-foreground" />
-                  <h3 className="text-lg font-semibold text-primary-foreground">Parent / Guardian Information</h3>
+                  <h3 className="text-lg font-semibold text-primary-foreground">
+                    Parent / Guardian Information
+                  </h3>
                 </div>
                 <CardContent className="p-6 space-y-5">
-                  {parentQuestions.map((q) => (
-                    <div key={q.id} className="space-y-1.5">
+                  {guardianFields.map((field) => (
+                    <div key={field.id} className="space-y-1.5">
                       <Label className="text-sm font-medium flex items-center gap-1">
-                        {q.label}
-                        {q.required && <span className="text-destructive">*</span>}
+                        {field.label}
+                        {field.required && <span className="text-destructive">*</span>}
                       </Label>
-                      <QuestionField
-                        q={q}
-                        value={parentData[q.id] ?? ""}
-                        onChange={(v) => handleParentChange(q.id, v)}
+                      <FieldInput
+                        field={field}
+                        value={guardianAnswers[field.id] ?? ""}
+                        onChange={(v) => handleGuardianChange(field.id, v)}
                       />
                     </div>
                   ))}
@@ -282,17 +306,21 @@ export default function PublicRegistrationForm() {
               </Card>
             )}
 
-            {/* Children Sections */}
-            {children.map((childAnswers, idx) => (
-              <Card key={idx} className="shadow-sm overflow-hidden" data-testid={`child-section-${idx}`}>
+            {/* Per-child sections */}
+            {childrenAnswers.map((childAnswerMap, idx) => (
+              <Card
+                key={idx}
+                className="shadow-sm overflow-hidden"
+                data-testid={`child-section-${idx}`}
+              >
                 <div className="bg-secondary px-6 py-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Users className="w-5 h-5 text-secondary-foreground" />
                     <h3 className="text-lg font-semibold text-secondary-foreground">
-                      {children.length > 1 ? `Child ${idx + 1}` : "Child Information"}
+                      {childrenAnswers.length > 1 ? `Child ${idx + 1}` : "Child Information"}
                     </h3>
                   </div>
-                  {children.length > 1 && (
+                  {childrenAnswers.length > 1 && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -306,28 +334,30 @@ export default function PublicRegistrationForm() {
                   )}
                 </div>
                 <CardContent className="p-6 space-y-5">
-                  {childQuestions.length > 0 ? (
-                    childQuestions.map((q) => (
-                      <div key={q.id} className="space-y-1.5">
+                  {childFields.length > 0 ? (
+                    childFields.map((field) => (
+                      <div key={field.id} className="space-y-1.5">
                         <Label className="text-sm font-medium flex items-center gap-1">
-                          {q.label}
-                          {q.required && <span className="text-destructive">*</span>}
+                          {field.label}
+                          {field.required && <span className="text-destructive">*</span>}
                         </Label>
-                        <QuestionField
-                          q={q}
-                          value={childAnswers[q.id] ?? ""}
-                          onChange={(v) => handleChildChange(idx, q.id, v)}
+                        <FieldInput
+                          field={field}
+                          value={childAnswerMap[field.id] ?? ""}
+                          onChange={(v) => handleChildChange(idx, field.id, v)}
                         />
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-muted-foreground">No child-specific questions configured.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No child-specific fields configured for this form.
+                    </p>
                   )}
                 </CardContent>
               </Card>
             ))}
 
-            {/* Add Another Child */}
+            {/* Add another child */}
             <Button
               type="button"
               variant="outline"
@@ -339,12 +369,10 @@ export default function PublicRegistrationForm() {
               Add Another Child
             </Button>
 
-            {/* Submit Error */}
             {submitError && (
               <p className="text-center text-destructive text-sm">{submitError}</p>
             )}
 
-            {/* Submit Button */}
             <Button
               type="submit"
               size="lg"
@@ -354,9 +382,9 @@ export default function PublicRegistrationForm() {
             >
               {isSubmitting
                 ? "Submitting..."
-                : children.length > 1
-                ? `Register ${children.length} Children`
-                : "Complete Registration"}
+                : childrenAnswers.length > 1
+                  ? `Register ${childrenAnswers.length} Children`
+                  : "Complete Registration"}
             </Button>
 
             <p className="text-center text-xs text-muted-foreground pb-4">

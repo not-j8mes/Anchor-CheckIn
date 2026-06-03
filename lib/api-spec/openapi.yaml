@@ -1089,30 +1089,27 @@ components:
 
     RegistrationInput:
       type: object
-      required: [childFirstName, childLastName, guardianName, guardianPhone, answers]
+      required: [fields]
       properties:
-        childFirstName:
-          type: string
-        childLastName:
-          type: string
-        childDateOfBirth:
-          type: string
-        guardianName:
-          type: string
-        guardianPhone:
-          type: string
-        guardianEmail:
-          type: string
-        allergies:
-          type: string
-        specialNeeds:
-          type: string
-        room:
-          type: string
-        answers:
+        fields:
           type: array
+          description: >
+            One entry per form field submitted. System fields are routed to the
+            appropriate participant/guardian/emergency_contact columns server-side.
+            Custom question answers are stored in registration_custom_answers.
           items:
-            $ref: "#/components/schemas/AnswerInput"
+            $ref: "#/components/schemas/FieldSubmission"
+
+    FieldSubmission:
+      type: object
+      required: [fieldId, value]
+      properties:
+        fieldId:
+          type: integer
+          description: The form_fields.id this answer is for.
+        value:
+          type: string
+          description: The submitted value (always a string; checkboxes use "true"/"false").
 
     Answer:
       type: object

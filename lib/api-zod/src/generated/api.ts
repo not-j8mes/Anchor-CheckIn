@@ -585,19 +585,10 @@ export const SubmitRegistrationParams = zod.object({
 })
 
 export const SubmitRegistrationBody = zod.object({
-  "childFirstName": zod.string(),
-  "childLastName": zod.string(),
-  "childDateOfBirth": zod.string().optional(),
-  "guardianName": zod.string(),
-  "guardianPhone": zod.string(),
-  "guardianEmail": zod.string().optional(),
-  "allergies": zod.string().optional(),
-  "specialNeeds": zod.string().optional(),
-  "room": zod.string().optional(),
-  "answers": zod.array(zod.object({
-  "questionId": zod.number(),
-  "value": zod.string()
-}))
+  "fields": zod.array(zod.object({
+  "fieldId": zod.number().describe('The form_fields.id this answer is for.'),
+  "value": zod.string().describe('The submitted value (always a string; checkboxes use \"true\"\/\"false\").')
+})).describe('One entry per form field submitted. System fields are routed to the appropriate participant\/guardian\/emergency_contact columns server-side. Custom question answers are stored in registration_custom_answers.\n')
 })
 
 

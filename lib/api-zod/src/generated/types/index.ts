@@ -21,6 +21,7 @@ export * from './dayCount';
 export * from './event';
 export * from './eventCheckin';
 export * from './eventWithForm';
+export * from './fieldSubmission';
 export * from './form';
 export * from './formField';
 export * from './formFieldFieldKind';

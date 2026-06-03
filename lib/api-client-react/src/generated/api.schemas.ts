@@ -255,22 +255,22 @@ export interface RegistrationDetail {
   answers: Answer[];
 }
 
-export interface AnswerInput {
-  questionId: number;
+export interface FieldSubmission {
+  /** The form_fields.id this answer is for. */
+  fieldId: number;
+  /** The submitted value (always a string; checkboxes use "true"/"false"). */
   value: string;
 }
 
 export interface RegistrationInput {
-  childFirstName: string;
-  childLastName: string;
-  childDateOfBirth?: string;
-  guardianName: string;
-  guardianPhone: string;
-  guardianEmail?: string;
-  allergies?: string;
-  specialNeeds?: string;
-  room?: string;
-  answers: AnswerInput[];
+  /** One entry per form field submitted. System fields are routed to the appropriate participant/guardian/emergency_contact columns server-side. Custom question answers are stored in registration_custom_answers.
+   */
+  fields: FieldSubmission[];
+}
+
+export interface AnswerInput {
+  questionId: number;
+  value: string;
 }
 
 export interface Child {
