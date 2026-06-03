@@ -270,16 +270,30 @@ export function getSystemFieldsByCategory(category: SystemFieldCategory): System
 }
 
 /**
- * System fields that are added by default when a new event is created.
- * Keys must match entries in SYSTEM_FIELDS.
+ * Default Kids Program Registration template.
+ * Keys added to every new event form, in display order.
+ * Must match the DEFAULT_FORM_FIELDS array in artifacts/api-server/src/routes/events.ts.
+ *
+ * Required (first 8): child names, DOB, guardian names + phone, emergency contact.
+ * Optional (remaining): guardian email, allergies, medical notes, special needs,
+ *                       authorized pickup, photo permission, medical permission.
  */
 export const DEFAULT_SYSTEM_FIELD_KEYS: string[] = [
+  // Required
   "child_first_name",
   "child_last_name",
   "date_of_birth",
   "guardian_first_name",
+  "guardian_last_name",
   "guardian_phone",
+  "emergency_contact_name",
+  "emergency_contact_phone",
+  // Optional
   "guardian_email",
   "allergies",
+  "medical_notes",
   "special_needs",
+  "authorized_pickup_names",
+  "photo_permission",
+  "medical_permission",
 ];

@@ -17,19 +17,33 @@ const DEFAULT_QUESTIONS = [
 ];
 
 /**
- * Default form_fields seeded for every new event.
- * system_key values are stable identifiers — they match SYSTEM_FIELDS in the
+ * Default Kids Program Registration template — seeded for every new event.
+ * system_key values are stable identifiers that match SYSTEM_FIELDS in the
  * frontend's systemFields.ts library and must not change.
+ *
+ * Required:  Child First/Last Name, Date of Birth, Guardian First/Last Name,
+ *            Guardian Phone, Emergency Contact Name & Phone.
+ * Optional:  Guardian Email, Allergies, Medical Notes, Special Needs,
+ *            Authorized Pickup Names, Photo Permission, Medical Permission.
  */
 const DEFAULT_FORM_FIELDS = [
-  { fieldKind: "system", systemKey: "child_first_name",    label: "Child First Name",                    fieldType: "text",     required: true,  sortOrder: 0, placeholder: "Enter first name",                          options: null },
-  { fieldKind: "system", systemKey: "child_last_name",     label: "Child Last Name",                     fieldType: "text",     required: true,  sortOrder: 1, placeholder: "Enter last name",                           options: null },
-  { fieldKind: "system", systemKey: "date_of_birth",       label: "Date of Birth",                       fieldType: "date",     required: true,  sortOrder: 2, placeholder: null,                                        options: null },
-  { fieldKind: "system", systemKey: "guardian_first_name", label: "Parent / Guardian First Name",        fieldType: "text",     required: true,  sortOrder: 3, placeholder: "First name",                                options: null },
-  { fieldKind: "system", systemKey: "guardian_phone",      label: "Parent / Guardian Phone",             fieldType: "phone",    required: true,  sortOrder: 4, placeholder: "(555) 000-0000",                            options: null },
-  { fieldKind: "system", systemKey: "guardian_email",      label: "Parent / Guardian Email",             fieldType: "email",    required: false, sortOrder: 5, placeholder: "email@example.com",                         options: null },
-  { fieldKind: "system", systemKey: "allergies",           label: "Allergies or Medical Notes",          fieldType: "textarea", required: false, sortOrder: 6, placeholder: "List any allergies or medical conditions…",  options: null },
-  { fieldKind: "system", systemKey: "special_needs",       label: "Special Needs / Accommodations",      fieldType: "textarea", required: false, sortOrder: 7, placeholder: "Describe any special needs or accommodations…", options: null },
+  // ── Required fields ────────────────────────────────────────────────────────
+  { fieldKind: "system", systemKey: "child_first_name",          label: "Child First Name",                     fieldType: "text",     required: true,  sortOrder: 0,  placeholder: "Enter first name",                              options: null },
+  { fieldKind: "system", systemKey: "child_last_name",           label: "Child Last Name",                      fieldType: "text",     required: true,  sortOrder: 1,  placeholder: "Enter last name",                               options: null },
+  { fieldKind: "system", systemKey: "date_of_birth",             label: "Date of Birth",                        fieldType: "date",     required: true,  sortOrder: 2,  placeholder: null,                                            options: null },
+  { fieldKind: "system", systemKey: "guardian_first_name",       label: "Parent / Guardian First Name",         fieldType: "text",     required: true,  sortOrder: 3,  placeholder: "First name",                                    options: null },
+  { fieldKind: "system", systemKey: "guardian_last_name",        label: "Parent / Guardian Last Name",          fieldType: "text",     required: true,  sortOrder: 4,  placeholder: "Last name",                                     options: null },
+  { fieldKind: "system", systemKey: "guardian_phone",            label: "Parent / Guardian Phone",              fieldType: "phone",    required: true,  sortOrder: 5,  placeholder: "(555) 000-0000",                                options: null },
+  { fieldKind: "system", systemKey: "emergency_contact_name",    label: "Emergency Contact Name",               fieldType: "text",     required: true,  sortOrder: 6,  placeholder: "Full name",                                     options: null },
+  { fieldKind: "system", systemKey: "emergency_contact_phone",   label: "Emergency Contact Phone",              fieldType: "phone",    required: true,  sortOrder: 7,  placeholder: "(555) 000-0000",                                options: null },
+  // ── Optional fields ────────────────────────────────────────────────────────
+  { fieldKind: "system", systemKey: "guardian_email",            label: "Parent / Guardian Email",              fieldType: "email",    required: false, sortOrder: 8,  placeholder: "email@example.com",                             options: null },
+  { fieldKind: "system", systemKey: "allergies",                 label: "Allergies",                            fieldType: "textarea", required: false, sortOrder: 9,  placeholder: "List any food, medication, or environmental allergies…", options: null },
+  { fieldKind: "system", systemKey: "medical_notes",             label: "Medical Notes",                        fieldType: "textarea", required: false, sortOrder: 10, placeholder: "Any diagnoses, medications, or medical considerations…",  options: null },
+  { fieldKind: "system", systemKey: "special_needs",             label: "Special Needs / Accommodations",       fieldType: "textarea", required: false, sortOrder: 11, placeholder: "Describe any special needs or accommodations required…",  options: null },
+  { fieldKind: "system", systemKey: "authorized_pickup_names",   label: "Authorized Pickup Names",              fieldType: "textarea", required: false, sortOrder: 12, placeholder: "List everyone authorized to pick up this child…",        options: null },
+  { fieldKind: "system", systemKey: "photo_permission",          label: "Photo Permission",                     fieldType: "select",   required: false, sortOrder: 13, placeholder: null,                                            options: "Yes,No" },
+  { fieldKind: "system", systemKey: "medical_permission",        label: "Medical Permission",                   fieldType: "select",   required: false, sortOrder: 14, placeholder: null,                                            options: "Yes,No" },
 ] as const;
 
 async function buildEventRow(event: typeof eventsTable.$inferSelect) {
