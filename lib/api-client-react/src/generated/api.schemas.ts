@@ -86,6 +86,45 @@ export interface Question {
   fieldKey?: string | null;
 }
 
+export type FormFieldFieldKind = typeof FormFieldFieldKind[keyof typeof FormFieldFieldKind];
+
+
+export const FormFieldFieldKind = {
+  system: 'system',
+  custom: 'custom',
+} as const;
+
+export type FormFieldFieldType = typeof FormFieldFieldType[keyof typeof FormFieldFieldType];
+
+
+export const FormFieldFieldType = {
+  text: 'text',
+  textarea: 'textarea',
+  select: 'select',
+  multiselect: 'multiselect',
+  checkbox: 'checkbox',
+  date: 'date',
+  phone: 'phone',
+  email: 'email',
+  number: 'number',
+} as const;
+
+export interface FormField {
+  id: number;
+  formId: number;
+  fieldKind: FormFieldFieldKind;
+  /** @nullable */
+  systemKey?: string | null;
+  label: string;
+  fieldType: FormFieldFieldType;
+  /** @nullable */
+  placeholder?: string | null;
+  required: boolean;
+  sortOrder: number;
+  /** @nullable */
+  options?: string | null;
+}
+
 export interface FormWithQuestions {
   id: number;
   title: string;
@@ -97,6 +136,7 @@ export interface FormWithQuestions {
   submissionCount?: number;
   createdAt?: string;
   questions: Question[];
+  formFields?: FormField[];
 }
 
 export type QuestionInputType = typeof QuestionInputType[keyof typeof QuestionInputType];
@@ -127,6 +167,44 @@ export interface QuestionInput {
 
 export interface ReorderInput {
   questionIds: number[];
+}
+
+export type FormFieldInputFieldKind = typeof FormFieldInputFieldKind[keyof typeof FormFieldInputFieldKind];
+
+
+export const FormFieldInputFieldKind = {
+  system: 'system',
+  custom: 'custom',
+} as const;
+
+export type FormFieldInputFieldType = typeof FormFieldInputFieldType[keyof typeof FormFieldInputFieldType];
+
+
+export const FormFieldInputFieldType = {
+  text: 'text',
+  textarea: 'textarea',
+  select: 'select',
+  multiselect: 'multiselect',
+  checkbox: 'checkbox',
+  date: 'date',
+  phone: 'phone',
+  email: 'email',
+  number: 'number',
+} as const;
+
+export interface FormFieldInput {
+  fieldKind?: FormFieldInputFieldKind;
+  systemKey?: string;
+  label: string;
+  fieldType?: FormFieldInputFieldType;
+  placeholder?: string;
+  required?: boolean;
+  sortOrder?: number;
+  options?: string;
+}
+
+export interface ReorderFieldsInput {
+  fieldIds: number[];
 }
 
 export interface Registration {

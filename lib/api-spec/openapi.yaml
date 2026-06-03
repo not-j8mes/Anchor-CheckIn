@@ -15,7 +15,9 @@ tags:
   - name: forms
     description: Registration form management
   - name: questions
-    description: Form questions
+    description: Form questions (legacy)
+  - name: form_fields
+    description: Form fields (new architecture — system + custom fields)
   - name: registrations
     description: Form registrations/submissions
   - name: children
@@ -410,6 +412,125 @@ paths:
         "204":
           description: Deleted
 
+  /forms/{formId}/fields:
+    get:
+      operationId: listFormFields
+      tags: [form_fields]
+      summary: List form fields for a form (new architecture)
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of form fields
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FormField"
+    post:
+      operationId: createFormField
+      tags: [form_fields]
+      summary: Add a field to a form
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FormFieldInput"
+      responses:
+        "201":
+          description: Created form field
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormField"
+
+  /forms/{formId}/fields/reorder:
+    put:
+      operationId: reorderFormFields
+      tags: [form_fields]
+      summary: Reorder fields in a form
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderFieldsInput"
+      responses:
+        "200":
+          description: Reordered fields
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FormField"
+
+  /forms/{formId}/fields/{fieldId}:
+    put:
+      operationId: updateFormField
+      tags: [form_fields]
+      summary: Update a form field
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FormFieldInput"
+      responses:
+        "200":
+          description: Updated form field
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormField"
+    delete:
+      operationId: deleteFormField
+      tags: [form_fields]
+      summary: Delete a form field
+      parameters:
+        - name: formId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: fieldId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /forms/{formId}/register:
     post:
       operationId: submitRegistration
@@ -783,6 +904,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Question"
+        formFields:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormField"
 
     Question:
       type: object
@@ -837,6 +962,65 @@ components:
       required: [questionIds]
       properties:
         questionIds:
+          type: array
+          items:
+            type: integer
+
+    FormField:
+      type: object
+      required: [id, formId, fieldKind, label, fieldType, required, sortOrder]
+      properties:
+        id:
+          type: integer
+        formId:
+          type: integer
+        fieldKind:
+          type: string
+          enum: [system, custom]
+        systemKey:
+          type: ["string", "null"]
+        label:
+          type: string
+        fieldType:
+          type: string
+          enum: [text, textarea, select, multiselect, checkbox, date, phone, email, number]
+        placeholder:
+          type: ["string", "null"]
+        required:
+          type: boolean
+        sortOrder:
+          type: integer
+        options:
+          type: ["string", "null"]
+
+    FormFieldInput:
+      type: object
+      required: [label]
+      properties:
+        fieldKind:
+          type: string
+          enum: [system, custom]
+        systemKey:
+          type: string
+        label:
+          type: string
+        fieldType:
+          type: string
+          enum: [text, textarea, select, multiselect, checkbox, date, phone, email, number]
+        placeholder:
+          type: string
+        required:
+          type: boolean
+        sortOrder:
+          type: integer
+        options:
+          type: string
+
+    ReorderFieldsInput:
+      type: object
+      required: [fieldIds]
+      properties:
+        fieldIds:
           type: array
           items:
             type: integer

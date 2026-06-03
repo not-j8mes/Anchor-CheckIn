@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq, sql, desc } from "drizzle-orm";
-import { db, formsTable, questionsTable, registrationsTable } from "@workspace/db";
+import { eq, sql, desc, asc } from "drizzle-orm";
+import { db, formsTable, questionsTable, formFieldsTable, registrationsTable } from "@workspace/db";
 import { CreateFormBody, UpdateFormBody, GetFormParams, UpdateFormParams, DeleteFormParams } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
 
@@ -52,16 +52,12 @@ router.get("/forms/by-slug/:embedSlug", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const questions = await db
-      .select()
-      .from(questionsTable)
-      .where(eq(questionsTable.formId, form[0].id))
-      .orderBy(questionsTable.order);
-    const [{ count }] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(registrationsTable)
-      .where(eq(registrationsTable.formId, form[0].id));
-    res.json({ ...form[0], submissionCount: count, questions });
+    const [questions, formFields, [{ count }]] = await Promise.all([
+      db.select().from(questionsTable).where(eq(questionsTable.formId, form[0].id)).orderBy(asc(questionsTable.order)),
+      db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, form[0].id)).orderBy(asc(formFieldsTable.sortOrder)),
+      db.select({ count: sql<number>`count(*)::int` }).from(registrationsTable).where(eq(registrationsTable.formId, form[0].id)),
+    ]);
+    res.json({ ...form[0], submissionCount: count, questions, formFields });
   } catch (err) {
     req.log.error({ err }, "Failed to get form by slug");
     res.status(500).json({ error: "Internal server error" });
@@ -77,16 +73,12 @@ router.get("/forms/:formId", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const questions = await db
-      .select()
-      .from(questionsTable)
-      .where(eq(questionsTable.formId, formId))
-      .orderBy(questionsTable.order);
-    const [{ count }] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(registrationsTable)
-      .where(eq(registrationsTable.formId, formId));
-    res.json({ ...form[0], submissionCount: count, questions });
+    const [questions, formFields, [{ count }]] = await Promise.all([
+      db.select().from(questionsTable).where(eq(questionsTable.formId, formId)).orderBy(asc(questionsTable.order)),
+      db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, formId)).orderBy(asc(formFieldsTable.sortOrder)),
+      db.select({ count: sql<number>`count(*)::int` }).from(registrationsTable).where(eq(registrationsTable.formId, formId)),
+    ]);
+    res.json({ ...form[0], submissionCount: count, questions, formFields });
   } catch (err) {
     req.log.error({ err }, "Failed to get form");
     res.status(500).json({ error: "Internal server error" });

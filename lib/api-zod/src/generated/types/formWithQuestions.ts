@@ -5,6 +5,7 @@
  * Church check-in and registration API
  * OpenAPI spec version: 0.1.0
  */
+import type { FormField } from './formField';
 import type { Question } from './question';
 
 export interface FormWithQuestions {
@@ -18,4 +19,5 @@ export interface FormWithQuestions {
   submissionCount?: number;
   createdAt?: string;
   questions: Question[];
+  formFields?: FormField[];
 }

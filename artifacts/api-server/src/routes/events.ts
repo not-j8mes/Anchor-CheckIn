@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq, sql, desc, inArray } from "drizzle-orm";
-import { db, eventsTable, formsTable, questionsTable, registrationsTable, checkinsTable } from "@workspace/db";
+import { eq, sql, desc, inArray, asc } from "drizzle-orm";
+import { db, eventsTable, formsTable, questionsTable, formFieldsTable, registrationsTable, checkinsTable } from "@workspace/db";
 import { randomBytes } from "crypto";
 
 const router = Router();
@@ -15,6 +15,18 @@ const DEFAULT_QUESTIONS = [
   { label: "Allergies or Medical Notes", type: "textarea", required: false, order: 6, isChildField: true, fieldKey: "allergies", placeholder: "List any allergies or medical conditions..." },
   { label: "Special Needs or Accommodations", type: "textarea", required: false, order: 7, isChildField: true, fieldKey: "specialNeeds", placeholder: "Describe any special needs..." },
 ];
+
+/** New-architecture defaults — one system field per DEFAULT_QUESTIONS entry */
+const DEFAULT_FORM_FIELDS = [
+  { fieldKind: "system", systemKey: "participant.first_name",   label: "Child's First Name",               fieldType: "text",     required: true,  sortOrder: 0, placeholder: "Enter first name",                         options: null },
+  { fieldKind: "system", systemKey: "participant.last_name",    label: "Child's Last Name",                fieldType: "text",     required: true,  sortOrder: 1, placeholder: "Enter last name",                          options: null },
+  { fieldKind: "system", systemKey: "participant.date_of_birth",label: "Date of Birth",                    fieldType: "date",     required: true,  sortOrder: 2, placeholder: null,                                       options: null },
+  { fieldKind: "system", systemKey: "guardian.full_name",       label: "Parent/Guardian Name",             fieldType: "text",     required: true,  sortOrder: 3, placeholder: "Full name",                                options: null },
+  { fieldKind: "system", systemKey: "guardian.phone",           label: "Phone Number",                     fieldType: "phone",    required: true,  sortOrder: 4, placeholder: "(555) 000-0000",                           options: null },
+  { fieldKind: "system", systemKey: "guardian.email",           label: "Email Address",                    fieldType: "email",    required: false, sortOrder: 5, placeholder: "email@example.com",                        options: null },
+  { fieldKind: "system", systemKey: "participant.allergies",    label: "Allergies or Medical Notes",       fieldType: "textarea", required: false, sortOrder: 6, placeholder: "List any allergies or medical conditions...", options: null },
+  { fieldKind: "system", systemKey: "participant.special_needs",label: "Special Needs or Accommodations",  fieldType: "textarea", required: false, sortOrder: 7, placeholder: "Describe any special needs...",             options: null },
+] as const;
 
 async function buildEventRow(event: typeof eventsTable.$inferSelect) {
   let formTitle: string | null = null;
@@ -76,8 +88,13 @@ router.post("/events", async (req, res) => {
       .returning();
 
     if (addDefaultQuestions !== false) {
+      // Legacy questions table (backward compat)
       await db.insert(questionsTable).values(
         DEFAULT_QUESTIONS.map((q) => ({ ...q, formId: form.id, options: null }))
+      );
+      // New form_fields table
+      await db.insert(formFieldsTable).values(
+        DEFAULT_FORM_FIELDS.map((f) => ({ ...f, formId: form.id }))
       );
     }
 
@@ -94,11 +111,10 @@ router.post("/events", async (req, res) => {
       })
       .returning();
 
-    const questions = await db
-      .select()
-      .from(questionsTable)
-      .where(eq(questionsTable.formId, form.id))
-      .orderBy(questionsTable.order);
+    const [questions, formFields] = await Promise.all([
+      db.select().from(questionsTable).where(eq(questionsTable.formId, form.id)).orderBy(asc(questionsTable.order)),
+      db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, form.id)).orderBy(asc(formFieldsTable.sortOrder)),
+    ]);
 
     res.status(201).json({
       ...event,
@@ -106,7 +122,7 @@ router.post("/events", async (req, res) => {
       formTitle: form.title,
       formEmbedSlug: form.embedSlug,
       registrationCount: 0,
-      form: { ...form, submissionCount: 0, questions },
+      form: { ...form, submissionCount: 0, questions, formFields },
     });
   } catch (err) {
     req.log.error({ err }, "Failed to create event");
@@ -158,12 +174,11 @@ router.get("/events/:eventId", async (req, res) => {
     if (event[0].formId) {
       const formRow = await db.select().from(formsTable).where(eq(formsTable.id, event[0].formId)).limit(1);
       if (formRow[0]) {
-        const questions = await db
-          .select()
-          .from(questionsTable)
-          .where(eq(questionsTable.formId, formRow[0].id))
-          .orderBy(questionsTable.order);
-        form = { ...formRow[0], submissionCount: row.registrationCount, questions };
+        const [questions, formFields] = await Promise.all([
+          db.select().from(questionsTable).where(eq(questionsTable.formId, formRow[0].id)).orderBy(asc(questionsTable.order)),
+          db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, formRow[0].id)).orderBy(asc(formFieldsTable.sortOrder)),
+        ]);
+        form = { ...formRow[0], submissionCount: row.registrationCount, questions, formFields };
       }
     }
 

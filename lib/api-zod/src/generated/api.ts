@@ -182,7 +182,19 @@ export const GetEventResponse = zod.object({
   "options": zod.string().nullish(),
   "isChildField": zod.boolean().optional(),
   "fieldKey": zod.string().nullish()
-}))
+})),
+  "formFields": zod.array(zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "fieldKind": zod.enum(['system', 'custom']),
+  "systemKey": zod.string().nullish(),
+  "label": zod.string(),
+  "fieldType": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']),
+  "placeholder": zod.string().nullish(),
+  "required": zod.boolean(),
+  "sortOrder": zod.number(),
+  "options": zod.string().nullish()
+})).optional()
 }),zod.null()]).optional()
 })
 
@@ -254,7 +266,19 @@ export const GetFormBySlugResponse = zod.object({
   "options": zod.string().nullish(),
   "isChildField": zod.boolean().optional(),
   "fieldKey": zod.string().nullish()
-}))
+})),
+  "formFields": zod.array(zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "fieldKind": zod.enum(['system', 'custom']),
+  "systemKey": zod.string().nullish(),
+  "label": zod.string(),
+  "fieldType": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']),
+  "placeholder": zod.string().nullish(),
+  "required": zod.boolean(),
+  "sortOrder": zod.number(),
+  "options": zod.string().nullish()
+})).optional()
 })
 
 
@@ -285,7 +309,19 @@ export const GetFormResponse = zod.object({
   "options": zod.string().nullish(),
   "isChildField": zod.boolean().optional(),
   "fieldKey": zod.string().nullish()
-}))
+})),
+  "formFields": zod.array(zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "fieldKind": zod.enum(['system', 'custom']),
+  "systemKey": zod.string().nullish(),
+  "label": zod.string(),
+  "fieldType": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']),
+  "placeholder": zod.string().nullish(),
+  "required": zod.boolean(),
+  "sortOrder": zod.number(),
+  "options": zod.string().nullish()
+})).optional()
 })
 
 
@@ -429,6 +465,115 @@ export const UpdateQuestionResponse = zod.object({
 export const DeleteQuestionParams = zod.object({
   "formId": zod.coerce.number(),
   "questionId": zod.coerce.number()
+})
+
+
+/**
+ * @summary List form fields for a form (new architecture)
+ */
+export const ListFormFieldsParams = zod.object({
+  "formId": zod.coerce.number()
+})
+
+export const ListFormFieldsResponseItem = zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "fieldKind": zod.enum(['system', 'custom']),
+  "systemKey": zod.string().nullish(),
+  "label": zod.string(),
+  "fieldType": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']),
+  "placeholder": zod.string().nullish(),
+  "required": zod.boolean(),
+  "sortOrder": zod.number(),
+  "options": zod.string().nullish()
+})
+export const ListFormFieldsResponse = zod.array(ListFormFieldsResponseItem)
+
+
+/**
+ * @summary Add a field to a form
+ */
+export const CreateFormFieldParams = zod.object({
+  "formId": zod.coerce.number()
+})
+
+export const CreateFormFieldBody = zod.object({
+  "fieldKind": zod.enum(['system', 'custom']).optional(),
+  "systemKey": zod.string().optional(),
+  "label": zod.string(),
+  "fieldType": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']).optional(),
+  "placeholder": zod.string().optional(),
+  "required": zod.boolean().optional(),
+  "sortOrder": zod.number().optional(),
+  "options": zod.string().optional()
+})
+
+
+/**
+ * @summary Reorder fields in a form
+ */
+export const ReorderFormFieldsParams = zod.object({
+  "formId": zod.coerce.number()
+})
+
+export const ReorderFormFieldsBody = zod.object({
+  "fieldIds": zod.array(zod.number())
+})
+
+export const ReorderFormFieldsResponseItem = zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "fieldKind": zod.enum(['system', 'custom']),
+  "systemKey": zod.string().nullish(),
+  "label": zod.string(),
+  "fieldType": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']),
+  "placeholder": zod.string().nullish(),
+  "required": zod.boolean(),
+  "sortOrder": zod.number(),
+  "options": zod.string().nullish()
+})
+export const ReorderFormFieldsResponse = zod.array(ReorderFormFieldsResponseItem)
+
+
+/**
+ * @summary Update a form field
+ */
+export const UpdateFormFieldParams = zod.object({
+  "formId": zod.coerce.number(),
+  "fieldId": zod.coerce.number()
+})
+
+export const UpdateFormFieldBody = zod.object({
+  "fieldKind": zod.enum(['system', 'custom']).optional(),
+  "systemKey": zod.string().optional(),
+  "label": zod.string(),
+  "fieldType": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']).optional(),
+  "placeholder": zod.string().optional(),
+  "required": zod.boolean().optional(),
+  "sortOrder": zod.number().optional(),
+  "options": zod.string().optional()
+})
+
+export const UpdateFormFieldResponse = zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "fieldKind": zod.enum(['system', 'custom']),
+  "systemKey": zod.string().nullish(),
+  "label": zod.string(),
+  "fieldType": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']),
+  "placeholder": zod.string().nullish(),
+  "required": zod.boolean(),
+  "sortOrder": zod.number(),
+  "options": zod.string().nullish()
+})
+
+
+/**
+ * @summary Delete a form field
+ */
+export const DeleteFormFieldParams = zod.object({
+  "formId": zod.coerce.number(),
+  "fieldId": zod.coerce.number()
 })
 
 
