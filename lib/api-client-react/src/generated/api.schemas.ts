@@ -403,6 +403,14 @@ export interface Event {
   /** @nullable */
   formEmbedSlug?: string | null;
   registrationCount: number;
+  /** @nullable */
+  trackAttendance?: boolean | null;
+  /** @nullable */
+  requireCheckout?: boolean | null;
+  /** @nullable */
+  printLabels?: boolean | null;
+  /** @nullable */
+  labelType?: string | null;
   createdAt: string;
 }
 
@@ -426,6 +434,14 @@ export interface EventWithForm {
   /** @nullable */
   formEmbedSlug?: string | null;
   registrationCount: number;
+  /** @nullable */
+  trackAttendance?: boolean | null;
+  /** @nullable */
+  requireCheckout?: boolean | null;
+  /** @nullable */
+  printLabels?: boolean | null;
+  /** @nullable */
+  labelType?: string | null;
   createdAt: string;
   form?: FormWithQuestions | null;
 }
@@ -441,6 +457,10 @@ export interface CreateEventInput {
   formTitle: string;
   formDescription?: string;
   addDefaultQuestions?: boolean;
+  trackAttendance?: boolean;
+  requireCheckout?: boolean;
+  printLabels?: boolean;
+  labelType?: string;
 }
 
 export interface UpdateEventInput {
@@ -451,6 +471,10 @@ export interface UpdateEventInput {
   startDate?: string;
   endDate?: string;
   status?: string;
+  trackAttendance?: boolean;
+  requireCheckout?: boolean;
+  printLabels?: boolean;
+  labelType?: string;
 }
 
 export type ListChildrenParams = {

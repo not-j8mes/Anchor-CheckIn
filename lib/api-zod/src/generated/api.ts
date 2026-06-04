@@ -103,6 +103,10 @@ export const ListEventsResponseItem = zod.object({
   "formTitle": zod.string().nullish(),
   "formEmbedSlug": zod.string().nullish(),
   "registrationCount": zod.number(),
+  "trackAttendance": zod.boolean().nullish(),
+  "requireCheckout": zod.boolean().nullish(),
+  "printLabels": zod.boolean().nullish(),
+  "labelType": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListEventsResponse = zod.array(ListEventsResponseItem)
@@ -121,7 +125,11 @@ export const CreateEventBody = zod.object({
   "status": zod.string().optional(),
   "formTitle": zod.string(),
   "formDescription": zod.string().optional(),
-  "addDefaultQuestions": zod.boolean().optional()
+  "addDefaultQuestions": zod.boolean().optional(),
+  "trackAttendance": zod.boolean().optional(),
+  "requireCheckout": zod.boolean().optional(),
+  "printLabels": zod.boolean().optional(),
+  "labelType": zod.string().optional()
 })
 
 
@@ -166,6 +174,10 @@ export const GetEventResponse = zod.object({
   "formTitle": zod.string().nullish(),
   "formEmbedSlug": zod.string().nullish(),
   "registrationCount": zod.number(),
+  "trackAttendance": zod.boolean().nullish(),
+  "requireCheckout": zod.boolean().nullish(),
+  "printLabels": zod.boolean().nullish(),
+  "labelType": zod.string().nullish(),
   "createdAt": zod.string(),
   "form": zod.union([zod.object({
   "id": zod.number(),
@@ -219,7 +231,11 @@ export const UpdateEventBody = zod.object({
   "registrationType": zod.string().optional(),
   "startDate": zod.string().optional(),
   "endDate": zod.string().optional(),
-  "status": zod.string().optional()
+  "status": zod.string().optional(),
+  "trackAttendance": zod.boolean().optional(),
+  "requireCheckout": zod.boolean().optional(),
+  "printLabels": zod.boolean().optional(),
+  "labelType": zod.string().optional()
 })
 
 export const UpdateEventResponse = zod.object({
@@ -235,6 +251,10 @@ export const UpdateEventResponse = zod.object({
   "formTitle": zod.string().nullish(),
   "formEmbedSlug": zod.string().nullish(),
   "registrationCount": zod.number(),
+  "trackAttendance": zod.boolean().nullish(),
+  "requireCheckout": zod.boolean().nullish(),
+  "printLabels": zod.boolean().nullish(),
+  "labelType": zod.string().nullish(),
   "createdAt": zod.string()
 })
 

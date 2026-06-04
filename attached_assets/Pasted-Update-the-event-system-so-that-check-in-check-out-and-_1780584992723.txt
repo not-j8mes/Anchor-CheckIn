@@ -1,0 +1,60 @@
+Update the event system so that check-in, check-out, and label printing are controlled by event settings instead of appearing on every event.
+
+Add event-level settings:
+
+1. Registration Type
+- Kids event with parent/guardian registration
+- Individual signup
+- Group/family signup
+
+2. Attendance Tracking
+- Add a toggle: “Track attendance with check-ins”
+- If this is OFF:
+  - Hide the Checked In tab
+  - Hide the Checked In count card
+  - Hide the “Go to Check-In Kiosk” button
+  - Do not show check-in actions for registrations
+
+3. Check-Out Tracking
+- Add a toggle: “Require check-out”
+- This should only be available for kids/child events
+- If this is OFF:
+  - Hide the Checked Out tab
+  - Hide the Checked Out count card
+  - Hide all check-out actions
+  - Do not generate or display child pickup/security codes
+
+4. Label Printing
+- Add a toggle: “Print name labels at check-in”
+- This option should only appear if “Track attendance with check-ins” is ON
+- Add a dropdown for label type:
+  - Simple name label
+  - Child security label
+
+Label behavior:
+- For individual signup events, labels should be simple name labels only.
+- A simple name label should include only the person’s name and optionally the event name.
+- It should NOT include an alphanumeric pickup/security code.
+- Child security labels should only be used for kids events where check-out is required.
+- Child security labels should include the child name, parent/guardian info if available, allergies/notes if available, and the matching pickup/security code.
+
+Update the event dashboard UI:
+- Only show the Registered card for all events.
+- Show Checked In card only when attendance tracking is enabled.
+- Show Checked Out card only when check-out tracking is enabled.
+- In the tab bar, only show tabs that apply to the current event settings.
+- For an individual signup event with attendance tracking OFF, only show Registrations and Form Builder.
+- For an individual signup event with attendance tracking ON, show Registrations, Checked In, and Form Builder.
+- For a kids event with check-in and check-out enabled, show Registrations, Checked In, Checked Out, and Form Builder.
+
+Update the event creation/edit flow:
+- When creating or editing an event, include these settings clearly in an “Event Options” or “Check-In Settings” section.
+- Set smart defaults:
+  - Kids event: check-ins ON, check-outs ON, label printing ON, child security labels
+  - Individual signup: check-ins OFF by default, check-outs OFF, label printing OFF, simple name labels only if enabled
+  - Group/family signup: check-ins optional, check-outs OFF by default, label printing optional
+
+Important:
+- Do not remove existing check-in/check-out functionality.
+- Make the visibility of dashboard cards, tabs, kiosk buttons, and label options depend on the event’s settings.
+- Existing events should keep working. If old events do not have these settings yet, default them safely based on event type.

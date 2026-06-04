@@ -116,12 +116,19 @@ router.get("/events", async (req, res) => {
 });
 
 router.post("/events", async (req, res) => {
-  const { name, description, eventType, registrationType, startDate, endDate, status, formTitle, formDescription, addDefaultQuestions } = req.body;
+  const { name, description, eventType, registrationType, startDate, endDate, status, formTitle, formDescription, addDefaultQuestions, trackAttendance, requireCheckout, printLabels, labelType } = req.body;
 
   if (!name || !eventType || !formTitle) {
     res.status(400).json({ error: "name, eventType, and formTitle are required" });
     return;
   }
+
+  // Smart defaults based on registration type when caller doesn't specify
+  const isChildCheckin = !registrationType || registrationType === "child_checkin";
+  const resolvedTrackAttendance = trackAttendance !== undefined ? trackAttendance : isChildCheckin;
+  const resolvedRequireCheckout = requireCheckout !== undefined ? requireCheckout : isChildCheckin;
+  const resolvedPrintLabels = printLabels !== undefined ? printLabels : isChildCheckin;
+  const resolvedLabelType = labelType || (resolvedRequireCheckout ? "child_security" : "simple_name");
 
   try {
     const embedSlug = randomBytes(6).toString("hex");
@@ -162,6 +169,10 @@ router.post("/events", async (req, res) => {
         endDate: endDate || null,
         status: status || "upcoming",
         formId: form.id,
+        trackAttendance: resolvedTrackAttendance,
+        requireCheckout: resolvedRequireCheckout,
+        printLabels: resolvedPrintLabels,
+        labelType: resolvedLabelType,
       })
       .returning();
 
@@ -249,7 +260,7 @@ router.put("/events/:eventId", async (req, res) => {
     res.status(400).json({ error: "Invalid eventId" });
     return;
   }
-  const { name, description, eventType, registrationType, startDate, endDate, status } = req.body;
+  const { name, description, eventType, registrationType, startDate, endDate, status, trackAttendance, requireCheckout, printLabels, labelType } = req.body;
   try {
     const [updated] = await db
       .update(eventsTable)
@@ -261,6 +272,10 @@ router.put("/events/:eventId", async (req, res) => {
         ...(startDate !== undefined && { startDate }),
         ...(endDate !== undefined && { endDate }),
         ...(status !== undefined && { status }),
+        ...(trackAttendance !== undefined && { trackAttendance }),
+        ...(requireCheckout !== undefined && { requireCheckout }),
+        ...(printLabels !== undefined && { printLabels }),
+        ...(labelType !== undefined && { labelType }),
       })
       .where(eq(eventsTable.id, eventId))
       .returning();

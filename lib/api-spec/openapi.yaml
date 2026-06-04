@@ -1345,6 +1345,14 @@ components:
           type: ["string", "null"]
         registrationCount:
           type: integer
+        trackAttendance:
+          type: ["boolean", "null"]
+        requireCheckout:
+          type: ["boolean", "null"]
+        printLabels:
+          type: ["boolean", "null"]
+        labelType:
+          type: ["string", "null"]
         createdAt:
           type: string
 
@@ -1376,6 +1384,14 @@ components:
           type: ["string", "null"]
         registrationCount:
           type: integer
+        trackAttendance:
+          type: ["boolean", "null"]
+        requireCheckout:
+          type: ["boolean", "null"]
+        printLabels:
+          type: ["boolean", "null"]
+        labelType:
+          type: ["string", "null"]
         createdAt:
           type: string
         form:
@@ -1407,6 +1423,14 @@ components:
           type: string
         addDefaultQuestions:
           type: boolean
+        trackAttendance:
+          type: boolean
+        requireCheckout:
+          type: boolean
+        printLabels:
+          type: boolean
+        labelType:
+          type: string
 
     UpdateEventInput:
       type: object
@@ -1424,4 +1448,12 @@ components:
         endDate:
           type: string
         status:
+          type: string
+        trackAttendance:
+          type: boolean
+        requireCheckout:
+          type: boolean
+        printLabels:
+          type: boolean
+        labelType:
           type: string

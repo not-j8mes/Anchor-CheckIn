@@ -17,4 +17,8 @@ export interface CreateEventInput {
   formTitle: string;
   formDescription?: string;
   addDefaultQuestions?: boolean;
+  trackAttendance?: boolean;
+  requireCheckout?: boolean;
+  printLabels?: boolean;
+  labelType?: string;
 }

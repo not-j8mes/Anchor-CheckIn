@@ -14,4 +14,8 @@ export interface UpdateEventInput {
   startDate?: string;
   endDate?: string;
   status?: string;
+  trackAttendance?: boolean;
+  requireCheckout?: boolean;
+  printLabels?: boolean;
+  labelType?: string;
 }

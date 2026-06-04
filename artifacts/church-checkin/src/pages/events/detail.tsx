@@ -131,6 +131,26 @@ export default function EventDetail() {
   const checkedOut = checkins?.filter((c) => !!c.checkoutAt) ?? [];
   const isFormTab = activeTab === "form";
 
+  // Derive check-in settings — null means use smart defaults from registration type
+  const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
+  const trackAttendance = event.trackAttendance ?? isChildCheckin;
+  const requireCheckout = event.requireCheckout ?? (isChildCheckin && trackAttendance);
+  const labelType = event.labelType ?? (requireCheckout ? "child_security" : "simple_name");
+
+  // Build visible tabs based on settings
+  const visibleTabs = [
+    "registrations",
+    ...(trackAttendance ? ["checked-in"] : []),
+    ...(requireCheckout ? ["checked-out"] : []),
+    "form",
+  ];
+  const tabGridClass: Record<number, string> = {
+    2: "grid-cols-2",
+    3: "grid-cols-3",
+    4: "grid-cols-4",
+  };
+  const tabGrid = tabGridClass[visibleTabs.length] ?? "grid-cols-4";
+
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">
       {/* Header */}
@@ -160,28 +180,32 @@ export default function EventDetail() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-5 flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <LogIn className="w-5 h-5 text-green-700" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{checkedIn.length}</p>
-              <p className="text-sm text-muted-foreground">Checked In</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5 flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-              <LogOut className="w-5 h-5 text-amber-700" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{checkedOut.length}</p>
-              <p className="text-sm text-muted-foreground">Checked Out</p>
-            </div>
-          </CardContent>
-        </Card>
+        {trackAttendance && (
+          <Card>
+            <CardContent className="p-5 flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <LogIn className="w-5 h-5 text-green-700" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{checkedIn.length}</p>
+                <p className="text-sm text-muted-foreground">Checked In</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {requireCheckout && (
+          <Card>
+            <CardContent className="p-5 flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                <LogOut className="w-5 h-5 text-amber-700" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{checkedOut.length}</p>
+                <p className="text-sm text-muted-foreground">Checked Out</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {event.startDate && (
           <Card>
             <CardContent className="p-5 flex items-center gap-3">
@@ -201,22 +225,26 @@ export default function EventDetail() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className={`grid grid-cols-1 gap-8 ${!isFormTab ? "md:grid-cols-3" : ""}`}>
           <div className={!isFormTab ? "md:col-span-2" : ""}>
-            <TabsList className="w-full grid grid-cols-4 mb-4">
+            <TabsList className={`w-full grid ${tabGrid} mb-4`}>
               <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm">
                 <ClipboardList className="w-4 h-4 shrink-0" />
                 <span className="hidden sm:inline">Registrations</span>
                 <Badge variant="secondary" className="text-xs ml-1">{registrations?.length ?? 0}</Badge>
               </TabsTrigger>
-              <TabsTrigger value="checked-in" className="gap-1.5 text-xs sm:text-sm">
-                <LogIn className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">Checked In</span>
-                <Badge variant="secondary" className="text-xs ml-1">{checkedIn.length}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="checked-out" className="gap-1.5 text-xs sm:text-sm">
-                <LogOut className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">Checked Out</span>
-                <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
-              </TabsTrigger>
+              {trackAttendance && (
+                <TabsTrigger value="checked-in" className="gap-1.5 text-xs sm:text-sm">
+                  <LogIn className="w-4 h-4 shrink-0" />
+                  <span className="hidden sm:inline">Checked In</span>
+                  <Badge variant="secondary" className="text-xs ml-1">{checkedIn.length}</Badge>
+                </TabsTrigger>
+              )}
+              {requireCheckout && (
+                <TabsTrigger value="checked-out" className="gap-1.5 text-xs sm:text-sm">
+                  <LogOut className="w-4 h-4 shrink-0" />
+                  <span className="hidden sm:inline">Checked Out</span>
+                  <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
+                </TabsTrigger>
+              )}
               <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
                 <FileEdit className="w-4 h-4 shrink-0" />
                 <span className="hidden sm:inline">Form Builder</span>
@@ -284,20 +312,24 @@ export default function EventDetail() {
                           </div>
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="text-right">
-                              <p className="font-mono font-bold text-sm text-green-700 bg-green-50 px-2 py-0.5 rounded">{c.labelCode}</p>
+                              {labelType === "child_security" && c.labelCode && (
+                                <p className="font-mono font-bold text-sm text-green-700 bg-green-50 px-2 py-0.5 rounded">{c.labelCode}</p>
+                              )}
                               <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(c.checkinAt), "h:mm a")}</p>
                             </div>
                             <div className="flex flex-col gap-1 items-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
-                                disabled={loadingId === c.id}
-                                onClick={() => { setLoadingId(c.id); checkoutChild.mutate({ checkinId: c.id }); }}
-                              >
-                                {loadingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
-                                Check Out
-                              </Button>
+                              {requireCheckout && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
+                                  disabled={loadingId === c.id}
+                                  onClick={() => { setLoadingId(c.id); checkoutChild.mutate({ checkinId: c.id }); }}
+                                >
+                                  {loadingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                                  Check Out
+                                </Button>
+                              )}
                               <button
                                 type="button"
                                 className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
@@ -427,11 +459,13 @@ export default function EventDetail() {
                 </Card>
               )}
 
-              <Button asChild className="w-full">
-                <Link href="/checkin">
-                  <CheckSquare className="w-4 h-4 mr-2" /> Go to Check-In Kiosk
-                </Link>
-              </Button>
+              {trackAttendance && (
+                <Button asChild className="w-full">
+                  <Link href="/checkin">
+                    <CheckSquare className="w-4 h-4 mr-2" /> Go to Check-In Kiosk
+                  </Link>
+                </Button>
+              )}
             </div>
           )}
         </div>

@@ -27,6 +27,14 @@ export interface EventWithForm {
   /** @nullable */
   formEmbedSlug?: string | null;
   registrationCount: number;
+  /** @nullable */
+  trackAttendance?: boolean | null;
+  /** @nullable */
+  requireCheckout?: boolean | null;
+  /** @nullable */
+  printLabels?: boolean | null;
+  /** @nullable */
+  labelType?: string | null;
   createdAt: string;
   form?: FormWithQuestions | null;
 }

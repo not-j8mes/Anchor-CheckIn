@@ -136,7 +136,11 @@ interface WizardState {
   formTitle: string;
   formDescription: string;
   addDefaultQuestions: boolean;
-  enableCheckin: boolean;
+  // Step 3: check-in / attendance settings
+  trackAttendance: boolean;
+  requireCheckout: boolean;
+  printLabels: boolean;
+  labelType: string;
 }
 
 const WIZARD_DEFAULTS: WizardState = {
@@ -150,7 +154,10 @@ const WIZARD_DEFAULTS: WizardState = {
   formTitle: "",
   formDescription: "",
   addDefaultQuestions: true,
-  enableCheckin: false,
+  trackAttendance: false,
+  requireCheckout: false,
+  printLabels: false,
+  labelType: "simple_name",
 };
 
 interface CreateEventWizardProps {
@@ -175,11 +182,14 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
   };
 
   const handleSelectType = (typeValue: string) => {
-    const chosen = REGISTRATION_TYPES.find((t) => t.value === typeValue);
+    const isChild = typeValue === "child_checkin";
     setState((prev) => ({
       ...prev,
       registrationType: typeValue,
-      enableCheckin: chosen?.defaultCheckin ?? false,
+      trackAttendance: isChild,
+      requireCheckout: isChild,
+      printLabels: isChild,
+      labelType: isChild ? "child_security" : "simple_name",
     }));
     setStep(2);
   };
@@ -213,6 +223,10 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
           formTitle: state.formTitle,
           formDescription: state.formDescription || undefined,
           addDefaultQuestions: state.addDefaultQuestions,
+          trackAttendance: state.trackAttendance,
+          requireCheckout: state.requireCheckout,
+          printLabels: state.printLabels,
+          labelType: state.labelType,
         },
       },
       {
@@ -383,42 +397,103 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium">Form fields</Label>
+              <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
+                <Switch
+                  id="default-questions"
+                  checked={state.addDefaultQuestions}
+                  onCheckedChange={(v) => update("addDefaultQuestions", v)}
+                />
+                <div>
+                  <Label htmlFor="default-questions" className="cursor-pointer font-medium text-sm">
+                    Start from template
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {state.registrationType === "child_checkin"
+                      ? "Includes child name, DOB, guardian, emergency contact, allergies, and more."
+                      : state.registrationType === "family_group"
+                      ? "Includes primary contact and fields for adding family members."
+                      : "Includes name, contact info, and basic attendee fields."}
+                    {" "}Turn off to start with a blank form.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Attendance &amp; Check-In</Label>
               <div className="space-y-2">
                 <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
                   <Switch
-                    id="default-questions"
-                    checked={state.addDefaultQuestions}
-                    onCheckedChange={(v) => update("addDefaultQuestions", v)}
+                    id="track-attendance"
+                    checked={state.trackAttendance}
+                    onCheckedChange={(v) => {
+                      update("trackAttendance", v);
+                      if (!v) { update("requireCheckout", false); update("printLabels", false); }
+                    }}
                   />
                   <div>
-                    <Label htmlFor="default-questions" className="cursor-pointer font-medium text-sm">
-                      Start from template
+                    <Label htmlFor="track-attendance" className="cursor-pointer font-medium text-sm">
+                      Track attendance with check-ins
                     </Label>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {state.registrationType === "child_checkin"
-                        ? "Includes child name, DOB, guardian, emergency contact, allergies, and more."
-                        : state.registrationType === "family_group"
-                        ? "Includes primary contact and fields for adding family members."
-                        : "Includes name, contact info, and basic attendee fields."}
-                      {" "}Turn off to start with a blank form.
+                      Staff can check attendees in at the kiosk. Shows Checked In tab and count.
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
-                  <Switch
-                    id="enable-checkin"
-                    checked={state.enableCheckin}
-                    onCheckedChange={(v) => update("enableCheckin", v)}
-                  />
-                  <div>
-                    <Label htmlFor="enable-checkin" className="cursor-pointer font-medium text-sm">
-                      Enable check-in for this event
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Allow staff to check attendees in and out and print name labels.
-                    </p>
+
+                {state.trackAttendance && state.registrationType === "child_checkin" && (
+                  <div className="ml-4 flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
+                    <Switch
+                      id="require-checkout"
+                      checked={state.requireCheckout}
+                      onCheckedChange={(v) => update("requireCheckout", v)}
+                    />
+                    <div>
+                      <Label htmlFor="require-checkout" className="cursor-pointer font-medium text-sm">
+                        Require check-out
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Staff must check children out. Enables pickup security codes.
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {state.trackAttendance && (
+                  <div className="ml-4 flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
+                    <Switch
+                      id="print-labels"
+                      checked={state.printLabels}
+                      onCheckedChange={(v) => update("printLabels", v)}
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor="print-labels" className="cursor-pointer font-medium text-sm">
+                        Print name labels at check-in
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Print a label when each attendee checks in.
+                      </p>
+                      {state.printLabels && (
+                        <div className="mt-2">
+                          <Select
+                            value={state.labelType}
+                            onValueChange={(v) => update("labelType", v)}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="simple_name">Simple name label</SelectItem>
+                              <SelectItem value="child_security" disabled={state.registrationType !== "child_checkin"}>
+                                Child security label {state.registrationType !== "child_checkin" ? "(kids events only)" : ""}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -457,7 +532,20 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
 // ─── Edit Event Dialog ──────────────────────────────────────────────────────
 
 interface EditEventDialogProps {
-  event: { id: number; name: string; description?: string | null; eventType: string; startDate?: string | null; endDate?: string | null; status: string };
+  event: {
+    id: number;
+    name: string;
+    description?: string | null;
+    eventType: string;
+    registrationType?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    status: string;
+    trackAttendance?: boolean | null;
+    requireCheckout?: boolean | null;
+    printLabels?: boolean | null;
+    labelType?: string | null;
+  };
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -465,6 +553,9 @@ interface EditEventDialogProps {
 function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Safe defaults for check-in settings (null = derive from registrationType)
+  const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
   const [form, setForm] = useState({
     name: event.name,
     description: event.description ?? "",
@@ -472,6 +563,10 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
     startDate: event.startDate ?? "",
     endDate: event.endDate ?? "",
     status: event.status,
+    trackAttendance: event.trackAttendance ?? isChildCheckin,
+    requireCheckout: event.requireCheckout ?? isChildCheckin,
+    printLabels: event.printLabels ?? isChildCheckin,
+    labelType: event.labelType ?? (isChildCheckin ? "child_security" : "simple_name"),
   });
 
   const updateEvent = useUpdateEvent({
@@ -488,7 +583,7 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby={undefined}>
+      <DialogContent aria-describedby={undefined} className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Event</DialogTitle>
         </DialogHeader>
@@ -532,6 +627,74 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* ── Check-In Settings ── */}
+          <div className="space-y-2 pt-1 border-t border-border">
+            <Label className="text-sm font-medium">Attendance &amp; Check-In</Label>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between py-1.5">
+                <div>
+                  <span className="text-sm font-medium">Track attendance with check-ins</span>
+                  <p className="text-xs text-muted-foreground">Show Checked In tab and kiosk button</p>
+                </div>
+                <Switch
+                  checked={form.trackAttendance}
+                  onCheckedChange={(v) => setForm((p) => ({
+                    ...p,
+                    trackAttendance: v,
+                    requireCheckout: v ? p.requireCheckout : false,
+                    printLabels: v ? p.printLabels : false,
+                  }))}
+                />
+              </div>
+
+              {form.trackAttendance && isChildCheckin && (
+                <div className="ml-3 flex items-center justify-between py-1.5">
+                  <div>
+                    <span className="text-sm font-medium">Require check-out</span>
+                    <p className="text-xs text-muted-foreground">Track departures and security codes</p>
+                  </div>
+                  <Switch
+                    checked={form.requireCheckout}
+                    onCheckedChange={(v) => setForm((p) => ({ ...p, requireCheckout: v }))}
+                  />
+                </div>
+              )}
+
+              {form.trackAttendance && (
+                <div className="ml-3 flex items-center justify-between py-1.5">
+                  <div>
+                    <span className="text-sm font-medium">Print name labels at check-in</span>
+                    <p className="text-xs text-muted-foreground">Print a label per attendee</p>
+                  </div>
+                  <Switch
+                    checked={form.printLabels}
+                    onCheckedChange={(v) => setForm((p) => ({ ...p, printLabels: v }))}
+                  />
+                </div>
+              )}
+
+              {form.trackAttendance && form.printLabels && (
+                <div className="ml-3 space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Label type</Label>
+                  <Select
+                    value={form.labelType}
+                    onValueChange={(v) => setForm((p) => ({ ...p, labelType: v }))}
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="simple_name">Simple name label</SelectItem>
+                      <SelectItem value="child_security" disabled={!isChildCheckin}>
+                        Child security label {!isChildCheckin ? "(kids events only)" : ""}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <DialogFooter>
