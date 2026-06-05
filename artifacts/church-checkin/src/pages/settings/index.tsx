@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Moon, Sun, Trash2 } from "lucide-react";
+import { useDarkMode } from "@/hooks/use-dark-mode";
 
 export default function Settings() {
   const { data: org, isLoading } = useGetOrganization();
@@ -32,6 +34,7 @@ export default function Settings() {
     website: ""
   });
 
+  const { isDark, setIsDark } = useDarkMode();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
@@ -94,6 +97,29 @@ export default function Settings() {
         <h1 className="text-3xl font-serif font-bold text-foreground">Organization Settings</h1>
         <p className="text-muted-foreground mt-1">Configure your church identity and default styling</p>
       </div>
+
+      <Card className="border-card-border shadow-sm">
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+          <CardDescription>Customize how the application looks for you.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {isDark ? <Moon className="w-5 h-5 text-muted-foreground" /> : <Sun className="w-5 h-5 text-muted-foreground" />}
+              <div>
+                <p className="font-medium text-sm">Dark Mode</p>
+                <p className="text-xs text-muted-foreground">Switch between light and dark theme</p>
+              </div>
+            </div>
+            <Switch
+              checked={isDark}
+              onCheckedChange={setIsDark}
+              aria-label="Toggle dark mode"
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       <form onSubmit={handleSubmit}>
         <Card className="border-card-border shadow-sm">
