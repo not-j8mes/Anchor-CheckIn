@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, sql, desc, inArray, asc } from "drizzle-orm";
-import { db, eventsTable, formsTable, questionsTable, formFieldsTable, registrationsTable, checkinsTable } from "@workspace/db";
+import { db, eventsTable, formsTable, questionsTable, formFieldsTable, registrationsTable, checkinsTable, registrationCustomAnswersTable } from "@workspace/db";
 import { randomBytes } from "crypto";
 
 const router = Router();
@@ -217,6 +217,103 @@ router.get("/events/:eventId/checkins", async (req, res) => {
     })));
   } catch (err) {
     req.log.error({ err }, "Failed to list event checkins");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── GET /events/:eventId/registrations/export ────────────────────────────────
+// Returns registration + check-in + custom-answer data for CSV download.
+// Must be declared before the bare /:eventId route so Express resolves it first.
+
+router.get("/events/:eventId/registrations/export", async (req, res) => {
+  const eventId = parseInt(req.params.eventId, 10);
+  if (isNaN(eventId)) { res.status(400).json({ error: "Invalid eventId" }); return; }
+
+  try {
+    const [event] = await db
+      .select()
+      .from(eventsTable)
+      .where(eq(eventsTable.id, eventId))
+      .limit(1);
+
+    if (!event) { res.status(404).json({ error: "Event not found" }); return; }
+    if (!event.formId) {
+      res.json({ eventName: event.name, rows: [], customColumns: [] });
+      return;
+    }
+
+    const registrations = await db
+      .select()
+      .from(registrationsTable)
+      .where(eq(registrationsTable.formId, event.formId))
+      .orderBy(asc(registrationsTable.createdAt));
+
+    if (registrations.length === 0) {
+      res.json({ eventName: event.name, rows: [], customColumns: [] });
+      return;
+    }
+
+    const regIds = registrations.map((r) => r.id);
+
+    // Most-recent check-in per registration (desc so first entry = latest)
+    const allCheckins = await db
+      .select()
+      .from(checkinsTable)
+      .where(inArray(checkinsTable.registrationId, regIds))
+      .orderBy(desc(checkinsTable.checkinAt));
+
+    const latestCheckin = new Map<number, typeof checkinsTable.$inferSelect>();
+    for (const c of allCheckins) {
+      if (!latestCheckin.has(c.registrationId)) latestCheckin.set(c.registrationId, c);
+    }
+
+    // Custom (non-system) answers for all registrations
+    const allCustomAnswers = await db
+      .select()
+      .from(registrationCustomAnswersTable)
+      .where(inArray(registrationCustomAnswersTable.registrationId, regIds));
+
+    // Group custom answers and collect unique column names in first-seen order
+    const answersByReg = new Map<number, Record<string, string>>();
+    const customColumns: string[] = [];
+    const seenCols = new Set<string>();
+    for (const a of allCustomAnswers) {
+      if (!answersByReg.has(a.registrationId)) answersByReg.set(a.registrationId, {});
+      answersByReg.get(a.registrationId)![a.questionLabel] = a.answerValue;
+      if (!seenCols.has(a.questionLabel)) {
+        seenCols.add(a.questionLabel);
+        customColumns.push(a.questionLabel);
+      }
+    }
+
+    const rows = registrations.map((reg) => {
+      const checkin = latestCheckin.get(reg.id);
+      const checkinStatus = !checkin ? "Not Checked In"
+        : checkin.checkoutAt ? "Checked Out"
+        : "Checked In";
+
+      return {
+        id: reg.id,
+        submittedAt: (reg.submittedAt ?? reg.createdAt).toISOString(),
+        firstName: reg.childFirstName,
+        lastName: reg.childLastName,
+        fullName: [reg.childFirstName, reg.childLastName].filter(Boolean).join(" "),
+        guardianName: reg.guardianName,
+        guardianPhone: reg.guardianPhone,
+        guardianEmail: reg.guardianEmail ?? "",
+        allergies: reg.allergies ?? "",
+        specialNeeds: reg.specialNeeds ?? "",
+        room: reg.room ?? "",
+        checkinStatus,
+        checkedInAt: checkin?.checkinAt?.toISOString() ?? "",
+        checkedOutAt: checkin?.checkoutAt?.toISOString() ?? "",
+        customAnswers: answersByReg.get(reg.id) ?? {},
+      };
+    });
+
+    res.json({ eventName: event.name, rows, customColumns });
+  } catch (err) {
+    req.log.error({ err }, "Failed to export registrations");
     res.status(500).json({ error: "Internal server error" });
   }
 });

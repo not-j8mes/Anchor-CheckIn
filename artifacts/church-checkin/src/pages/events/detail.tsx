@@ -1,7 +1,8 @@
 import { Link, useParams, useSearch } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useGetEvent,
+  useUpdateEvent,
   useListRegistrations,
   useListEventCheckins,
   useCheckoutChild,
@@ -12,9 +13,12 @@ import {
   getListEventCheckinsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
@@ -29,6 +33,7 @@ import {
   Loader2,
   Undo2,
   FileEdit,
+  Download,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -58,6 +63,7 @@ export default function EventDetail() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const initialTab = new URLSearchParams(search).get("tab") ?? "registrations";
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -95,12 +101,125 @@ export default function EventDetail() {
     },
   });
 
+  const updateEvent = useUpdateEvent({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+        toast({ title: "Settings saved" });
+      },
+      onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
+    },
+  });
+
+  const [checkinSettings, setCheckinSettings] = useState({
+    trackAttendance: false,
+    requireCheckout: false,
+    printLabels: false,
+    labelType: "simple_name",
+  });
+
+  useEffect(() => {
+    if (!event) return;
+    const isChild = !event.registrationType || event.registrationType === "child_checkin";
+    setCheckinSettings({
+      trackAttendance: event.trackAttendance ?? isChild,
+      requireCheckout: event.requireCheckout ?? isChild,
+      printLabels: event.printLabels ?? isChild,
+      labelType: event.labelType ?? (isChild ? "child_security" : "simple_name"),
+    });
+  }, [event?.id]);
+
   const copyEmbedCode = () => {
     if (!event?.formEmbedSlug) return;
     const url = `${window.location.origin}/register/${event.formEmbedSlug}`;
     const code = `<iframe src="${url}" width="100%" height="800" frameborder="0" style="border:none;"></iframe>`;
     navigator.clipboard.writeText(code);
     toast({ title: "Embed code copied!" });
+  };
+
+  const handleExportCsv = async () => {
+    setIsExporting(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/registrations/export`);
+      if (!res.ok) throw new Error("Export failed");
+      const data = await res.json() as {
+        eventName: string;
+        rows: Array<{
+          id: number;
+          submittedAt: string;
+          firstName: string;
+          lastName: string;
+          fullName: string;
+          guardianName: string;
+          guardianPhone: string;
+          guardianEmail: string;
+          allergies: string;
+          specialNeeds: string;
+          room: string;
+          checkinStatus: string;
+          checkedInAt: string;
+          checkedOutAt: string;
+          customAnswers: Record<string, string>;
+        }>;
+        customColumns: string[];
+      };
+
+      // Wrap a cell value in quotes if it contains a comma, quote, or newline.
+      const cell = (v: string | number | null | undefined): string => {
+        const s = String(v ?? "");
+        return /[,"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+
+      const fixedHeaders = [
+        "Registration ID", "Submitted At",
+        "First Name", "Last Name", "Full Name",
+        "Guardian Name", "Guardian Phone", "Guardian Email",
+        "Allergies", "Special Needs", "Room",
+        "Check-In Status", "Checked In At", "Checked Out At",
+      ];
+      const allHeaders = [...fixedHeaders, ...data.customColumns];
+
+      const dataRows = data.rows.map((row) =>
+        [
+          cell(row.id),
+          cell(row.submittedAt),
+          cell(row.firstName),
+          cell(row.lastName),
+          cell(row.fullName),
+          cell(row.guardianName),
+          cell(row.guardianPhone),
+          cell(row.guardianEmail),
+          cell(row.allergies),
+          cell(row.specialNeeds),
+          cell(row.room),
+          cell(row.checkinStatus),
+          cell(row.checkedInAt),
+          cell(row.checkedOutAt),
+          ...data.customColumns.map((col) => cell(row.customAnswers[col] ?? "")),
+        ].join(",")
+      );
+
+      // UTF-8 BOM ensures Excel opens the file with correct encoding.
+      const csv = "﻿" + [allHeaders.map(cell).join(","), ...dataRows].join("\r\n");
+
+      const slug = data.eventName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      const filename = `${slug}-registrations.csv`;
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Export failed. Please try again.", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (isLoading) {
@@ -221,38 +340,56 @@ export default function EventDetail() {
         )}
       </div>
 
-      {/* Tabs — full width when Form Builder is active, 2/3 + sidebar otherwise */}
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {/* Tab bar always spans full content width */}
+        <TabsList className={`w-full grid ${tabGrid} mb-4`}>
+          <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm">
+            <ClipboardList className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Registrations</span>
+            <Badge variant="secondary" className="text-xs ml-1">{registrations?.length ?? 0}</Badge>
+          </TabsTrigger>
+          {trackAttendance && (
+            <TabsTrigger value="checked-in" className="gap-1.5 text-xs sm:text-sm">
+              <LogIn className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Checked In</span>
+              <Badge variant="secondary" className="text-xs ml-1">{checkedIn.length}</Badge>
+            </TabsTrigger>
+          )}
+          {requireCheckout && (
+            <TabsTrigger value="checked-out" className="gap-1.5 text-xs sm:text-sm">
+              <LogOut className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Checked Out</span>
+              <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
+            <FileEdit className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Form Builder</span>
+          </TabsTrigger>
+        </TabsList>
+
         <div className={`grid grid-cols-1 gap-8 ${!isFormTab ? "md:grid-cols-3" : ""}`}>
           <div className={!isFormTab ? "md:col-span-2" : ""}>
-            <TabsList className={`w-full grid ${tabGrid} mb-4`}>
-              <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm">
-                <ClipboardList className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">Registrations</span>
-                <Badge variant="secondary" className="text-xs ml-1">{registrations?.length ?? 0}</Badge>
-              </TabsTrigger>
-              {trackAttendance && (
-                <TabsTrigger value="checked-in" className="gap-1.5 text-xs sm:text-sm">
-                  <LogIn className="w-4 h-4 shrink-0" />
-                  <span className="hidden sm:inline">Checked In</span>
-                  <Badge variant="secondary" className="text-xs ml-1">{checkedIn.length}</Badge>
-                </TabsTrigger>
-              )}
-              {requireCheckout && (
-                <TabsTrigger value="checked-out" className="gap-1.5 text-xs sm:text-sm">
-                  <LogOut className="w-4 h-4 shrink-0" />
-                  <span className="hidden sm:inline">Checked Out</span>
-                  <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
-                </TabsTrigger>
-              )}
-              <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
-                <FileEdit className="w-4 h-4 shrink-0" />
-                <span className="hidden sm:inline">Form Builder</span>
-              </TabsTrigger>
-            </TabsList>
 
             {/* ── Registrations ── */}
             <TabsContent value="registrations">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-muted-foreground">
+                  {registrations?.length ?? 0} registration{registrations?.length === 1 ? "" : "s"}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportCsv}
+                  disabled={isExporting}
+                >
+                  {isExporting
+                    ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    : <Download className="w-3.5 h-3.5 mr-1.5" />}
+                  Export CSV
+                </Button>
+              </div>
               <Card>
                 <CardContent className="p-0">
                   {regsLoading ? (
@@ -459,7 +596,86 @@ export default function EventDetail() {
                 </Card>
               )}
 
-              {trackAttendance && (
+              {/* Check-In & Label Settings */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CheckSquare className="w-4 h-4 text-primary" /> Check-In &amp; Labels
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between py-0.5">
+                    <div>
+                      <Label className="text-sm font-medium">Track attendance</Label>
+                      <p className="text-xs text-muted-foreground">Enable check-in kiosk</p>
+                    </div>
+                    <Switch
+                      checked={checkinSettings.trackAttendance}
+                      onCheckedChange={(v) => setCheckinSettings((p) => ({
+                        ...p,
+                        trackAttendance: v,
+                        requireCheckout: v ? p.requireCheckout : false,
+                        printLabels: v ? p.printLabels : false,
+                      }))}
+                    />
+                  </div>
+                  {checkinSettings.trackAttendance && isChildCheckin && (
+                    <div className="flex items-center justify-between py-0.5 ml-2 border-l-2 border-border pl-3">
+                      <div>
+                        <Label className="text-sm font-medium">Require check-out</Label>
+                        <p className="text-xs text-muted-foreground">Security codes at pickup</p>
+                      </div>
+                      <Switch
+                        checked={checkinSettings.requireCheckout}
+                        onCheckedChange={(v) => setCheckinSettings((p) => ({ ...p, requireCheckout: v }))}
+                      />
+                    </div>
+                  )}
+                  {checkinSettings.trackAttendance && (
+                    <div className="flex items-center justify-between py-0.5 ml-2 border-l-2 border-border pl-3">
+                      <div>
+                        <Label className="text-sm font-medium">Print labels</Label>
+                        <p className="text-xs text-muted-foreground">Label at check-in</p>
+                      </div>
+                      <Switch
+                        checked={checkinSettings.printLabels}
+                        onCheckedChange={(v) => setCheckinSettings((p) => ({ ...p, printLabels: v }))}
+                      />
+                    </div>
+                  )}
+                  {checkinSettings.trackAttendance && checkinSettings.printLabels && (
+                    <div className="ml-2 pl-3 border-l-2 border-border">
+                      <Label className="text-xs text-muted-foreground mb-1 block">Label type</Label>
+                      <Select
+                        value={checkinSettings.labelType}
+                        onValueChange={(v) => setCheckinSettings((p) => ({ ...p, labelType: v }))}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="simple_name">Simple name label</SelectItem>
+                          <SelectItem value="child_security" disabled={!isChildCheckin}>
+                            Child security label {!isChildCheckin ? "(kids events only)" : ""}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </CardContent>
+                <CardFooter className="pt-0">
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    disabled={updateEvent.isPending}
+                    onClick={() => updateEvent.mutate({ eventId, data: checkinSettings })}
+                  >
+                    {updateEvent.isPending ? "Saving…" : "Save Settings"}
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              {checkinSettings.trackAttendance && (
                 <Button asChild className="w-full">
                   <Link href="/checkin">
                     <CheckSquare className="w-4 h-4 mr-2" /> Go to Check-In Kiosk

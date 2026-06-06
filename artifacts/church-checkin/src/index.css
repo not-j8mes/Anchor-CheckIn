@@ -65,8 +65,8 @@
   --popover-foreground: 220 40% 15%;
   --popover-border: 220 20% 90%;
   
-  --primary: 222 47% 25%; /* Warm Navy */
-  --primary-foreground: 45 30% 98%;
+  --primary: 38 90% 50%; /* Warm Gold */
+  --primary-foreground: 220 40% 15%;
   
   --secondary: 42 80% 55%; /* Warm Gold */
   --secondary-foreground: 220 40% 15%;
@@ -81,7 +81,7 @@
   --destructive-foreground: 0 0% 100%;
   
   --input: 220 20% 85%;
-  --ring: 42 80% 55%;
+  --ring: 38 90% 50%;
   
   --sidebar: 222 47% 25%;
   --sidebar-foreground: 45 30% 98%;
@@ -109,8 +109,8 @@
   --popover-foreground: 45 30% 95%;
   --popover-border: 220 20% 20%;
   
-  --primary: 42 80% 55%;
-  --primary-foreground: 222 47% 15%;
+  --primary: 38 90% 50%;
+  --primary-foreground: 220 40% 15%;
   
   --secondary: 222 47% 30%;
   --secondary-foreground: 45 30% 95%;

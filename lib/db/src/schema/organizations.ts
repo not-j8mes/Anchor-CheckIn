@@ -6,7 +6,6 @@ export const organizationsTable = pgTable("organizations", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().default("My Church"),
   logoUrl: text("logo_url"),
-  primaryColor: text("primary_color").notNull().default("#1e3a5f"),
   headerText: text("header_text"),
   address: text("address"),
   phone: text("phone"),

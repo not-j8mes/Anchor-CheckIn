@@ -19,6 +19,8 @@ export interface FormWithQuestions {
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;
+  /** @nullable */
+  registrationType?: string | null;
   questions: Question[];
   formFields?: FormField[];
 }

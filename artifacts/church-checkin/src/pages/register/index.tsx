@@ -167,6 +167,7 @@ export default function PublicRegistrationForm() {
 
   // ── Prefer formFields (new system); fall back to empty if none configured ──
   const formFields: FormField[] = form.formFields ?? [];
+  const isChildCheckin = !form.registrationType || form.registrationType === "child_checkin";
 
   const guardianFields = formFields.filter(isGuardianField);
   const childFields = formFields.filter((f) => !isGuardianField(f));
@@ -237,8 +238,8 @@ export default function PublicRegistrationForm() {
             </div>
           )}
           <h1 className="text-3xl font-serif font-bold text-foreground">{org?.name}</h1>
-          {org?.headerText && (
-            <p className="text-lg text-muted-foreground max-w-xl mx-auto">{org.headerText}</p>
+          {form.description && (
+            <p className="text-lg text-muted-foreground max-w-xl mx-auto">{form.description}</p>
           )}
         </div>
 
@@ -251,7 +252,7 @@ export default function PublicRegistrationForm() {
               <h2 className="text-3xl font-serif font-bold">Registration Complete!</h2>
               <p className="text-muted-foreground text-lg max-w-md">
                 {childrenAnswers.length > 1
-                  ? `Thank you! ${childrenAnswers.length} children have been registered successfully.`
+                  ? `Thank you! ${childrenAnswers.length} ${isChildCheckin ? "children" : "people"} have been registered successfully.`
                   : "Thank you for registering. We look forward to seeing you!"}
               </p>
               <Button
@@ -261,7 +262,7 @@ export default function PublicRegistrationForm() {
                 onClick={handleReset}
               >
                 <Plus className="w-4 h-4" />
-                Register Another Child
+                {isChildCheckin ? "Register Another Child" : "Register Another Person"}
               </Button>
             </CardContent>
           </Card>
@@ -274,9 +275,6 @@ export default function PublicRegistrationForm() {
             {/* Form title */}
             <div className="text-center pb-2">
               <h2 className="text-2xl font-serif font-bold text-foreground">{form.title}</h2>
-              {form.description && (
-                <p className="text-muted-foreground mt-2">{form.description}</p>
-              )}
             </div>
 
             {/* Parent / Guardian section */}
@@ -317,7 +315,9 @@ export default function PublicRegistrationForm() {
                   <div className="flex items-center gap-2">
                     <Users className="w-5 h-5 text-secondary-foreground" />
                     <h3 className="text-lg font-semibold text-secondary-foreground">
-                      {childrenAnswers.length > 1 ? `Child ${idx + 1}` : "Child Information"}
+                      {childrenAnswers.length > 1
+                        ? `${isChildCheckin ? "Child" : "Person"} ${idx + 1}`
+                        : isChildCheckin ? "Child Information" : "Attendee Information"}
                     </h3>
                   </div>
                   {childrenAnswers.length > 1 && (
@@ -350,7 +350,7 @@ export default function PublicRegistrationForm() {
                     ))
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      No child-specific fields configured for this form.
+                      No {isChildCheckin ? "child" : "attendee"}-specific fields configured for this form.
                     </p>
                   )}
                 </CardContent>
@@ -366,7 +366,7 @@ export default function PublicRegistrationForm() {
               data-testid="button-add-child"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Another Child
+              {isChildCheckin ? "Add Another Child" : "Add Another Person"}
             </Button>
 
             {submitError && (
@@ -383,7 +383,7 @@ export default function PublicRegistrationForm() {
               {isSubmitting
                 ? "Submitting..."
                 : childrenAnswers.length > 1
-                  ? `Register ${childrenAnswers.length} Children`
+                  ? `Register ${childrenAnswers.length} ${isChildCheckin ? "Children" : "People"}`
                   : "Complete Registration"}
             </Button>
 

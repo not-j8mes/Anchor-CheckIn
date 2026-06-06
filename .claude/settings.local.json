@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(pnpm *)",
+      "Bash(curl -s http://localhost:5000/api/events)",
+      "Bash(curl -sv http://localhost:5000/api/events)",
+      "Bash(pnpm --filter @workspace/api-server run dev)",
+      "Bash(curl -s http://localhost:5000/api/healthz)",
+      "Bash(printenv)",
+      "Bash(curl *)",
+      "Bash(xargs cat)",
+      "Bash(xargs ls -la)",
+      "Bash(python3 -m json.tool)",
+      "Bash(netstat -tlnp)",
+      "Bash(node ./build.mjs)",
+      "Bash(kill 321)",
+      "Bash(kill 127)"
+    ]
+  }
+}

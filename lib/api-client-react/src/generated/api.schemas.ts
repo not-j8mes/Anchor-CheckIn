@@ -14,7 +14,6 @@ export interface Organization {
   name: string;
   /** @nullable */
   logoUrl?: string | null;
-  primaryColor?: string;
   /** @nullable */
   headerText?: string | null;
   /** @nullable */
@@ -29,7 +28,6 @@ export interface Organization {
 export interface OrganizationInput {
   name: string;
   logoUrl?: string;
-  primaryColor?: string;
   headerText?: string;
   address?: string;
   phone?: string;
@@ -138,6 +136,8 @@ export interface FormWithQuestions {
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;
+  /** @nullable */
+  registrationType?: string | null;
   questions: Question[];
   formFields?: FormField[];
 }
@@ -213,6 +213,8 @@ export interface ReorderFieldsInput {
 export interface Registration {
   id: number;
   formId: number;
+  /** @nullable */
+  formVersionId?: number | null;
   childFirstName: string;
   childLastName: string;
   /** @nullable */
@@ -228,6 +230,67 @@ export interface Registration {
   /** @nullable */
   room?: string | null;
   createdAt: string;
+}
+
+export type FormVersionFieldFieldKind = typeof FormVersionFieldFieldKind[keyof typeof FormVersionFieldFieldKind];
+
+
+export const FormVersionFieldFieldKind = {
+  system: 'system',
+  custom: 'custom',
+} as const;
+
+export type FormVersionFieldFieldType = typeof FormVersionFieldFieldType[keyof typeof FormVersionFieldFieldType];
+
+
+export const FormVersionFieldFieldType = {
+  text: 'text',
+  textarea: 'textarea',
+  select: 'select',
+  multiselect: 'multiselect',
+  checkbox: 'checkbox',
+  date: 'date',
+  phone: 'phone',
+  email: 'email',
+  number: 'number',
+} as const;
+
+export interface FormVersionField {
+  id: number;
+  formVersionId: number;
+  /** @nullable */
+  originalFieldId?: number | null;
+  fieldKind: FormVersionFieldFieldKind;
+  /** @nullable */
+  systemKey?: string | null;
+  label: string;
+  fieldType: FormVersionFieldFieldType;
+  /** @nullable */
+  placeholder?: string | null;
+  required: boolean;
+  sortOrder: number;
+  /** @nullable */
+  options?: string | null;
+}
+
+export interface FormVersionWithFields {
+  id: number;
+  formId: number;
+  versionNumber: number;
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  createdAt: string;
+  fields: FormVersionField[];
+}
+
+export interface CustomAnswer {
+  id: number;
+  /** @nullable */
+  formFieldId?: number | null;
+  fieldLabel: string;
+  value: string;
+  sortOrder: number;
 }
 
 export interface Answer {
@@ -240,6 +303,8 @@ export interface Answer {
 export interface RegistrationDetail {
   id: number;
   formId: number;
+  /** @nullable */
+  formVersionId?: number | null;
   childFirstName: string;
   childLastName: string;
   /** @nullable */
@@ -255,6 +320,8 @@ export interface RegistrationDetail {
   /** @nullable */
   room?: string | null;
   createdAt: string;
+  formVersion?: FormVersionWithFields | null;
+  customAnswers: CustomAnswer[];
   answers: Answer[];
 }
 

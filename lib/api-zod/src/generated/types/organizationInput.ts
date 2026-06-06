@@ -9,7 +9,6 @@
 export interface OrganizationInput {
   name: string;
   logoUrl?: string;
-  primaryColor?: string;
   headerText?: string;
   address?: string;
   phone?: string;

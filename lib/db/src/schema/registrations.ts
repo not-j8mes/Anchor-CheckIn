@@ -5,6 +5,7 @@ import { formsTable } from "./forms";
 import { eventsTable } from "./events";
 import { participantsTable, guardiansTable } from "./participants";
 import { formFieldsTable } from "./form_fields";
+import { formVersionsTable } from "./form_versions";
 
 /**
  * registration_groups — a single submission that covers multiple people.
@@ -39,6 +40,9 @@ export const registrationsTable = pgTable("registrations", {
     () => registrationGroupsTable.id,
     { onDelete: "set null" }
   ),
+  formVersionId: integer("form_version_id").references(() => formVersionsTable.id, {
+    onDelete: "set null",
+  }),
   // Legacy flat columns — kept for backward compatibility
   childFirstName: text("child_first_name").notNull(),
   childLastName: text("child_last_name").notNull(),

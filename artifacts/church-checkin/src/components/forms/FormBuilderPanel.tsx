@@ -51,6 +51,7 @@ import {
   Eye,
   Users,
   ChevronDown,
+  Info,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -394,10 +395,26 @@ export function FormBuilderPanel({ formId }: FormBuilderPanelProps) {
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
+  const hasRegistrations = (form.submissionCount ?? 0) > 0;
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* ── Left: field list ──────────────────────────────────────────────────── */}
       <div className="md:col-span-2 space-y-4">
+        {/* Version / registration warning banner */}
+        {hasRegistrations && (
+          <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-4 py-3 text-sm">
+            <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="text-amber-800 dark:text-amber-300">
+              <span className="font-semibold">
+                This form has {form.submissionCount} registration{form.submissionCount === 1 ? "" : "s"}.
+              </span>{" "}
+              Changes will apply only to future submissions — existing registrations will keep the
+              form structure that was active when they were submitted.
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex justify-between items-center gap-2 flex-wrap">
           <h2 className="text-lg font-serif font-bold">Form Fields</h2>
@@ -489,10 +506,11 @@ export function FormBuilderPanel({ formId }: FormBuilderPanelProps) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="fb-desc">Description</Label>
+              <Label htmlFor="fb-desc">Header Text</Label>
               <Textarea
                 id="fb-desc"
                 rows={2}
+                placeholder="Welcome message shown above this form…"
                 value={formSettings.description}
                 onChange={(e) => setFormSettings((p) => ({ ...p, description: e.target.value }))}
               />

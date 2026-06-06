@@ -9,6 +9,8 @@
 export interface Registration {
   id: number;
   formId: number;
+  /** @nullable */
+  formVersionId?: number | null;
   childFirstName: string;
   childLastName: string;
   /** @nullable */

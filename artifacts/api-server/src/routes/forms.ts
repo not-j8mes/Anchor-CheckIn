@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, sql, desc, asc } from "drizzle-orm";
-import { db, formsTable, questionsTable, formFieldsTable, registrationsTable } from "@workspace/db";
+import { db, formsTable, questionsTable, formFieldsTable, registrationsTable, eventsTable } from "@workspace/db";
 import { CreateFormBody, UpdateFormBody, GetFormParams, UpdateFormParams, DeleteFormParams } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
 
@@ -52,12 +52,14 @@ router.get("/forms/by-slug/:embedSlug", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const [questions, formFields, [{ count }]] = await Promise.all([
+    const [questions, formFields, [{ count }], linkedEvent] = await Promise.all([
       db.select().from(questionsTable).where(eq(questionsTable.formId, form[0].id)).orderBy(asc(questionsTable.order)),
       db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, form[0].id)).orderBy(asc(formFieldsTable.sortOrder)),
       db.select({ count: sql<number>`count(*)::int` }).from(registrationsTable).where(eq(registrationsTable.formId, form[0].id)),
+      db.select({ registrationType: eventsTable.registrationType }).from(eventsTable).where(eq(eventsTable.formId, form[0].id)).limit(1),
     ]);
-    res.json({ ...form[0], submissionCount: count, questions, formFields });
+    const registrationType = linkedEvent[0]?.registrationType ?? null;
+    res.json({ ...form[0], submissionCount: count, questions, formFields, registrationType });
   } catch (err) {
     req.log.error({ err }, "Failed to get form by slug");
     res.status(500).json({ error: "Internal server error" });

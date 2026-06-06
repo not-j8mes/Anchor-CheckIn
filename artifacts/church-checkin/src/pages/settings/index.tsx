@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetOrganization, useUpdateOrganization, useResetAllData } from "@workspace/api-client-react";
+import { useGetOrganization, useUpdateOrganization, useResetAllData, getGetOrganizationQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,8 +26,6 @@ export default function Settings() {
 
   const [formData, setFormData] = useState({
     name: "",
-    headerText: "",
-    primaryColor: "",
     logoUrl: "",
     address: "",
     phone: "",
@@ -42,8 +40,6 @@ export default function Settings() {
     if (org) {
       setFormData({
         name: org.name || "",
-        headerText: org.headerText || "",
-        primaryColor: org.primaryColor || "#1e3a8a",
         logoUrl: org.logoUrl || "",
         address: org.address || "",
         phone: org.phone || "",
@@ -54,7 +50,10 @@ export default function Settings() {
 
   const updateOrg = useUpdateOrganization({
     mutation: {
-      onSuccess: () => toast({ title: "Settings updated successfully" }),
+      onSuccess: (updatedOrg) => {
+        queryClient.setQueryData(getGetOrganizationQueryKey(), updatedOrg);
+        toast({ title: "Settings updated successfully" });
+      },
       onError: () => toast({ title: "Failed to update settings", variant: "destructive" }),
     }
   });
@@ -141,47 +140,14 @@ export default function Settings() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="headerText">Form Header Text</Label>
-              <Textarea
-                id="headerText"
-                value={formData.headerText}
-                onChange={e => setFormData(p => ({ ...p, headerText: e.target.value }))}
-                placeholder="Welcome to our children's ministry registration!"
-                rows={2}
+              <Label htmlFor="logoUrl">Logo URL</Label>
+              <Input
+                id="logoUrl"
+                type="url"
+                placeholder="https://example.com/logo.png"
+                value={formData.logoUrl}
+                onChange={e => setFormData(p => ({ ...p, logoUrl: e.target.value }))}
               />
-              <p className="text-xs text-muted-foreground">Appears at the top of public registration forms.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="primaryColor">Brand Color</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="color"
-                    id="primaryColor"
-                    value={formData.primaryColor}
-                    onChange={e => setFormData(p => ({ ...p, primaryColor: e.target.value }))}
-                    className="w-12 h-10 p-1 cursor-pointer"
-                  />
-                  <Input
-                    type="text"
-                    value={formData.primaryColor}
-                    onChange={e => setFormData(p => ({ ...p, primaryColor: e.target.value }))}
-                    className="flex-1 font-mono uppercase"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="logoUrl">Logo URL</Label>
-                <Input
-                  id="logoUrl"
-                  type="url"
-                  placeholder="https://example.com/logo.png"
-                  value={formData.logoUrl}
-                  onChange={e => setFormData(p => ({ ...p, logoUrl: e.target.value }))}
-                />
-              </div>
             </div>
 
             <div className="pt-4 border-t border-border">

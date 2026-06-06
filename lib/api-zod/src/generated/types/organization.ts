@@ -11,7 +11,6 @@ export interface Organization {
   name: string;
   /** @nullable */
   logoUrl?: string | null;
-  primaryColor?: string;
   /** @nullable */
   headerText?: string | null;
   /** @nullable */

@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Answer } from './answer';
+import type { CustomAnswer } from './customAnswer';
+import type { FormVersionWithFields } from './formVersionWithFields';
 
 export interface RegistrationDetail {
   id: number;
   formId: number;
+  /** @nullable */
+  formVersionId?: number | null;
   childFirstName: string;
   childLastName: string;
   /** @nullable */
@@ -25,5 +29,7 @@ export interface RegistrationDetail {
   /** @nullable */
   room?: string | null;
   createdAt: string;
+  formVersion?: FormVersionWithFields | null;
+  customAnswers: CustomAnswer[];
   answers: Answer[];
 }

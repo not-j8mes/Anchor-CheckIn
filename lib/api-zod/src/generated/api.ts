@@ -23,7 +23,6 @@ export const GetOrganizationResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "logoUrl": zod.string().nullish(),
-  "primaryColor": zod.string().optional(),
   "headerText": zod.string().nullish(),
   "address": zod.string().nullish(),
   "phone": zod.string().nullish(),
@@ -38,7 +37,6 @@ export const GetOrganizationResponse = zod.object({
 export const UpdateOrganizationBody = zod.object({
   "name": zod.string(),
   "logoUrl": zod.string().optional(),
-  "primaryColor": zod.string().optional(),
   "headerText": zod.string().optional(),
   "address": zod.string().optional(),
   "phone": zod.string().optional(),
@@ -49,7 +47,6 @@ export const UpdateOrganizationResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "logoUrl": zod.string().nullish(),
-  "primaryColor": zod.string().optional(),
   "headerText": zod.string().nullish(),
   "address": zod.string().nullish(),
   "phone": zod.string().nullish(),
@@ -189,6 +186,7 @@ export const GetEventResponse = zod.object({
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
+  "registrationType": zod.string().nullish(),
   "questions": zod.array(zod.object({
   "id": zod.number(),
   "formId": zod.number(),
@@ -284,6 +282,7 @@ export const GetFormBySlugResponse = zod.object({
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
+  "registrationType": zod.string().nullish(),
   "questions": zod.array(zod.object({
   "id": zod.number(),
   "formId": zod.number(),
@@ -328,6 +327,7 @@ export const GetFormResponse = zod.object({
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
+  "registrationType": zod.string().nullish(),
   "questions": zod.array(zod.object({
   "id": zod.number(),
   "formId": zod.number(),
@@ -634,6 +634,7 @@ export const ListRegistrationsParams = zod.object({
 export const ListRegistrationsResponseItem = zod.object({
   "id": zod.number(),
   "formId": zod.number(),
+  "formVersionId": zod.number().nullish(),
   "childFirstName": zod.string(),
   "childLastName": zod.string(),
   "childDateOfBirth": zod.string().nullish(),
@@ -658,6 +659,7 @@ export const GetRegistrationParams = zod.object({
 export const GetRegistrationResponse = zod.object({
   "id": zod.number(),
   "formId": zod.number(),
+  "formVersionId": zod.number().nullish(),
   "childFirstName": zod.string(),
   "childLastName": zod.string(),
   "childDateOfBirth": zod.string().nullish(),
@@ -668,6 +670,34 @@ export const GetRegistrationResponse = zod.object({
   "specialNeeds": zod.string().nullish(),
   "room": zod.string().nullish(),
   "createdAt": zod.string(),
+  "formVersion": zod.union([zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "versionNumber": zod.number(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "fields": zod.array(zod.object({
+  "id": zod.number(),
+  "formVersionId": zod.number(),
+  "originalFieldId": zod.number().nullish(),
+  "fieldKind": zod.enum(['system', 'custom']),
+  "systemKey": zod.string().nullish(),
+  "label": zod.string(),
+  "fieldType": zod.enum(['text', 'textarea', 'select', 'multiselect', 'checkbox', 'date', 'phone', 'email', 'number']),
+  "placeholder": zod.string().nullish(),
+  "required": zod.boolean(),
+  "sortOrder": zod.number(),
+  "options": zod.string().nullish()
+}))
+}),zod.null()]).optional(),
+  "customAnswers": zod.array(zod.object({
+  "id": zod.number(),
+  "formFieldId": zod.number().nullish(),
+  "fieldLabel": zod.string(),
+  "value": zod.string(),
+  "sortOrder": zod.number()
+})),
   "answers": zod.array(zod.object({
   "id": zod.number(),
   "questionId": zod.number(),
@@ -839,6 +869,7 @@ export const GetDashboardStatsResponse = zod.object({
   "recentRegistrations": zod.array(zod.object({
   "id": zod.number(),
   "formId": zod.number(),
+  "formVersionId": zod.number().nullish(),
   "childFirstName": zod.string(),
   "childLastName": zod.string(),
   "childDateOfBirth": zod.string().nullish(),

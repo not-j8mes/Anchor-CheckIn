@@ -1,10 +1,13 @@
 import { Router } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, asc, and, sql } from "drizzle-orm";
+import { createHash } from "crypto";
 import {
   db,
   registrationsTable,
   registrationCustomAnswersTable,
   formFieldsTable,
+  formVersionsTable,
+  formVersionFieldsTable,
   formsTable,
   eventsTable,
   participantsTable,
@@ -13,6 +16,7 @@ import {
   emergencyContactsTable,
   answersTable,
 } from "@workspace/db";
+import type { FormField } from "@workspace/db";
 import {
   SubmitRegistrationBody,
   SubmitRegistrationParams,
@@ -24,8 +28,6 @@ const router = Router();
 
 // ─── System field → DB column mapping ────────────────────────────────────────
 // Mirrors the dbColumn values in artifacts/church-checkin/src/lib/systemFields.ts.
-// Keys not listed here have dbColumn: null (e.g. photo_permission, authorized_pickup_names)
-// and will be saved as custom answers.
 
 type FieldTable = "participants" | "guardians" | "emergency_contacts";
 
@@ -47,6 +49,95 @@ const SYSTEM_KEY_MAP: Record<string, { table: FieldTable; column: string }> = {
   emergency_contact_phone:         { table: "emergency_contacts", column: "phone"         },
   emergency_contact_relationship:  { table: "emergency_contacts", column: "relationship"  },
 };
+
+// ─── Form version helpers ─────────────────────────────────────────────────────
+
+/**
+ * Compute a short deterministic hash of the current form_fields set.
+ * Two submissions with identical field configurations will produce the same
+ * hash, so they share a form_version row.
+ */
+function computeFieldsHash(fields: FormField[]): string {
+  const normalized = [...fields]
+    .sort((a, b) => a.id - b.id)
+    .map((f) =>
+      [
+        f.id,
+        f.fieldKind,
+        f.systemKey ?? "",
+        f.label,
+        f.fieldType,
+        f.required ? "1" : "0",
+        f.sortOrder,
+        f.options ?? "",
+        f.placeholder ?? "",
+      ].join(":")
+    )
+    .join("|");
+  return createHash("sha256").update(normalized).digest("hex").slice(0, 16);
+}
+
+/**
+ * Find an existing form_version with the same fields hash, or create a new one.
+ * This is idempotent: submitting the same form structure always reuses the same
+ * version row.
+ */
+async function getOrCreateFormVersion(
+  formId: number,
+  form: { title: string; description: string | null },
+  formFields: FormField[]
+): Promise<number> {
+  const fieldsHash = computeFieldsHash(formFields);
+
+  const [existing] = await db
+    .select({ id: formVersionsTable.id })
+    .from(formVersionsTable)
+    .where(
+      and(
+        eq(formVersionsTable.formId, formId),
+        eq(formVersionsTable.fieldsHash, fieldsHash)
+      )
+    )
+    .limit(1);
+
+  if (existing) return existing.id;
+
+  // Determine the next version number for this form
+  const [{ maxVer }] = await db
+    .select({ maxVer: sql<number>`COALESCE(MAX(version_number), 0)::int` })
+    .from(formVersionsTable)
+    .where(eq(formVersionsTable.formId, formId));
+
+  const [newVersion] = await db
+    .insert(formVersionsTable)
+    .values({
+      formId,
+      versionNumber: maxVer + 1,
+      title: form.title,
+      description: form.description ?? null,
+      fieldsHash,
+    })
+    .returning();
+
+  if (formFields.length > 0) {
+    await db.insert(formVersionFieldsTable).values(
+      formFields.map((f) => ({
+        formVersionId: newVersion.id,
+        originalFieldId: f.id,
+        fieldKind: f.fieldKind,
+        systemKey: f.systemKey ?? null,
+        label: f.label,
+        fieldType: f.fieldType,
+        placeholder: f.placeholder ?? null,
+        required: f.required,
+        sortOrder: f.sortOrder,
+        options: f.options ?? null,
+      }))
+    );
+  }
+
+  return newVersion.id;
+}
 
 // ─── POST /forms/:formId/register ─────────────────────────────────────────────
 
@@ -82,9 +173,13 @@ router.post("/forms/:formId/register", async (req, res) => {
     const formFields = await db
       .select()
       .from(formFieldsTable)
-      .where(eq(formFieldsTable.formId, formId));
+      .where(eq(formFieldsTable.formId, formId))
+      .orderBy(asc(formFieldsTable.sortOrder));
 
     const fieldById = new Map(formFields.map((f) => [f.id, f]));
+
+    // ── Snapshot: find or create a form version for this field configuration ──
+    const formVersionId = await getOrCreateFormVersion(formId, form, formFields);
 
     // ── Classify each submitted answer ────────────────────────────────────────
     const participantCols: Record<string, string> = {};
@@ -105,8 +200,7 @@ router.post("/forms/:formId/register", async (req, res) => {
           else if (mapping.table === "guardians") guardianCols[mapping.column] = value;
           else if (mapping.table === "emergency_contacts") emergencyCols[mapping.column] = value;
         } else {
-          // System key with no structured column (photo_permission, authorized_pickup_names, etc.)
-          // Save as a custom answer so the data isn't lost
+          // System key with no structured column — save as custom answer so data isn't lost
           customAnswers.push({ formFieldId: fieldId, questionLabel: formField.label, answerValue: value });
         }
       } else {
@@ -165,12 +259,13 @@ router.post("/forms/:formId/register", async (req, res) => {
       .filter(Boolean)
       .join(" ");
 
-    // ── Insert registration ───────────────────────────────────────────────────
+    // ── Insert registration (now includes form_version_id) ────────────────────
     const [registration] = await db
       .insert(registrationsTable)
       .values({
         formId,
         eventId,
+        formVersionId,
         participantId: participant.id,
         guardianId:    guardian.id,
         submittedAt:   new Date(),
@@ -238,11 +333,90 @@ router.get("/registrations/:registrationId", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
+
+    // ── Legacy answers (from the old answers table) ───────────────────────────
     const answers = await db
       .select()
       .from(answersTable)
       .where(eq(answersTable.registrationId, registrationId));
-    res.json({ ...reg, answers });
+
+    // ── Custom answers, ordered by the snapshot field sort order ─────────────
+    let customAnswers: {
+      id: number;
+      formFieldId: number | null;
+      fieldLabel: string;
+      value: string;
+      sortOrder: number;
+    }[];
+
+    if (reg.formVersionId) {
+      // Join with form_version_fields to get the sort order from the snapshot
+      customAnswers = await db
+        .select({
+          id: registrationCustomAnswersTable.id,
+          formFieldId: registrationCustomAnswersTable.formFieldId,
+          fieldLabel: registrationCustomAnswersTable.questionLabel,
+          value: registrationCustomAnswersTable.answerValue,
+          sortOrder: sql<number>`COALESCE(${formVersionFieldsTable.sortOrder}, 999)::int`,
+        })
+        .from(registrationCustomAnswersTable)
+        .leftJoin(
+          formVersionFieldsTable,
+          and(
+            eq(formVersionFieldsTable.formVersionId, reg.formVersionId),
+            eq(
+              formVersionFieldsTable.originalFieldId,
+              registrationCustomAnswersTable.formFieldId
+            )
+          )
+        )
+        .where(eq(registrationCustomAnswersTable.registrationId, registrationId))
+        .orderBy(asc(formVersionFieldsTable.sortOrder));
+    } else {
+      // Legacy: no version — return as-is with a default sort order
+      const rows = await db
+        .select()
+        .from(registrationCustomAnswersTable)
+        .where(eq(registrationCustomAnswersTable.registrationId, registrationId));
+      customAnswers = rows.map((r, i) => ({
+        id: r.id,
+        formFieldId: r.formFieldId,
+        fieldLabel: r.questionLabel,
+        value: r.answerValue,
+        sortOrder: i,
+      }));
+    }
+
+    // ── Load form version with its frozen fields (if available) ───────────────
+    let formVersion: {
+      id: number;
+      formId: number;
+      versionNumber: number;
+      title: string;
+      description: string | null;
+      createdAt: Date;
+      fields: typeof formVersionFieldsTable.$inferSelect[];
+    } | null = null;
+
+    if (reg.formVersionId) {
+      const [version] = await db
+        .select()
+        .from(formVersionsTable)
+        .where(eq(formVersionsTable.id, reg.formVersionId))
+        .limit(1);
+
+      if (version) {
+        const fields = await db
+          .select()
+          .from(formVersionFieldsTable)
+          .where(eq(formVersionFieldsTable.formVersionId, version.id))
+          .orderBy(asc(formVersionFieldsTable.sortOrder));
+
+        formVersion = { ...version, fields };
+      }
+    }
+
+    res.json({ ...reg, formVersion, customAnswers, answers });
   } catch (err) {
     req.log.error({ err }, "Failed to get registration");
     res.status(500).json({ error: "Internal server error" });

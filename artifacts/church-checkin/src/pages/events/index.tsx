@@ -53,10 +53,24 @@ import {
   Pencil,
   CheckSquare,
   ChevronRight,
+  ChevronLeft,
   Check,
+  List,
+  CalendarDays,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  isSameMonth,
+  isToday,
+  addMonths,
+  subMonths,
+} from "date-fns";
 
 const EVENT_TYPES = [
   { value: "vbs", label: "Vacation Bible School (VBS)" },
@@ -120,6 +134,15 @@ function eventTypeLabel(type: string) {
   return EVENT_TYPES.find((t) => t.value === type)?.label ?? type;
 }
 
+function eventChipClass(type: string) {
+  if (type === "vbs") return "bg-yellow-100 text-yellow-800";
+  if (type === "awana") return "bg-blue-100 text-blue-800";
+  if (type === "sunday_school") return "bg-purple-100 text-purple-800";
+  if (type === "youth_group") return "bg-green-100 text-green-800";
+  if (type === "camp") return "bg-orange-100 text-orange-800";
+  return "bg-primary/10 text-primary";
+}
+
 // ─── Create Event Wizard ────────────────────────────────────────────────────
 
 interface WizardState {
@@ -129,6 +152,7 @@ interface WizardState {
   name: string;
   description: string;
   eventType: string;
+  isMultiDay: boolean;
   startDate: string;
   endDate: string;
   status: string;
@@ -148,6 +172,7 @@ const WIZARD_DEFAULTS: WizardState = {
   name: "",
   description: "",
   eventType: "general",
+  isMultiDay: false,
   startDate: "",
   endDate: "",
   status: "upcoming",
@@ -343,24 +368,52 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
                 onChange={(e) => update("description", e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+              <div>
+                <p className="text-sm font-medium">Multi-day event</p>
+                <p className="text-xs text-muted-foreground">Spans more than one day</p>
+              </div>
+              <Switch
+                checked={state.isMultiDay}
+                onCheckedChange={(v) => {
+                  update("isMultiDay", v);
+                  if (!v) update("endDate", "");
+                }}
+              />
+            </div>
+            {state.isMultiDay ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Start Date</Label>
+                  <Input
+                    type="date"
+                    value={state.startDate}
+                    onChange={(e) => {
+                      update("startDate", e.target.value);
+                      if (state.endDate && e.target.value > state.endDate) update("endDate", "");
+                    }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>End Date</Label>
+                  <Input
+                    type="date"
+                    value={state.endDate}
+                    min={state.startDate || undefined}
+                    onChange={(e) => update("endDate", e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : (
               <div className="space-y-1.5">
-                <Label>Start Date</Label>
+                <Label>Date</Label>
                 <Input
                   type="date"
                   value={state.startDate}
                   onChange={(e) => update("startDate", e.target.value)}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label>End Date</Label>
-                <Input
-                  type="date"
-                  value={state.endDate}
-                  onChange={(e) => update("endDate", e.target.value)}
-                />
-              </div>
-            </div>
+            )}
             <div className="space-y-1.5">
               <Label>Status</Label>
               <Select value={state.status} onValueChange={(v) => update("status", v)}>
@@ -556,6 +609,9 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
 
   // Safe defaults for check-in settings (null = derive from registrationType)
   const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
+  const [isMultiDay, setIsMultiDay] = useState(
+    !!(event.startDate && event.endDate && event.startDate !== event.endDate)
+  );
   const [form, setForm] = useState({
     name: event.name,
     description: event.description ?? "",
@@ -607,16 +663,48 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
             <Label>Description</Label>
             <Textarea rows={2} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex items-center justify-between py-1.5">
+            <div>
+              <span className="text-sm font-medium">Multi-day event</span>
+              <p className="text-xs text-muted-foreground">Spans more than one day</p>
+            </div>
+            <Switch
+              checked={isMultiDay}
+              onCheckedChange={(v) => {
+                setIsMultiDay(v);
+                if (!v) setForm((p) => ({ ...p, endDate: "" }));
+              }}
+            />
+          </div>
+          {isMultiDay ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={form.startDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm((p) => ({ ...p, startDate: val, endDate: p.endDate && val > p.endDate ? "" : p.endDate }));
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End Date</Label>
+                <Input
+                  type="date"
+                  value={form.endDate}
+                  min={form.startDate || undefined}
+                  onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
+                />
+              </div>
+            </div>
+          ) : (
             <div className="space-y-1.5">
-              <Label>Start Date</Label>
+              <Label>Date</Label>
               <Input type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} />
             </div>
-            <div className="space-y-1.5">
-              <Label>End Date</Label>
-              <Input type="date" value={form.endDate} onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))} />
-            </div>
-          </div>
+          )}
           <div className="space-y-1.5">
             <Label>Status</Label>
             <Select value={form.status} onValueChange={(v) => setForm((p) => ({ ...p, status: v }))}>
@@ -711,7 +799,172 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
   );
 }
 
+// ─── Event card (shared between list view and other places) ──────────────────
+
+function EventCard({ event, onEdit, onDelete }: {
+  event: ChurchEvent;
+  onEdit: (e: ChurchEvent) => void;
+  onDelete: (id: number) => void;
+}) {
+  return (
+    <Card className="overflow-hidden hover-elevate transition-all border-card-border" data-testid={`event-card-${event.id}`}>
+      <CardContent className="p-0">
+        <div className="flex items-stretch">
+          <div className={`w-1.5 flex-shrink-0 ${
+            event.eventType === "vbs" ? "bg-yellow-400" :
+            event.eventType === "awana" ? "bg-blue-500" :
+            event.eventType === "sunday_school" ? "bg-purple-500" :
+            event.eventType === "youth_group" ? "bg-green-500" :
+            event.eventType === "camp" ? "bg-orange-500" :
+            "bg-primary"
+          }`} />
+          <div className="flex-1 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-serif font-bold truncate">{event.name}</h3>
+                {statusBadge(event.status)}
+                {registrationTypeBadge(event.registrationType)}
+              </div>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {eventTypeLabel(event.eventType)}
+                {(event.startDate || event.endDate) && (
+                  <span className="ml-3">
+                    {event.startDate && format(new Date(event.startDate + "T00:00:00"), "MMM d, yyyy")}
+                    {event.startDate && event.endDate && event.startDate !== event.endDate && " – "}
+                    {event.endDate && event.startDate !== event.endDate && format(new Date(event.endDate + "T00:00:00"), "MMM d, yyyy")}
+                  </span>
+                )}
+              </p>
+              {event.description && (
+                <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{event.description}</p>
+              )}
+              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Users className="w-3.5 h-3.5" />
+                  {event.registrationCount} registered
+                </span>
+                {event.formTitle && <span className="truncate">Form: {event.formTitle}</span>}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground"
+                onClick={() => onEdit(event)} data-testid={`button-edit-event-${event.id}`}>
+                <Pencil className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"
+                onClick={() => onDelete(event.id)} data-testid={`button-delete-event-${event.id}`}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/events/${event.id}`}>View <ArrowRight className="w-3.5 h-3.5 ml-1" /></Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Calendar view ────────────────────────────────────────────────────────────
+
+function CalendarView({ events }: { events: ChurchEvent[] }) {
+  const [month, setMonth] = useState(() => new Date());
+
+  const days = eachDayOfInterval({
+    start: startOfWeek(startOfMonth(month), { weekStartsOn: 0 }),
+    end: endOfWeek(endOfMonth(month), { weekStartsOn: 0 }),
+  });
+
+  // Index events by every date they cover (start through end)
+  const eventsByDate = new Map<string, ChurchEvent[]>();
+  for (const event of events) {
+    if (!event.startDate) continue;
+    const start = new Date(event.startDate + "T00:00:00");
+    const end = event.endDate ? new Date(event.endDate + "T00:00:00") : start;
+    const span = eachDayOfInterval({ start, end });
+    for (const d of span) {
+      const key = format(d, "yyyy-MM-dd");
+      const bucket = eventsByDate.get(key) ?? [];
+      if (!bucket.find((e) => e.id === event.id)) bucket.push(event);
+      eventsByDate.set(key, bucket);
+    }
+  }
+
+  return (
+    <div>
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-4">
+        <Button variant="outline" size="icon" onClick={() => setMonth((m) => subMonths(m, 1))}>
+          <ChevronLeft className="w-4 h-4" />
+        </Button>
+        <h2 className="font-serif font-bold text-xl">{format(month, "MMMM yyyy")}</h2>
+        <Button variant="outline" size="icon" onClick={() => setMonth((m) => addMonths(m, 1))}>
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Day-of-week headers */}
+      <div className="grid grid-cols-7 mb-1">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+          <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2">{d}</div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 border-l border-t border-border rounded-lg overflow-hidden">
+        {days.map((day) => {
+          const key = format(day, "yyyy-MM-dd");
+          const dayEvents = eventsByDate.get(key) ?? [];
+          const inMonth = isSameMonth(day, month);
+          const today = isToday(day);
+
+          return (
+            <div
+              key={key}
+              className={`border-r border-b border-border min-h-[88px] p-1.5 ${
+                !inMonth ? "bg-muted/40" : "bg-card"
+              }`}
+            >
+              <div className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full mb-1 ${
+                today
+                  ? "bg-primary text-primary-foreground"
+                  : inMonth
+                  ? "text-foreground"
+                  : "text-muted-foreground"
+              }`}>
+                {format(day, "d")}
+              </div>
+              <div className="space-y-0.5">
+                {dayEvents.slice(0, 3).map((event) => (
+                  <Link key={event.id} href={`/events/${event.id}`}>
+                    <div className={`text-xs px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-80 transition-opacity font-medium ${eventChipClass(event.eventType)}`}>
+                      {event.name}
+                    </div>
+                  </Link>
+                ))}
+                {dayEvents.length > 3 && (
+                  <p className="text-xs text-muted-foreground px-1">+{dayEvents.length - 3} more</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Events Page ─────────────────────────────────────────────────────────────
+
+function isPast(event: ChurchEvent): boolean {
+  if (event.status === "completed") return true;
+  const refDate = event.endDate || event.startDate;
+  if (!refDate) return false;
+  const d = new Date(refDate + "T00:00:00");
+  d.setHours(23, 59, 59, 999);
+  return d < new Date();
+}
 
 export default function EventsPage() {
   const { data: events, isLoading } = useListEvents();
@@ -721,6 +974,8 @@ export default function EventsPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<ChurchEvent | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [showPast, setShowPast] = useState(false);
 
   const deleteEvent = useDeleteEvent({
     mutation: {
@@ -733,27 +988,67 @@ export default function EventsPage() {
     },
   });
 
+  // Sort by startDate ascending; undated events go last
+  const sorted = [...(events ?? [])].sort((a, b) => {
+    const aT = a.startDate ? new Date(a.startDate + "T00:00:00").getTime() : Infinity;
+    const bT = b.startDate ? new Date(b.startDate + "T00:00:00").getTime() : Infinity;
+    return aT - bT;
+  });
+
+  const pastCount = sorted.filter(isPast).length;
+  const visible = viewMode === "list"
+    ? sorted.filter((e) => showPast || !isPast(e))
+    : sorted;
+
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold text-foreground">Events</h1>
           <p className="text-muted-foreground mt-1">
             Manage church events — each linked to its own registration form.
           </p>
         </div>
-        <Button onClick={() => setWizardOpen(true)} data-testid="button-create-event">
-          <Plus className="w-4 h-4 mr-2" /> New Event
-        </Button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* View toggle */}
+          <div className="flex items-center border border-border rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={`px-3 py-2 flex items-center gap-1.5 text-sm transition-colors ${
+                viewMode === "list"
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted text-muted-foreground"
+              }`}
+              aria-label="List view"
+            >
+              <List className="w-4 h-4" />
+              <span className="hidden sm:inline">List</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("calendar")}
+              className={`px-3 py-2 flex items-center gap-1.5 text-sm transition-colors ${
+                viewMode === "calendar"
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted text-muted-foreground"
+              }`}
+              aria-label="Calendar view"
+            >
+              <CalendarDays className="w-4 h-4" />
+              <span className="hidden sm:inline">Calendar</span>
+            </button>
+          </div>
+          <Button onClick={() => setWizardOpen(true)} data-testid="button-create-event">
+            <Plus className="w-4 h-4 mr-2" /> New Event
+          </Button>
+        </div>
       </div>
 
-      {/* Events list */}
       {isLoading ? (
         <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse h-36" />
-          ))}
+          {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse h-36" />)}
         </div>
       ) : !events?.length ? (
         <Card className="border-dashed">
@@ -772,84 +1067,52 @@ export default function EventsPage() {
             </Button>
           </CardContent>
         </Card>
+      ) : viewMode === "calendar" ? (
+        <CalendarView events={sorted} />
       ) : (
+        /* ── List view ── */
         <div className="space-y-4">
-          {events.map((event) => (
-            <Card key={event.id} className="overflow-hidden hover-elevate transition-all border-card-border" data-testid={`event-card-${event.id}`}>
-              <CardContent className="p-0">
-                <div className="flex items-stretch">
-                  {/* Color accent bar by type */}
-                  <div className={`w-1.5 flex-shrink-0 ${
-                    event.eventType === "vbs" ? "bg-yellow-400" :
-                    event.eventType === "awana" ? "bg-blue-500" :
-                    event.eventType === "sunday_school" ? "bg-purple-500" :
-                    event.eventType === "youth_group" ? "bg-green-500" :
-                    event.eventType === "camp" ? "bg-orange-500" :
-                    "bg-primary"
-                  }`} />
+          {/* Past-events toggle */}
+          {pastCount > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {showPast
+                  ? `Showing all ${sorted.length} events`
+                  : `${sorted.length - pastCount} upcoming event${sorted.length - pastCount !== 1 ? "s" : ""}`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowPast((v) => !v)}
+                className="text-primary hover:underline text-sm font-medium"
+              >
+                {showPast ? "Hide past events" : `Show ${pastCount} past event${pastCount !== 1 ? "s" : ""}`}
+              </button>
+            </div>
+          )}
 
-                  <div className="flex-1 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-lg font-serif font-bold truncate">{event.name}</h3>
-                        {statusBadge(event.status)}
-                        {registrationTypeBadge(event.registrationType)}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        {eventTypeLabel(event.eventType)}
-                        {(event.startDate || event.endDate) && (
-                          <span className="ml-3">
-                            {event.startDate && format(new Date(event.startDate + "T00:00:00"), "MMM d, yyyy")}
-                            {event.startDate && event.endDate && " – "}
-                            {event.endDate && format(new Date(event.endDate + "T00:00:00"), "MMM d, yyyy")}
-                          </span>
-                        )}
-                      </p>
-                      {event.description && (
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{event.description}</p>
-                      )}
-
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Users className="w-3.5 h-3.5" />
-                          {event.registrationCount} registered
-                        </span>
-                        {event.formTitle && (
-                          <span className="truncate">Form: {event.formTitle}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-foreground"
-                        onClick={() => setEditEvent(event)}
-                        data-testid={`button-edit-event-${event.id}`}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleteId(event.id)}
-                        data-testid={`button-delete-event-${event.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={`/events/${event.id}`}>
-                          View <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+          {visible.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-10 text-center text-muted-foreground">
+                <p>No upcoming events.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowPast(true)}
+                  className="text-primary hover:underline text-sm mt-1"
+                >
+                  Show past events
+                </button>
               </CardContent>
             </Card>
-          ))}
+          ) : (
+            visible.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                onEdit={setEditEvent}
+                onDelete={setDeleteId}
+              />
+            ))
+          )}
         </div>
       )}
 
