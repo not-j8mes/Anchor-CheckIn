@@ -10,6 +10,7 @@ import checkinsRouter from "./checkins";
 import statsRouter from "./stats";
 import eventsRouter from "./events";
 import adminRouter from "./admin";
+import roomsRouter from "./rooms";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(childrenRouter);
 router.use(checkinsRouter);
 router.use(statsRouter);
 router.use(adminRouter);
+router.use(roomsRouter);
 
 export default router;

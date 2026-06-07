@@ -423,4 +423,71 @@ router.get("/registrations/:registrationId", async (req, res) => {
   }
 });
 
+// ─── PUT /registrations/:registrationId ──────────────────────────────────────
+
+router.put("/registrations/:registrationId", async (req, res) => {
+  const registrationId = parseInt(req.params.registrationId, 10);
+  if (isNaN(registrationId)) { res.status(400).json({ error: "Invalid registrationId" }); return; }
+
+  const {
+    childFirstName, childLastName, childDateOfBirth,
+    guardianFirstName, guardianLastName, guardianPhone, guardianEmail,
+    allergies, specialNeeds, room,
+  } = req.body as Record<string, string | undefined>;
+
+  try {
+    const [reg] = await db
+      .select()
+      .from(registrationsTable)
+      .where(eq(registrationsTable.id, registrationId))
+      .limit(1);
+    if (!reg) { res.status(404).json({ error: "Not found" }); return; }
+
+    const guardianName = [guardianFirstName, guardianLastName].filter(Boolean).join(" ") || reg.guardianName;
+
+    // Update flat columns on the registration row
+    const [updated] = await db
+      .update(registrationsTable)
+      .set({
+        ...(childFirstName !== undefined && { childFirstName }),
+        ...(childLastName !== undefined && { childLastName }),
+        ...(childDateOfBirth !== undefined && { childDateOfBirth: childDateOfBirth || null }),
+        ...(guardianName && { guardianName }),
+        ...(guardianPhone !== undefined && { guardianPhone }),
+        ...(guardianEmail !== undefined && { guardianEmail: guardianEmail || null }),
+        ...(allergies !== undefined && { allergies: allergies || null }),
+        ...(specialNeeds !== undefined && { specialNeeds: specialNeeds || null }),
+        ...(room !== undefined && { room: room || null }),
+      })
+      .where(eq(registrationsTable.id, registrationId))
+      .returning();
+
+    // Sync participant record
+    if (reg.participantId) {
+      await db.update(participantsTable).set({
+        ...(childFirstName !== undefined && { firstName: childFirstName }),
+        ...(childLastName !== undefined && { lastName: childLastName }),
+        ...(childDateOfBirth !== undefined && { dateOfBirth: childDateOfBirth || null }),
+        ...(allergies !== undefined && { allergies: allergies || null }),
+        ...(specialNeeds !== undefined && { specialNeeds: specialNeeds || null }),
+      }).where(eq(participantsTable.id, reg.participantId));
+    }
+
+    // Sync guardian record
+    if (reg.guardianId) {
+      await db.update(guardiansTable).set({
+        ...(guardianFirstName !== undefined && { firstName: guardianFirstName }),
+        ...(guardianLastName !== undefined && { lastName: guardianLastName }),
+        ...(guardianPhone !== undefined && { phone: guardianPhone }),
+        ...(guardianEmail !== undefined && { email: guardianEmail || null }),
+      }).where(eq(guardiansTable.id, reg.guardianId));
+    }
+
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "Failed to update registration");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

@@ -116,7 +116,7 @@ async function buildEventRow(event: typeof eventsTable.$inferSelect) {
 
 router.get("/events", async (req, res) => {
   try {
-    const events = await db.select().from(eventsTable).orderBy(desc(eventsTable.createdAt));
+    const events = await db.select().from(eventsTable).orderBy(sql`start_date DESC NULLS LAST, created_at DESC`);
     const rows = await Promise.all(events.map(buildEventRow));
     res.json(rows);
   } catch (err) {

@@ -95,6 +95,7 @@ type ModalMode = "none" | "system-picker" | "field-editor" | "preview";
 
 interface FormBuilderPanelProps {
   formId: number;
+  hideAdditionalPeople?: boolean;
 }
 
 // ─── Sub-component: FieldCard ───────────────────────────────────────────────────
@@ -201,7 +202,7 @@ function FieldCard({ field, index, total, onEdit, onDelete, onMove }: FieldCardP
 
 // ─── Main component ─────────────────────────────────────────────────────────────
 
-export function FormBuilderPanel({ formId }: FormBuilderPanelProps) {
+export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormBuilderPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -535,19 +536,21 @@ export function FormBuilderPanel({ formId }: FormBuilderPanelProps) {
                 onCheckedChange={(c) => setFormSettings((p) => ({ ...p, isPublic: c }))}
               />
             </div>
-            <div className="flex items-center justify-between py-2">
-              <div>
-                <Label className="text-sm flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-muted-foreground" />
-                  Additional People
-                </Label>
-                <p className="text-xs text-muted-foreground">Allow registering multiple people</p>
+            {!hideAdditionalPeople && (
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <Label className="text-sm flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                    Additional People
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Allow registering multiple people</p>
+                </div>
+                <Switch
+                  checked={formSettings.allowAdditionalPeople}
+                  onCheckedChange={(c) => setFormSettings((p) => ({ ...p, allowAdditionalPeople: c }))}
+                />
               </div>
-              <Switch
-                checked={formSettings.allowAdditionalPeople}
-                onCheckedChange={(c) => setFormSettings((p) => ({ ...p, allowAdditionalPeople: c }))}
-              />
-            </div>
+            )}
           </CardContent>
           <CardFooter>
             <Button

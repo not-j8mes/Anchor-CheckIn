@@ -1,16 +1,183 @@
 import { useState } from "react";
-import { useListChildren } from "@workspace/api-client-react";
+import {
+  useListChildren,
+  useUpdateRegistration,
+  useListRooms,
+  getListChildrenQueryKey,
+  type Child,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Users, Phone, User, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Users, Phone, User, Calendar, Pencil, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+
+// ─── Edit dialog ──────────────────────────────────────────────────────────────
+
+interface EditChildDialogProps {
+  child: Child;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function EditChildDialog({ child, open, onOpenChange }: EditChildDialogProps) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: rooms } = useListRooms();
+
+  const guardianParts = (child.guardianName ?? "").trim().split(/\s+/);
+  const [form, setForm] = useState({
+    childFirstName: child.firstName,
+    childLastName: child.lastName,
+    childDateOfBirth: child.dateOfBirth ?? "",
+    guardianFirstName: guardianParts[0] ?? "",
+    guardianLastName: guardianParts.slice(1).join(" ") ?? "",
+    guardianPhone: child.guardianPhone ?? "",
+    guardianEmail: child.guardianEmail ?? "",
+    allergies: child.allergies ?? "",
+    specialNeeds: child.specialNeeds ?? "",
+    room: child.room ?? "",
+  });
+
+  const set = (field: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((p) => ({ ...p, [field]: e.target.value }));
+
+  const updateRegistration = useUpdateRegistration({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey() });
+        toast({ title: "Record updated" });
+        onOpenChange(false);
+      },
+      onError: () => toast({ title: "Failed to save changes", variant: "destructive" }),
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateRegistration.mutate({
+      registrationId: child.registrationId ?? child.id,
+      data: {
+        childFirstName: form.childFirstName.trim() || undefined,
+        childLastName: form.childLastName.trim() || undefined,
+        childDateOfBirth: form.childDateOfBirth || undefined,
+        guardianFirstName: form.guardianFirstName.trim() || undefined,
+        guardianLastName: form.guardianLastName.trim() || undefined,
+        guardianPhone: form.guardianPhone.trim() || undefined,
+        guardianEmail: form.guardianEmail.trim() || undefined,
+        allergies: form.allergies.trim() || undefined,
+        specialNeeds: form.specialNeeds.trim() || undefined,
+        room: form.room || undefined,
+      },
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!updateRegistration.isPending) onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-serif">
+            Edit — {child.firstName} {child.lastName}
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-5 pt-2">
+
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Child</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>First Name</Label>
+                <Input value={form.childFirstName} onChange={set("childFirstName")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Last Name</Label>
+                <Input value={form.childLastName} onChange={set("childLastName")} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Date of Birth</Label>
+              <Input type="date" value={form.childDateOfBirth} onChange={set("childDateOfBirth")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Allergies</Label>
+              <Input value={form.allergies} onChange={set("allergies")} placeholder="e.g. peanuts, latex" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Special Needs / Notes</Label>
+              <Input value={form.specialNeeds} onChange={set("specialNeeds")} placeholder="Any accommodations needed" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Room</Label>
+              {rooms && rooms.length > 0 ? (
+                <Select
+                  value={form.room || "__none__"}
+                  onValueChange={(v) => setForm((p) => ({ ...p, room: v === "__none__" ? "" : v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Unassigned</SelectItem>
+                    {rooms.map((r) => (
+                      <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={form.room} onChange={set("room")} placeholder="Room name" />
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-1 border-t border-border">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">Guardian</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>First Name</Label>
+                <Input value={form.guardianFirstName} onChange={set("guardianFirstName")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Last Name</Label>
+                <Input value={form.guardianLastName} onChange={set("guardianLastName")} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input type="tel" value={form.guardianPhone} onChange={set("guardianPhone")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input type="email" value={form.guardianEmail} onChange={set("guardianEmail")} />
+            </div>
+          </div>
+
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={updateRegistration.isPending} className="gap-2">
+              {updateRegistration.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ChildrenDirectory() {
   const [search, setSearch] = useState("");
-  // Pass undefined if search is empty to avoid sending empty string to API
   const { data: children, isLoading } = useListChildren({ search: search || undefined });
+  const [editingChild, setEditingChild] = useState<Child | null>(null);
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto w-full space-y-8">
@@ -23,8 +190,8 @@ export default function ChildrenDirectory() {
 
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input 
-          placeholder="Search by child or guardian name..." 
+        <Input
+          placeholder="Search by child or guardian name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
@@ -35,15 +202,15 @@ export default function ChildrenDirectory() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <Card key={i} className="animate-pulse">
-              <CardHeader className="h-20 bg-muted/50 rounded-t-lg border-b border-border/50"></CardHeader>
-              <CardContent className="h-32"></CardContent>
+              <CardHeader className="h-20 bg-muted/50 rounded-t-lg border-b border-border/50" />
+              <CardContent className="h-32" />
             </Card>
           ))}
         </div>
       ) : children && children.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {children.map((child) => (
-            <Card key={child.id} className="hover-elevate transition-all border-card-border overflow-hidden">
+            <Card key={child.id} className="hover-elevate transition-all border-card-border overflow-hidden group">
               <CardHeader className="bg-card pb-4 border-b border-border/50 relative">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold font-serif text-lg shrink-0">
@@ -57,6 +224,14 @@ export default function ChildrenDirectory() {
                       <User className="w-3 h-3" /> {child.guardianName || "No Guardian"}
                     </CardDescription>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity -mt-1 -mr-2"
+                    onClick={() => setEditingChild(child)}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
               </CardHeader>
               <CardContent className="py-4 space-y-3">
@@ -104,10 +279,19 @@ export default function ChildrenDirectory() {
           ))}
         </div>
       ) : (
-        <EmptyState 
+        <EmptyState
           title="No children found"
           description={search ? "Try adjusting your search terms." : "No children have been registered yet. They will appear here once someone registers through a form."}
           icon={<Users className="w-8 h-8" />}
+        />
+      )}
+
+      {editingChild && (
+        <EditChildDialog
+          key={editingChild.id}
+          child={editingChild}
+          open={!!editingChild}
+          onOpenChange={(v) => { if (!v) setEditingChild(null); }}
         />
       )}
     </div>

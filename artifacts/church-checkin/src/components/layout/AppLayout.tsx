@@ -27,7 +27,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Events", href: "/events", icon: CalendarDays },
     { name: "Check-In Kiosk", href: "/checkin", icon: CheckSquare },
-    { name: "Children", href: "/children", icon: Users },
   ];
 
   return (

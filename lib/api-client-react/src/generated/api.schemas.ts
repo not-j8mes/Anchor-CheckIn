@@ -530,6 +530,32 @@ export interface CreateEventInput {
   labelType?: string;
 }
 
+export interface Room {
+  id: number;
+  name: string;
+  /** @nullable */
+  capacity?: number | null;
+  createdAt: string;
+}
+
+export interface RoomInput {
+  name: string;
+  capacity?: number;
+}
+
+export interface RegistrationUpdateInput {
+  childFirstName?: string;
+  childLastName?: string;
+  childDateOfBirth?: string;
+  guardianFirstName?: string;
+  guardianLastName?: string;
+  guardianPhone?: string;
+  guardianEmail?: string;
+  allergies?: string;
+  specialNeeds?: string;
+  room?: string;
+}
+
 export interface UpdateEventInput {
   name?: string;
   description?: string;

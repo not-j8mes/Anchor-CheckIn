@@ -17,6 +17,7 @@ import PublicRegistrationForm from "@/pages/register";
 import ChildrenDirectory from "@/pages/children";
 import Settings from "@/pages/settings";
 import CheckinKiosk from "@/pages/checkin";
+import RoomsPage from "@/pages/rooms";
 
 const queryClient = new QueryClient();
 
@@ -50,6 +51,9 @@ function Router() {
       </Route>
       <Route path="/children">
         <AppLayout><ChildrenDirectory /></AppLayout>
+      </Route>
+      <Route path="/rooms">
+        <AppLayout><RoomsPage /></AppLayout>
       </Route>
       <Route path="/settings">
         <AppLayout><Settings /></AppLayout>

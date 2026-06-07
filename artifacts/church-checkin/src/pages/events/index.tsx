@@ -954,11 +954,11 @@ export default function EventsPage() {
     },
   });
 
-  // Sort by startDate ascending; undated events go last
+  // Sort by startDate descending (most recent first); undated events go last
   const sorted = [...(events ?? [])].sort((a, b) => {
-    const aT = a.startDate ? new Date(a.startDate + "T00:00:00").getTime() : Infinity;
-    const bT = b.startDate ? new Date(b.startDate + "T00:00:00").getTime() : Infinity;
-    return aT - bT;
+    const aT = a.startDate ? new Date(a.startDate + "T00:00:00").getTime() : -Infinity;
+    const bT = b.startDate ? new Date(b.startDate + "T00:00:00").getTime() : -Infinity;
+    return bT - aT;
   });
 
   const pastCount = sorted.filter(isPast).length;

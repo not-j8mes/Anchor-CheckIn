@@ -595,6 +595,99 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RegistrationDetail"
+    put:
+      operationId: updateRegistration
+      tags: [registrations]
+      summary: Update a registration's child and guardian details
+      parameters:
+        - name: registrationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrationUpdateInput"
+      responses:
+        "200":
+          description: Updated registration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Registration"
+
+  /rooms:
+    get:
+      operationId: listRooms
+      tags: [rooms]
+      summary: List all rooms
+      responses:
+        "200":
+          description: List of rooms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Room"
+    post:
+      operationId: createRoom
+      tags: [rooms]
+      summary: Create a room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomInput"
+      responses:
+        "201":
+          description: Created room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+
+  /rooms/{roomId}:
+    put:
+      operationId: updateRoom
+      tags: [rooms]
+      summary: Update a room
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomInput"
+      responses:
+        "200":
+          description: Updated room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+    delete:
+      operationId: deleteRoom
+      tags: [rooms]
+      summary: Delete a room
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
 
   /children:
     get:
@@ -1509,6 +1602,52 @@ components:
         printLabels:
           type: boolean
         labelType:
+          type: string
+
+    Room:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        capacity:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    RoomInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        capacity:
+          type: integer
+
+    RegistrationUpdateInput:
+      type: object
+      properties:
+        childFirstName:
+          type: string
+        childLastName:
+          type: string
+        childDateOfBirth:
+          type: string
+        guardianFirstName:
+          type: string
+        guardianLastName:
+          type: string
+        guardianPhone:
+          type: string
+        guardianEmail:
+          type: string
+        allergies:
+          type: string
+        specialNeeds:
+          type: string
+        room:
           type: string
 
     UpdateEventInput:

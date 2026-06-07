@@ -6,12 +6,16 @@ import {
   useCheckoutChild,
   useDeleteCheckin,
   useListEvents,
+  useSubmitRegistration,
   getListChildrenQueryKey,
+  getGetFormBySlugQueryKey,
+  getFormBySlug,
   LabelData,
   Child,
   Event,
+  type FormField,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +23,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox as UiCheckbox } from "@/components/ui/checkbox";
 import {
   Search,
   AlertCircle,
@@ -32,6 +39,9 @@ import {
   UserPlus,
   Calendar,
   ChevronRight,
+  Plus,
+  Trash2,
+  User,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
@@ -212,46 +222,94 @@ function FamilyCard({
   );
 }
 
+// ─── Field renderer (mirrors the public registration form) ────────────────────
+
+function FieldInput({ field, value, onChange }: { field: FormField; value: string; onChange: (v: string) => void }) {
+  const { fieldType, placeholder, options, required, label } = field;
+  if (fieldType === "textarea")
+    return <Textarea required={required} placeholder={placeholder ?? ""} value={value} onChange={(e) => onChange(e.target.value)} rows={2} />;
+  if ((fieldType === "select" || fieldType === "multiselect") && options)
+    return (
+      <UiSelect value={value} onValueChange={onChange}>
+        <SelectTrigger><SelectValue placeholder={placeholder ?? "Select…"} /></SelectTrigger>
+        <SelectContent>
+          {options.split(",").map((o) => <SelectItem key={o.trim()} value={o.trim()}>{o.trim()}</SelectItem>)}
+        </SelectContent>
+      </UiSelect>
+    );
+  if (fieldType === "checkbox")
+    return (
+      <div className="flex items-center gap-2 mt-1">
+        <UiCheckbox id={`wf-${field.id}`} checked={value === "true"} onCheckedChange={(c) => onChange(c ? "true" : "")} />
+        <label htmlFor={`wf-${field.id}`} className="text-sm text-muted-foreground cursor-pointer">{placeholder ?? label}</label>
+      </div>
+    );
+  return (
+    <Input
+      type={fieldType === "date" ? "date" : fieldType === "email" ? "email" : fieldType === "phone" ? "tel" : fieldType === "number" ? "number" : "text"}
+      required={required} placeholder={placeholder ?? ""} value={value}
+      onChange={(e) => onChange(e.target.value)} autoComplete="off"
+    />
+  );
+}
+
+function isGuardianField(field: FormField): boolean {
+  if (field.fieldKind !== "system" || !field.systemKey) return false;
+  return ["guardian_first_name", "guardian_last_name", "guardian_email", "guardian_phone",
+    "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship"].includes(field.systemKey);
+}
+
+// ─── Walk-in dialog ───────────────────────────────────────────────────────────
+
 interface WalkInDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: (labelData: LabelData) => void;
-  eventId: number;
+  onSuccess: (labels: LabelData[]) => void;
+  event: Event;
 }
 
-function WalkInDialog({ open, onOpenChange, onSuccess, eventId }: WalkInDialogProps) {
+function WalkInDialog({ open, onOpenChange, onSuccess, event }: WalkInDialogProps) {
   const { toast } = useToast();
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
-    childFirstName: "",
-    childLastName: "",
-    guardianName: "",
-    guardianPhone: "",
+
+  const { data: form, isLoading: formLoading } = useQuery({
+    queryKey: getGetFormBySlugQueryKey(event.formEmbedSlug ?? ""),
+    queryFn: () => getFormBySlug(event.formEmbedSlug!),
+    enabled: open && !!event.formEmbedSlug,
   });
 
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const formFields: FormField[] = form?.formFields ?? [];
+  const guardianFields = formFields.filter(isGuardianField);
+  const childFields = formFields.filter((f) => !isGuardianField(f));
+
+  const [guardianAnswers, setGuardianAnswers] = useState<Record<number, string>>({});
+  const [childrenAnswers, setChildrenAnswers] = useState<Record<number, string>[]>([{}]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submitRegistration = useSubmitRegistration();
+  const batchCheckin = useBatchCheckin();
+
+  const reset = () => { setGuardianAnswers({}); setChildrenAnswers([{}]); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/checkins/walkin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventId,
-          childFirstName: form.childFirstName.trim(),
-          childLastName: form.childLastName.trim(),
-          guardianName: form.guardianName.trim(),
-          guardianPhone: form.guardianPhone.trim(),
-        }),
+      const registrationIds: number[] = [];
+      for (const childAnswerMap of childrenAnswers) {
+        const fields = [
+          ...guardianFields.map((f) => ({ fieldId: f.id, value: guardianAnswers[f.id] ?? "" })),
+          ...childFields.map((f) => ({ fieldId: f.id, value: childAnswerMap[f.id] ?? "" })),
+        ];
+        const reg = await submitRegistration.mutateAsync({ formId: form.id, data: { fields } });
+        registrationIds.push((reg as { id: number }).id);
+      }
+      const result = await batchCheckin.mutateAsync({
+        data: { items: registrationIds.map((id) => ({ registrationId: id })) },
       });
-      if (!res.ok) throw new Error("Walk-in failed");
-      const data = await res.json() as { labelData: LabelData };
-      onSuccess(data.labelData);
+      onSuccess(result.labels as LabelData[]);
       onOpenChange(false);
-      setForm({ childFirstName: "", childLastName: "", guardianName: "", guardianPhone: "" });
+      reset();
     } catch {
       toast({ title: "Walk-in failed — please try again.", variant: "destructive" });
     } finally {
@@ -259,41 +317,83 @@ function WalkInDialog({ open, onOpenChange, onSuccess, eventId }: WalkInDialogPr
     }
   };
 
-  const isValid = form.childFirstName.trim() && form.childLastName.trim() && form.guardianName.trim() && form.guardianPhone.trim();
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={(v) => { if (!submitting) { onOpenChange(v); if (!v) reset(); } }}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-serif">Walk-In Check-In</DialogTitle>
+          <DialogTitle className="text-xl font-serif">Walk-In Registration</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Child First Name</Label>
-              <Input value={form.childFirstName} onChange={set("childFirstName")} placeholder="First name" autoComplete="off" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Child Last Name</Label>
-              <Input value={form.childLastName} onChange={set("childLastName")} placeholder="Last name" autoComplete="off" />
-            </div>
+
+        {formLoading ? (
+          <div className="flex items-center justify-center py-12 gap-3">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <span className="text-muted-foreground">Loading form…</span>
           </div>
-          <div className="space-y-1.5">
-            <Label>Guardian Name</Label>
-            <Input value={form.guardianName} onChange={set("guardianName")} placeholder="Parent / guardian full name" autoComplete="off" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Guardian Phone</Label>
-            <Input value={form.guardianPhone} onChange={set("guardianPhone")} placeholder="(555) 000-0000" type="tel" autoComplete="off" />
-          </div>
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={!isValid || submitting} className="gap-2">
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
-              Register &amp; Check In
+        ) : !form ? (
+          <p className="py-8 text-center text-muted-foreground">This event has no registration form.</p>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-5 pt-2">
+            {/* Guardian section */}
+            {guardianFields.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-1 border-b border-border">
+                  <User className="w-4 h-4 text-primary" />
+                  <p className="text-sm font-semibold">Parent / Guardian</p>
+                </div>
+                {guardianFields.map((field) => (
+                  <div key={field.id} className="space-y-1.5">
+                    <Label className="text-sm flex items-center gap-1">
+                      {field.label}{field.required && <span className="text-destructive">*</span>}
+                    </Label>
+                    <FieldInput field={field} value={guardianAnswers[field.id] ?? ""} onChange={(v) => setGuardianAnswers((p) => ({ ...p, [field.id]: v }))} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Per-child sections */}
+            {childrenAnswers.map((childAnswerMap, idx) => (
+              <div key={idx} className="space-y-3">
+                <div className="flex items-center justify-between pb-1 border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <p className="text-sm font-semibold">
+                      {childrenAnswers.length > 1 ? `Child ${idx + 1}` : "Child Information"}
+                    </p>
+                  </div>
+                  {childrenAnswers.length > 1 && (
+                    <button type="button" className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1"
+                      onClick={() => setChildrenAnswers((p) => p.filter((_, i) => i !== idx))}>
+                      <Trash2 className="w-3 h-3" /> Remove
+                    </button>
+                  )}
+                </div>
+                {childFields.map((field) => (
+                  <div key={field.id} className="space-y-1.5">
+                    <Label className="text-sm flex items-center gap-1">
+                      {field.label}{field.required && <span className="text-destructive">*</span>}
+                    </Label>
+                    <FieldInput field={field} value={childAnswerMap[field.id] ?? ""}
+                      onChange={(v) => setChildrenAnswers((p) => { const next = [...p]; next[idx] = { ...next[idx], [field.id]: v }; return next; })} />
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            <Button type="button" variant="outline" size="sm" className="w-full border-dashed gap-2"
+              onClick={() => setChildrenAnswers((p) => [...p, {}])}>
+              <Plus className="w-3.5 h-3.5" /> Add Another Child
             </Button>
-          </DialogFooter>
-        </form>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => { onOpenChange(false); reset(); }}>Cancel</Button>
+              <Button type="submit" disabled={submitting} className="gap-2">
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
+                Register &amp; Check In
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -391,10 +491,15 @@ export default function CheckinKiosk() {
   const [checkingInGuardian, setCheckingInGuardian] = useState<string | null>(null);
   const [loadingCheckinId, setLoadingCheckinId] = useState<number | null>(null);
 
-  const handleWalkInSuccess = (labelData: LabelData) => {
-    setCollectedLabels([labelData]);
+  const handleWalkInSuccess = (labels: LabelData[]) => {
+    setCollectedLabels(labels);
     setPrintDialogOpen(true);
-    toast({ title: `${labelData.childName} checked in!` });
+    queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey(childrenParams) });
+    toast({
+      title: labels.length > 1
+        ? `${labels.length} children registered and checked in!`
+        : `${labels[0]?.childName} registered and checked in!`,
+    });
   };
 
   const batchCheckin = useBatchCheckin();
@@ -597,7 +702,7 @@ export default function CheckinKiosk() {
           open={walkInOpen}
           onOpenChange={setWalkInOpen}
           onSuccess={handleWalkInSuccess}
-          eventId={selectedEvent.id}
+          event={selectedEvent}
         />
       )}
     </div>

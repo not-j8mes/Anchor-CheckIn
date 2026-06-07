@@ -6,3 +6,4 @@ export * from "./form_versions";
 export * from "./registrations";
 export * from "./checkins";
 export * from "./events";
+export * from "./rooms";

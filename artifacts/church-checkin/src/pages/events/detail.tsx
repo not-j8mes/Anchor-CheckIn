@@ -8,9 +8,19 @@ import {
   useCheckoutChild,
   useDeleteCheckin,
   useUndoCheckout,
+  useListChildren,
+  useUpdateRegistration,
+  useListRooms,
+  useCreateRoom,
+  useUpdateRoom,
+  useDeleteRoom,
   getGetEventQueryKey,
   getListRegistrationsQueryKey,
   getListEventCheckinsQueryKey,
+  getListChildrenQueryKey,
+  getListRoomsQueryKey,
+  type Child,
+  type Room,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +28,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
@@ -35,6 +47,12 @@ import {
   FileEdit,
   Download,
   BarChart2,
+  DoorOpen,
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  Baby,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +75,320 @@ function statusBadge(status: string) {
   return <Badge variant="outline">{status}</Badge>;
 }
 
+// ─── Rooms tab ─────────────────────────────────────────────────────────────────
+
+function EventRoomFormDialog({ room, open, onOpenChange }: { room?: Room; open: boolean; onOpenChange: (v: boolean) => void }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const isEdit = !!room;
+  const [name, setName] = useState(room?.name ?? "");
+  const [capacity, setCapacity] = useState(room?.capacity != null ? String(room.capacity) : "");
+
+  const createRoom = useCreateRoom({ mutation: { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListRoomsQueryKey() }); toast({ title: "Room created" }); onOpenChange(false); }, onError: () => toast({ title: "Failed to create room", variant: "destructive" }) } });
+  const updateRoom = useUpdateRoom({ mutation: { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListRoomsQueryKey() }); toast({ title: "Room updated" }); onOpenChange(false); }, onError: () => toast({ title: "Failed to update room", variant: "destructive" }) } });
+  const isPending = createRoom.isPending || updateRoom.isPending;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    const cap = capacity ? parseInt(capacity, 10) : undefined;
+    if (isEdit) updateRoom.mutate({ roomId: room!.id, data: { name: name.trim(), capacity: cap } });
+    else createRoom.mutate({ data: { name: name.trim(), capacity: cap } });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!isPending) onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader><DialogTitle>{isEdit ? "Edit Room" : "Add Room"}</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          <div className="space-y-1.5">
+            <Label>Room Name <span className="text-destructive">*</span></Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Nursery, K–2nd Grade" autoFocus />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Capacity <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Input type="number" min="1" value={capacity} onChange={(e) => setCapacity(e.target.value)} placeholder="Max children" />
+          </div>
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={!name.trim() || isPending}>
+              {isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              {isEdit ? "Save Changes" : "Add Room"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RoomsTabContent() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: rooms, isLoading } = useListRooms();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingRoom, setEditingRoom] = useState<Room | undefined>(undefined);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const deleteRoom = useDeleteRoom({
+    mutation: {
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListRoomsQueryKey() }); toast({ title: "Room deleted" }); setDeletingId(null); },
+      onError: () => { toast({ title: "Failed to delete room", variant: "destructive" }); setDeletingId(null); },
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">{rooms?.length ?? 0} room{rooms?.length === 1 ? "" : "s"}</p>
+        <Button size="sm" className="gap-1.5" onClick={() => { setEditingRoom(undefined); setDialogOpen(true); }}>
+          <Plus className="w-3.5 h-3.5" /> Add Room
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
+      ) : !rooms?.length ? (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            <DoorOpen className="w-8 h-8 mx-auto mb-3 opacity-30" />
+            <p>No rooms yet. Add rooms like Nursery or K–2nd Grade to organize check-ins.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {rooms.map((room) => (
+            <Card key={room.id}>
+              <CardContent className="px-4 py-3 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <DoorOpen className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{room.name}</p>
+                    {room.capacity != null && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Users className="w-3 h-3" /> Capacity: {room.capacity}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Button variant="ghost" size="sm" onClick={() => { setEditingRoom(room); setDialogOpen(true); }}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="sm"
+                    className="text-muted-foreground hover:text-destructive"
+                    disabled={deletingId === room.id}
+                    onClick={() => { setDeletingId(room.id); deleteRoom.mutate({ roomId: room.id }); }}
+                  >
+                    {deletingId === room.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <EventRoomFormDialog
+        key={editingRoom?.id ?? "new"}
+        room={editingRoom}
+        open={dialogOpen}
+        onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditingRoom(undefined); }}
+      />
+    </div>
+  );
+}
+
+// ─── Children tab ──────────────────────────────────────────────────────────────
+
+function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; open: boolean; onOpenChange: (v: boolean) => void }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: rooms } = useListRooms();
+
+  const guardianParts = (child.guardianName ?? "").trim().split(/\s+/);
+  const [form, setForm] = useState({
+    childFirstName: child.firstName,
+    childLastName: child.lastName,
+    childDateOfBirth: child.dateOfBirth ?? "",
+    guardianFirstName: guardianParts[0] ?? "",
+    guardianLastName: guardianParts.slice(1).join(" "),
+    guardianPhone: child.guardianPhone ?? "",
+    guardianEmail: child.guardianEmail ?? "",
+    allergies: child.allergies ?? "",
+    specialNeeds: child.specialNeeds ?? "",
+    room: child.room ?? "",
+  });
+
+  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((p) => ({ ...p, [field]: e.target.value }));
+
+  const updateRegistration = useUpdateRegistration({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey() });
+        toast({ title: "Record updated" });
+        onOpenChange(false);
+      },
+      onError: () => toast({ title: "Failed to save changes", variant: "destructive" }),
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateRegistration.mutate({
+      registrationId: child.registrationId ?? child.id,
+      data: {
+        childFirstName: form.childFirstName.trim() || undefined,
+        childLastName: form.childLastName.trim() || undefined,
+        childDateOfBirth: form.childDateOfBirth || undefined,
+        guardianFirstName: form.guardianFirstName.trim() || undefined,
+        guardianLastName: form.guardianLastName.trim() || undefined,
+        guardianPhone: form.guardianPhone.trim() || undefined,
+        guardianEmail: form.guardianEmail.trim() || undefined,
+        allergies: form.allergies.trim() || undefined,
+        specialNeeds: form.specialNeeds.trim() || undefined,
+        room: form.room || undefined,
+      },
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!updateRegistration.isPending) onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-serif">Edit — {child.firstName} {child.lastName}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-5 pt-2">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Child</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>First Name</Label><Input value={form.childFirstName} onChange={set("childFirstName")} /></div>
+              <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.childLastName} onChange={set("childLastName")} /></div>
+            </div>
+            <div className="space-y-1.5"><Label>Date of Birth</Label><Input type="date" value={form.childDateOfBirth} onChange={set("childDateOfBirth")} /></div>
+            <div className="space-y-1.5"><Label>Allergies</Label><Input value={form.allergies} onChange={set("allergies")} placeholder="e.g. peanuts, latex" /></div>
+            <div className="space-y-1.5"><Label>Special Needs / Notes</Label><Input value={form.specialNeeds} onChange={set("specialNeeds")} /></div>
+            <div className="space-y-1.5">
+              <Label>Room</Label>
+              {rooms && rooms.length > 0 ? (
+                <Select value={form.room || "__none__"} onValueChange={(v) => setForm((p) => ({ ...p, room: v === "__none__" ? "" : v }))}>
+                  <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Unassigned</SelectItem>
+                    {rooms.map((r) => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={form.room} onChange={set("room")} placeholder="Room name" />
+              )}
+            </div>
+          </div>
+          <div className="space-y-3 pt-1 border-t border-border">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">Guardian</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>First Name</Label><Input value={form.guardianFirstName} onChange={set("guardianFirstName")} /></div>
+              <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.guardianLastName} onChange={set("guardianLastName")} /></div>
+            </div>
+            <div className="space-y-1.5"><Label>Phone</Label><Input type="tel" value={form.guardianPhone} onChange={set("guardianPhone")} /></div>
+            <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.guardianEmail} onChange={set("guardianEmail")} /></div>
+          </div>
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={updateRegistration.isPending} className="gap-2">
+              {updateRegistration.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ChildrenTabContent({ eventId }: { eventId: number }) {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [editingChild, setEditingChild] = useState<Child | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: children, isLoading } = useListChildren({ eventId, search: debouncedSearch || undefined });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Search children…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <p className="text-sm text-muted-foreground shrink-0">
+          {children?.length ?? 0} registered
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
+      ) : !children?.length ? (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            <Baby className="w-8 h-8 mx-auto mb-3 opacity-30" />
+            <p>{search ? `No children matching "${search}"` : "No children registered for this event yet."}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {children.map((child) => (
+            <Card key={child.id} className="group">
+              <CardContent className="px-4 py-3 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-sm flex-shrink-0">
+                    {child.firstName[0]}{child.lastName[0]}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium">{child.firstName} {child.lastName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {child.guardianName}{child.room ? ` · ${child.room}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {child.allergies && (
+                    <Badge className="text-[10px] bg-red-100 text-red-800 hover:bg-red-100 border-none">Allergy</Badge>
+                  )}
+                  <Button
+                    variant="ghost" size="sm"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => setEditingChild(child)}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {editingChild && (
+        <EventEditChildDialog
+          key={editingChild.id}
+          child={editingChild}
+          open={!!editingChild}
+          onOpenChange={(v) => { if (!v) setEditingChild(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Main page ─────────────────────────────────────────────────────────────────
+
 export default function EventDetail() {
   const params = useParams<{ id: string }>();
   const eventId = parseInt(params.id || "0", 10);
@@ -68,6 +400,8 @@ export default function EventDetail() {
 
   const initialTab = new URLSearchParams(search).get("tab") ?? "registrations";
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [view, setView] = useState<"activity" | "manage">("activity");
+  const [manageTab, setManageTab] = useState("children");
 
   const invalidateCheckins = () =>
     queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
@@ -130,7 +464,6 @@ export default function EventDetail() {
     });
   }, [event?.id]);
 
-  // Must be before any early returns to satisfy Rules of Hooks
   const attendanceSessions = useMemo(() => {
     if (!checkins?.length) return [];
     const byDate = new Map<string, typeof checkins>();
@@ -179,7 +512,6 @@ export default function EventDetail() {
         customColumns: string[];
       };
 
-      // Wrap a cell value in quotes if it contains a comma, quote, or newline.
       const cell = (v: string | number | null | undefined): string => {
         const s = String(v ?? "");
         return /[,"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -196,38 +528,22 @@ export default function EventDetail() {
 
       const dataRows = data.rows.map((row) =>
         [
-          cell(row.id),
-          cell(row.submittedAt),
-          cell(row.firstName),
-          cell(row.lastName),
-          cell(row.fullName),
-          cell(row.guardianName),
-          cell(row.guardianPhone),
-          cell(row.guardianEmail),
-          cell(row.allergies),
-          cell(row.specialNeeds),
-          cell(row.room),
-          cell(row.checkinStatus),
-          cell(row.checkedInAt),
-          cell(row.checkedOutAt),
+          cell(row.id), cell(row.submittedAt),
+          cell(row.firstName), cell(row.lastName), cell(row.fullName),
+          cell(row.guardianName), cell(row.guardianPhone), cell(row.guardianEmail),
+          cell(row.allergies), cell(row.specialNeeds), cell(row.room),
+          cell(row.checkinStatus), cell(row.checkedInAt), cell(row.checkedOutAt),
           ...data.customColumns.map((col) => cell(row.customAnswers[col] ?? "")),
         ].join(",")
       );
 
-      // UTF-8 BOM ensures Excel opens the file with correct encoding.
       const csv = "﻿" + [allHeaders.map(cell).join(","), ...dataRows].join("\r\n");
-
-      const slug = data.eventName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
-      const filename = `${slug}-registrations.csv`;
-
+      const slug = data.eventName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = filename;
+      link.download = `${slug}-registrations.csv`;
       link.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -263,29 +579,11 @@ export default function EventDetail() {
 
   const checkedIn = checkins?.filter((c) => !c.checkoutAt) ?? [];
   const checkedOut = checkins?.filter((c) => !!c.checkoutAt) ?? [];
-  const isFormTab = activeTab === "form";
 
-  // Derive check-in settings — null means use smart defaults from registration type
   const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
   const trackAttendance = event.trackAttendance ?? isChildCheckin;
   const requireCheckout = event.requireCheckout ?? (isChildCheckin && trackAttendance);
   const labelType = event.labelType ?? (requireCheckout ? "child_security" : "simple_name");
-
-  // Build visible tabs based on settings
-  const visibleTabs = [
-    "registrations",
-    ...(trackAttendance ? ["checked-in"] : []),
-    ...(requireCheckout ? ["checked-out"] : []),
-    ...(trackAttendance ? ["attendance"] : []),
-    "form",
-  ];
-  const tabGridClass: Record<number, string> = {
-    2: "grid-cols-2",
-    3: "grid-cols-3",
-    4: "grid-cols-4",
-    5: "grid-cols-5",
-  };
-  const tabGrid = tabGridClass[visibleTabs.length] ?? "grid-cols-5";
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">
@@ -357,43 +655,67 @@ export default function EventDetail() {
         )}
       </div>
 
-      {/* Tabs */}
+      {/* ── View toggle ── */}
+      <div className="flex items-center justify-center">
+        <div className="inline-flex rounded-lg border border-border bg-muted p-1 gap-1">
+          <button
+            type="button"
+            onClick={() => setView("activity")}
+            className={`px-5 py-1.5 rounded-md text-sm font-medium transition-all ${
+              view === "activity"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Activity
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("manage")}
+            className={`px-5 py-1.5 rounded-md text-sm font-medium transition-all ${
+              view === "manage"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Manage
+          </button>
+        </div>
+      </div>
+
+      {/* ── Activity section ── */}
+      {view === "activity" && (
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        {/* Tab bar always spans full content width */}
-        <TabsList className={`w-full grid ${tabGrid} mb-4`}>
-          <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm">
+        <div className="sr-only" />
+        <TabsList className="w-full flex flex-wrap h-auto gap-1 mb-4">
+          <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm flex-1">
             <ClipboardList className="w-4 h-4 shrink-0" />
             <span className="hidden sm:inline">Registrations</span>
             <Badge variant="secondary" className="text-xs ml-1">{registrations?.length ?? 0}</Badge>
           </TabsTrigger>
           {trackAttendance && (
-            <TabsTrigger value="checked-in" className="gap-1.5 text-xs sm:text-sm">
+            <TabsTrigger value="checked-in" className="gap-1.5 text-xs sm:text-sm flex-1">
               <LogIn className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Checked In</span>
               <Badge variant="secondary" className="text-xs ml-1">{checkedIn.length}</Badge>
             </TabsTrigger>
           )}
           {requireCheckout && (
-            <TabsTrigger value="checked-out" className="gap-1.5 text-xs sm:text-sm">
+            <TabsTrigger value="checked-out" className="gap-1.5 text-xs sm:text-sm flex-1">
               <LogOut className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Checked Out</span>
               <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
             </TabsTrigger>
           )}
           {trackAttendance && (
-            <TabsTrigger value="attendance" className="gap-1.5 text-xs sm:text-sm">
+            <TabsTrigger value="attendance" className="gap-1.5 text-xs sm:text-sm flex-1">
               <BarChart2 className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Attendance</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
-            <FileEdit className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Form Builder</span>
-          </TabsTrigger>
         </TabsList>
 
-        <div className={`grid grid-cols-1 gap-8 ${!isFormTab ? "md:grid-cols-3" : ""}`}>
-          <div className={!isFormTab ? "md:col-span-2" : ""}>
+        <div>
 
             {/* ── Registrations ── */}
             <TabsContent value="registrations">
@@ -401,15 +723,8 @@ export default function EventDetail() {
                 <p className="text-sm text-muted-foreground">
                   {registrations?.length ?? 0} registration{registrations?.length === 1 ? "" : "s"}
                 </p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportCsv}
-                  disabled={isExporting}
-                >
-                  {isExporting
-                    ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    : <Download className="w-3.5 h-3.5 mr-1.5" />}
+                <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={isExporting}>
+                  {isExporting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
                   Export CSV
                 </Button>
               </div>
@@ -480,8 +795,7 @@ export default function EventDetail() {
                             <div className="flex flex-col gap-1 items-end">
                               {requireCheckout && (
                                 <Button
-                                  variant="outline"
-                                  size="sm"
+                                  variant="outline" size="sm"
                                   className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
                                   disabled={loadingId === c.id}
                                   onClick={() => { setLoadingId(c.id); checkoutChild.mutate({ checkinId: c.id }); }}
@@ -536,18 +850,15 @@ export default function EventDetail() {
                                 )}
                               </div>
                             </div>
-                            <div className="flex flex-col gap-1 items-end">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1 text-muted-foreground hover:text-primary hover:border-primary"
-                                disabled={loadingId === c.id}
-                                onClick={() => { setLoadingId(c.id); undoCheckout.mutate({ checkinId: c.id }); }}
-                              >
-                                {loadingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Undo2 className="w-3.5 h-3.5" />}
-                                Undo Checkout
-                              </Button>
-                            </div>
+                            <Button
+                              variant="outline" size="sm"
+                              className="gap-1 text-muted-foreground hover:text-primary hover:border-primary"
+                              disabled={loadingId === c.id}
+                              onClick={() => { setLoadingId(c.id); undoCheckout.mutate({ checkinId: c.id }); }}
+                            >
+                              {loadingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Undo2 className="w-3.5 h-3.5" />}
+                              Undo Checkout
+                            </Button>
                           </div>
                         </div>
                       ))}
@@ -609,11 +920,40 @@ export default function EventDetail() {
                 </div>
               )}
             </TabsContent>
+        </div>
+      </Tabs>
+      )}
 
-            {/* ── Form Builder ── */}
+      {/* ── Manage section ── */}
+      {view === "manage" && (
+      <Tabs value={manageTab} onValueChange={setManageTab}>
+        <div className="sr-only" />
+        <TabsList className="w-full grid grid-cols-3 mb-4">
+          <TabsTrigger value="children" className="gap-1.5 text-xs sm:text-sm">
+            <Baby className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Children</span>
+          </TabsTrigger>
+          <TabsTrigger value="rooms" className="gap-1.5 text-xs sm:text-sm">
+            <DoorOpen className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Rooms</span>
+          </TabsTrigger>
+          <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
+            <FileEdit className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Form Builder</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <div className={`grid grid-cols-1 gap-8 ${manageTab !== "form" ? "md:grid-cols-3" : ""}`}>
+          <div className={manageTab !== "form" ? "md:col-span-2" : ""}>
+            <TabsContent value="children">
+              <ChildrenTabContent eventId={eventId} />
+            </TabsContent>
+            <TabsContent value="rooms">
+              <RoomsTabContent />
+            </TabsContent>
             <TabsContent value="form">
               {event.formId ? (
-                <FormBuilderPanel formId={event.formId} />
+                <FormBuilderPanel formId={event.formId} hideAdditionalPeople={event.registrationType === "child_checkin"} />
               ) : (
                 <Card>
                   <CardContent className="p-10 text-center text-muted-foreground">
@@ -624,8 +964,8 @@ export default function EventDetail() {
             </TabsContent>
           </div>
 
-          {/* Sidebar — hidden when Form Builder tab is active */}
-          {!isFormTab && (
+          {/* Sidebar — shown alongside Children and Rooms, hidden for Form Builder */}
+          {manageTab !== "form" && (
             <div className="space-y-4">
               {event.formId && (
                 <Card>
@@ -649,14 +989,6 @@ export default function EventDetail() {
                         </Button>
                       </>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => setActiveTab("form")}
-                    >
-                      <FileEdit className="w-3.5 h-3.5 mr-1.5" /> Edit form questions
-                    </Button>
                   </CardContent>
                 </Card>
               )}
@@ -672,7 +1004,6 @@ export default function EventDetail() {
                 </Card>
               )}
 
-              {/* Check-In & Label Settings */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -741,8 +1072,7 @@ export default function EventDetail() {
                 </CardContent>
                 <CardFooter className="pt-0">
                   <Button
-                    size="sm"
-                    className="w-full"
+                    size="sm" className="w-full"
                     disabled={updateEvent.isPending}
                     onClick={() => updateEvent.mutate({ eventId, data: checkinSettings })}
                   >
@@ -762,6 +1092,7 @@ export default function EventDetail() {
           )}
         </div>
       </Tabs>
+      )}
     </div>
   );
 }

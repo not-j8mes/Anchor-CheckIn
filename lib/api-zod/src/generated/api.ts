@@ -708,6 +708,92 @@ export const GetRegistrationResponse = zod.object({
 
 
 /**
+ * @summary Update a registration's child and guardian details
+ */
+export const UpdateRegistrationParams = zod.object({
+  "registrationId": zod.coerce.number()
+})
+
+export const UpdateRegistrationBody = zod.object({
+  "childFirstName": zod.string().optional(),
+  "childLastName": zod.string().optional(),
+  "childDateOfBirth": zod.string().optional(),
+  "guardianFirstName": zod.string().optional(),
+  "guardianLastName": zod.string().optional(),
+  "guardianPhone": zod.string().optional(),
+  "guardianEmail": zod.string().optional(),
+  "allergies": zod.string().optional(),
+  "specialNeeds": zod.string().optional(),
+  "room": zod.string().optional()
+})
+
+export const UpdateRegistrationResponse = zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "formVersionId": zod.number().nullish(),
+  "childFirstName": zod.string(),
+  "childLastName": zod.string(),
+  "childDateOfBirth": zod.string().nullish(),
+  "guardianName": zod.string().optional(),
+  "guardianPhone": zod.string().optional(),
+  "guardianEmail": zod.string().nullish(),
+  "allergies": zod.string().nullish(),
+  "specialNeeds": zod.string().nullish(),
+  "room": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary List all rooms
+ */
+export const ListRoomsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "capacity": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+export const ListRoomsResponse = zod.array(ListRoomsResponseItem)
+
+
+/**
+ * @summary Create a room
+ */
+export const CreateRoomBody = zod.object({
+  "name": zod.string(),
+  "capacity": zod.number().optional()
+})
+
+
+/**
+ * @summary Update a room
+ */
+export const UpdateRoomParams = zod.object({
+  "roomId": zod.coerce.number()
+})
+
+export const UpdateRoomBody = zod.object({
+  "name": zod.string(),
+  "capacity": zod.number().optional()
+})
+
+export const UpdateRoomResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "capacity": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a room
+ */
+export const DeleteRoomParams = zod.object({
+  "roomId": zod.coerce.number()
+})
+
+
+/**
  * @summary List all children
  */
 export const ListChildrenQueryParams = zod.object({
