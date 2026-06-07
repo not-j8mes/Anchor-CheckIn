@@ -308,7 +308,17 @@ function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; ope
   );
 }
 
-function ChildrenTabContent({ eventId }: { eventId: number }) {
+function ChildrenTabContent({
+  eventId,
+  searchPlaceholder = "Search children…",
+  emptyMessage = "No children registered for this event yet.",
+  emptyIcon: EmptyIcon = Baby,
+}: {
+  eventId: number;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
+  emptyIcon?: React.ComponentType<{ className?: string }>;
+}) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [editingChild, setEditingChild] = useState<Child | null>(null);
@@ -325,7 +335,7 @@ function ChildrenTabContent({ eventId }: { eventId: number }) {
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Search children…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder={searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <p className="text-sm text-muted-foreground shrink-0">
           {children?.length ?? 0} registered
@@ -337,8 +347,8 @@ function ChildrenTabContent({ eventId }: { eventId: number }) {
       ) : !children?.length ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            <Baby className="w-8 h-8 mx-auto mb-3 opacity-30" />
-            <p>{search ? `No children matching "${search}"` : "No children registered for this event yet."}</p>
+            <EmptyIcon className="w-8 h-8 mx-auto mb-3 opacity-30" />
+            <p>{search ? `No results matching "${search}"` : emptyMessage}</p>
           </CardContent>
         </Card>
       ) : (
@@ -382,6 +392,79 @@ function ChildrenTabContent({ eventId }: { eventId: number }) {
           open={!!editingChild}
           onOpenChange={(v) => { if (!v) setEditingChild(null); }}
         />
+      )}
+    </div>
+  );
+}
+
+// ─── Families tab ─────────────────────────────────────────────────────────────
+
+function FamiliesTabContent({ eventId }: { eventId: number }) {
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const { data: children, isLoading } = useListChildren({ eventId, search: debouncedSearch || undefined });
+
+  const families = useMemo(() => {
+    if (!children) return [];
+    const map = new Map<string, typeof children>();
+    for (const child of children) {
+      const key = child.guardianName ?? "Unknown";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(child);
+    }
+    return [...map.entries()].map(([guardian, members]) => ({ guardian, members }));
+  }, [children]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Search families…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <p className="text-sm text-muted-foreground shrink-0">
+          {families.length} {families.length === 1 ? "family" : "families"}
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
+      ) : !families.length ? (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            <Users className="w-8 h-8 mx-auto mb-3 opacity-30" />
+            <p>{search ? `No families matching "${search}"` : "No registrants yet."}</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {families.map(({ guardian, members }) => (
+            <Card key={guardian}>
+              <CardContent className="px-4 py-3">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-sm flex-shrink-0">
+                    {guardian[0]}
+                  </div>
+                  <p className="font-medium">{guardian}</p>
+                  <Badge variant="secondary" className="text-xs ml-auto">
+                    {members.length} {members.length === 1 ? "member" : "members"}
+                  </Badge>
+                </div>
+                <div className="ml-12 space-y-0.5">
+                  {members.map((m) => (
+                    <p key={m.id} className="text-sm text-muted-foreground">{m.firstName} {m.lastName}</p>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -455,7 +538,9 @@ export default function EventDetail() {
 
   useEffect(() => {
     if (!event) return;
-    const isChild = !event.registrationType || event.registrationType === "child_checkin";
+    const type = event.registrationType;
+    const isChild = !type || type === "child_checkin";
+    setManageTab(isChild ? "children" : type === "individual" ? "registrants" : "registrations");
     setCheckinSettings({
       trackAttendance: event.trackAttendance ?? isChild,
       requireCheckout: event.requireCheckout ?? isChild,
@@ -581,6 +666,8 @@ export default function EventDetail() {
   const checkedOut = checkins?.filter((c) => !!c.checkoutAt) ?? [];
 
   const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
+  const isFamilyGroup = event.registrationType === "family_group";
+  const isIndividual = event.registrationType === "individual";
   const trackAttendance = event.trackAttendance ?? isChildCheckin;
   const requireCheckout = event.requireCheckout ?? (isChildCheckin && trackAttendance);
   const labelType = event.labelType ?? (requireCheckout ? "child_security" : "simple_name");
@@ -928,29 +1015,85 @@ export default function EventDetail() {
       {view === "manage" && (
       <Tabs value={manageTab} onValueChange={setManageTab}>
         <div className="sr-only" />
-        <TabsList className="w-full grid grid-cols-3 mb-4">
-          <TabsTrigger value="children" className="gap-1.5 text-xs sm:text-sm">
-            <Baby className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Children</span>
-          </TabsTrigger>
-          <TabsTrigger value="rooms" className="gap-1.5 text-xs sm:text-sm">
-            <DoorOpen className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Rooms</span>
-          </TabsTrigger>
-          <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
-            <FileEdit className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Form Builder</span>
-          </TabsTrigger>
-        </TabsList>
+
+        {/* Tabs vary by registration type */}
+        {isChildCheckin ? (
+          <TabsList className="w-full grid grid-cols-3 mb-4">
+            <TabsTrigger value="children" className="gap-1.5 text-xs sm:text-sm">
+              <Baby className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Children</span>
+            </TabsTrigger>
+            <TabsTrigger value="rooms" className="gap-1.5 text-xs sm:text-sm">
+              <DoorOpen className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Rooms</span>
+            </TabsTrigger>
+            <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
+              <FileEdit className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Form Builder</span>
+            </TabsTrigger>
+          </TabsList>
+        ) : isFamilyGroup ? (
+          <TabsList className="w-full grid grid-cols-3 mb-4">
+            <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm">
+              <ClipboardList className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Registrations</span>
+            </TabsTrigger>
+            <TabsTrigger value="families" className="gap-1.5 text-xs sm:text-sm">
+              <Users className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Families</span>
+            </TabsTrigger>
+            <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
+              <FileEdit className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Form Builder</span>
+            </TabsTrigger>
+          </TabsList>
+        ) : (
+          <TabsList className="w-full grid grid-cols-2 mb-4">
+            <TabsTrigger value="registrants" className="gap-1.5 text-xs sm:text-sm">
+              <ClipboardList className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Registrants</span>
+            </TabsTrigger>
+            <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
+              <FileEdit className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Form Builder</span>
+            </TabsTrigger>
+          </TabsList>
+        )}
 
         <div className={`grid grid-cols-1 gap-8 ${manageTab !== "form" ? "md:grid-cols-3" : ""}`}>
           <div className={manageTab !== "form" ? "md:col-span-2" : ""}>
+            {/* Child check-in tabs */}
             <TabsContent value="children">
               <ChildrenTabContent eventId={eventId} />
             </TabsContent>
             <TabsContent value="rooms">
               <RoomsTabContent />
             </TabsContent>
+
+            {/* Family / Group tabs */}
+            <TabsContent value="registrations">
+              <ChildrenTabContent
+                eventId={eventId}
+                searchPlaceholder="Search registrants…"
+                emptyMessage="No registrants yet."
+                emptyIcon={Users}
+              />
+            </TabsContent>
+            <TabsContent value="families">
+              <FamiliesTabContent eventId={eventId} />
+            </TabsContent>
+
+            {/* Individual tab */}
+            <TabsContent value="registrants">
+              <ChildrenTabContent
+                eventId={eventId}
+                searchPlaceholder="Search registrants…"
+                emptyMessage="No registrants yet."
+                emptyIcon={Users}
+              />
+            </TabsContent>
+
+            {/* Shared Form Builder tab */}
             <TabsContent value="form">
               {event.formId ? (
                 <FormBuilderPanel formId={event.formId} hideAdditionalPeople={event.registrationType === "child_checkin"} />

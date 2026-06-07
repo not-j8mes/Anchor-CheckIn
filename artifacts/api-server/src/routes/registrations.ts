@@ -32,6 +32,7 @@ const router = Router();
 type FieldTable = "participants" | "guardians" | "emergency_contacts";
 
 const SYSTEM_KEY_MAP: Record<string, { table: FieldTable; column: string }> = {
+  // Child check-in fields
   child_first_name:                { table: "participants",       column: "first_name"    },
   child_last_name:                 { table: "participants",       column: "last_name"     },
   date_of_birth:                   { table: "participants",       column: "date_of_birth" },
@@ -48,6 +49,13 @@ const SYSTEM_KEY_MAP: Record<string, { table: FieldTable; column: string }> = {
   emergency_contact_name:          { table: "emergency_contacts", column: "name"          },
   emergency_contact_phone:         { table: "emergency_contacts", column: "phone"         },
   emergency_contact_relationship:  { table: "emergency_contacts", column: "relationship"  },
+  // Family / individual registration fields (participant is the registrant)
+  participant_first_name:          { table: "participants",       column: "first_name"    },
+  participant_last_name:           { table: "participants",       column: "last_name"     },
+  participant_email:               { table: "guardians",          column: "email"         },
+  participant_phone:               { table: "guardians",          column: "phone"         },
+  dietary_restrictions:            { table: "participants",       column: "notes"         },
+  accessibility_needs:             { table: "participants",       column: "special_needs" },
 };
 
 // ─── Form version helpers ─────────────────────────────────────────────────────
@@ -306,11 +314,73 @@ router.get("/forms/:formId/registrations", async (req, res) => {
   const { formId: formIdStr } = ListRegistrationsParams.parse(req.params);
   const formId = Number(formIdStr);
   try {
-    const registrations = await db
-      .select()
+    const rows = await db
+      .select({
+        // All registration columns
+        id: registrationsTable.id,
+        formId: registrationsTable.formId,
+        eventId: registrationsTable.eventId,
+        participantId: registrationsTable.participantId,
+        guardianId: registrationsTable.guardianId,
+        registrationGroupId: registrationsTable.registrationGroupId,
+        formVersionId: registrationsTable.formVersionId,
+        childFirstName: registrationsTable.childFirstName,
+        childLastName: registrationsTable.childLastName,
+        childDateOfBirth: registrationsTable.childDateOfBirth,
+        guardianName: registrationsTable.guardianName,
+        guardianPhone: registrationsTable.guardianPhone,
+        guardianEmail: registrationsTable.guardianEmail,
+        allergies: registrationsTable.allergies,
+        specialNeeds: registrationsTable.specialNeeds,
+        room: registrationsTable.room,
+        createdAt: registrationsTable.createdAt,
+        submittedAt: registrationsTable.submittedAt,
+        // Participant columns for name fallback
+        participantFirstName: participantsTable.firstName,
+        participantLastName: participantsTable.lastName,
+        // Guardian columns for contact fallback
+        guardianFirstNameJoined: guardiansTable.firstName,
+        guardianLastNameJoined: guardiansTable.lastName,
+        guardianPhoneJoined: guardiansTable.phone,
+        guardianEmailJoined: guardiansTable.email,
+      })
       .from(registrationsTable)
+      .leftJoin(participantsTable, eq(registrationsTable.participantId, participantsTable.id))
+      .leftJoin(guardiansTable, eq(registrationsTable.guardianId, guardiansTable.id))
       .where(eq(registrationsTable.formId, formId))
       .orderBy(desc(registrationsTable.createdAt));
+
+    // Overlay participant/guardian data onto the legacy flat columns when the
+    // legacy columns are empty (happens for family/individual event types).
+    const registrations = rows.map((row) => {
+      const firstName = row.childFirstName || row.participantFirstName || "";
+      const lastName  = row.childLastName  || row.participantLastName  || "";
+      const guardianName = row.guardianName ||
+        [row.guardianFirstNameJoined, row.guardianLastNameJoined].filter(Boolean).join(" ");
+      const guardianPhone = row.guardianPhone || row.guardianPhoneJoined || "";
+      const guardianEmail = row.guardianEmail || row.guardianEmailJoined || null;
+      return {
+        id: row.id,
+        formId: row.formId,
+        eventId: row.eventId,
+        participantId: row.participantId,
+        guardianId: row.guardianId,
+        registrationGroupId: row.registrationGroupId,
+        formVersionId: row.formVersionId,
+        childFirstName: firstName,
+        childLastName: lastName,
+        childDateOfBirth: row.childDateOfBirth,
+        guardianName,
+        guardianPhone,
+        guardianEmail,
+        allergies: row.allergies,
+        specialNeeds: row.specialNeeds,
+        room: row.room,
+        createdAt: row.createdAt,
+        submittedAt: row.submittedAt,
+      };
+    });
+
     res.json(registrations);
   } catch (err) {
     req.log.error({ err }, "Failed to list registrations");
