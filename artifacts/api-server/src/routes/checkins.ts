@@ -1,6 +1,16 @@
 import { Router } from "express";
 import { eq, gte, desc, and, inArray } from "drizzle-orm";
-import { db, checkinsTable, registrationsTable, organizationsTable, formsTable } from "@workspace/db";
+import {
+  db,
+  checkinsTable,
+  registrationsTable,
+  organizationsTable,
+  formsTable,
+  eventsTable,
+  participantsTable,
+  guardiansTable,
+  participantGuardiansTable,
+} from "@workspace/db";
 import { CreateCheckinBody, CheckoutChildParams } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
 
@@ -18,6 +28,98 @@ function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
     checkoutAt: c.checkoutAt?.toISOString() ?? null,
   };
 }
+
+// Walk-in: register a new child and immediately check them in
+router.post("/checkins/walkin", async (req, res) => {
+  const { eventId, childFirstName, childLastName, guardianName, guardianPhone } = req.body as Record<string, unknown>;
+  if (
+    typeof eventId !== "number" ||
+    typeof childFirstName !== "string" || !childFirstName.trim() ||
+    typeof childLastName !== "string" || !childLastName.trim() ||
+    typeof guardianName !== "string" || !guardianName.trim() ||
+    typeof guardianPhone !== "string" || !guardianPhone.trim()
+  ) {
+    res.status(400).json({ error: "Invalid input" });
+    return;
+  }
+
+  try {
+    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    if (!event?.formId) {
+      res.status(404).json({ error: "Event not found or has no registration form" });
+      return;
+    }
+
+    const nameParts = guardianName.trim().split(/\s+/);
+    const gFirst = nameParts[0] ?? guardianName;
+    const gLast = nameParts.slice(1).join(" ") || "";
+
+    const [participant] = await db
+      .insert(participantsTable)
+      .values({ firstName: childFirstName, lastName: childLastName })
+      .returning();
+
+    const [guardian] = await db
+      .insert(guardiansTable)
+      .values({ firstName: gFirst, lastName: gLast, phone: guardianPhone })
+      .returning();
+
+    await db.insert(participantGuardiansTable).values({
+      participantId: participant.id,
+      guardianId: guardian.id,
+      isPrimary: true,
+      canPickUp: true,
+    });
+
+    const [registration] = await db
+      .insert(registrationsTable)
+      .values({
+        formId: event.formId,
+        eventId,
+        participantId: participant.id,
+        guardianId: guardian.id,
+        submittedAt: new Date(),
+        childFirstName,
+        childLastName,
+        guardianName,
+        guardianPhone,
+      })
+      .returning();
+
+    const labelCode = generateLabelCode();
+    const orgs = await db.select().from(organizationsTable).limit(1);
+    const orgName = orgs[0]?.name ?? "Church";
+
+    const [checkin] = await db
+      .insert(checkinsTable)
+      .values({
+        registrationId: registration.id,
+        childFirstName,
+        childLastName,
+        guardianName,
+        labelCode,
+        labelPrinted: false,
+      })
+      .returning();
+
+    res.status(201).json({
+      checkin: serializeCheckin(checkin),
+      labelData: {
+        childName: `${childFirstName} ${childLastName}`,
+        guardianName,
+        labelCode,
+        checkinDate: checkin.checkinAt.toISOString(),
+        room: null,
+        allergies: null,
+        specialNeeds: null,
+        organizationName: orgName,
+      },
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to walk-in check-in");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 // Batch check-in — must be registered BEFORE /checkins/:checkinId routes
 router.post("/checkins/batch", async (req, res) => {

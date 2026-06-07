@@ -17,7 +17,10 @@
       "Bash(netstat -tlnp)",
       "Bash(node ./build.mjs)",
       "Bash(kill 321)",
-      "Bash(kill 127)"
+      "Bash(kill 127)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(xargs ls)"
     ]
   }
 }

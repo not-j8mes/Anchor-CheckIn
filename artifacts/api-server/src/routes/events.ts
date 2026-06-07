@@ -77,6 +77,15 @@ function getFormTemplate(registrationType?: string | null) {
   return TEMPLATE_CHILD_CHECKIN; // child_checkin or no type
 }
 
+function computeStatus(startDate: string | null, endDate: string | null): string {
+  const today = new Date().toISOString().slice(0, 10);
+  if (!startDate) return "upcoming";
+  const end = endDate || startDate;
+  if (end < today) return "completed";
+  if (startDate <= today) return "active";
+  return "upcoming";
+}
+
 async function buildEventRow(event: typeof eventsTable.$inferSelect) {
   let formTitle: string | null = null;
   let formEmbedSlug: string | null = null;
@@ -97,6 +106,7 @@ async function buildEventRow(event: typeof eventsTable.$inferSelect) {
 
   return {
     ...event,
+    status: computeStatus(event.startDate, event.endDate),
     createdAt: event.createdAt.toISOString(),
     formTitle,
     formEmbedSlug,
@@ -116,7 +126,7 @@ router.get("/events", async (req, res) => {
 });
 
 router.post("/events", async (req, res) => {
-  const { name, description, eventType, registrationType, startDate, endDate, status, formTitle, formDescription, addDefaultQuestions, trackAttendance, requireCheckout, printLabels, labelType } = req.body;
+  const { name, description, eventType, registrationType, startDate, endDate, formTitle, formDescription, addDefaultQuestions, trackAttendance, requireCheckout, printLabels, labelType } = req.body;
 
   if (!name || !eventType || !formTitle) {
     res.status(400).json({ error: "name, eventType, and formTitle are required" });
@@ -167,7 +177,7 @@ router.post("/events", async (req, res) => {
         registrationType: registrationType || null,
         startDate: startDate || null,
         endDate: endDate || null,
-        status: status || "upcoming",
+        status: computeStatus(startDate || null, endDate || null),
         formId: form.id,
         trackAttendance: resolvedTrackAttendance,
         requireCheckout: resolvedRequireCheckout,
@@ -357,7 +367,7 @@ router.put("/events/:eventId", async (req, res) => {
     res.status(400).json({ error: "Invalid eventId" });
     return;
   }
-  const { name, description, eventType, registrationType, startDate, endDate, status, trackAttendance, requireCheckout, printLabels, labelType } = req.body;
+  const { name, description, eventType, registrationType, startDate, endDate, trackAttendance, requireCheckout, printLabels, labelType } = req.body;
   try {
     const [updated] = await db
       .update(eventsTable)
@@ -368,7 +378,6 @@ router.put("/events/:eventId", async (req, res) => {
         ...(registrationType !== undefined && { registrationType }),
         ...(startDate !== undefined && { startDate }),
         ...(endDate !== undefined && { endDate }),
-        ...(status !== undefined && { status }),
         ...(trackAttendance !== undefined && { trackAttendance }),
         ...(requireCheckout !== undefined && { requireCheckout }),
         ...(printLabels !== undefined && { printLabels }),

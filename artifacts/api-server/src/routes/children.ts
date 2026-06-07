@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, desc, isNull } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db, registrationsTable, checkinsTable } from "@workspace/db";
 import { GetChildParams } from "@workspace/api-zod";
 
@@ -44,10 +44,13 @@ async function buildChild(reg: typeof registrationsTable.$inferSelect) {
 
 router.get("/children", async (req, res) => {
   const search = req.query.search as string | undefined;
+  const eventIdStr = req.query.eventId as string | undefined;
+  const eventId = eventIdStr ? parseInt(eventIdStr, 10) : undefined;
   try {
     const regs = await db
       .select()
       .from(registrationsTable)
+      .where(eventId !== undefined ? eq(registrationsTable.eventId, eventId) : undefined)
       .orderBy(desc(registrationsTable.createdAt));
 
     const children = await Promise.all(regs.map(buildChild));

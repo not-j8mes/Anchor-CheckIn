@@ -6,6 +6,53 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, FileText, Download } from "lucide-react";
 import { format } from "date-fns";
 import { EmptyState } from "@/components/ui/empty-state";
+import type { Registration } from "@workspace/api-client-react";
+
+function escapeCsvValue(value: string | null | undefined): string {
+  if (value == null) return "";
+  const str = String(value);
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+function exportToCsv(registrations: Registration[], formTitle: string) {
+  const headers = [
+    "Child First Name",
+    "Child Last Name",
+    "Date of Birth",
+    "Guardian Name",
+    "Guardian Phone",
+    "Guardian Email",
+    "Room",
+    "Allergies",
+    "Special Needs",
+    "Date Submitted",
+  ];
+
+  const rows = registrations.map((reg) => [
+    escapeCsvValue(reg.childFirstName),
+    escapeCsvValue(reg.childLastName),
+    escapeCsvValue(reg.childDateOfBirth),
+    escapeCsvValue(reg.guardianName),
+    escapeCsvValue(reg.guardianPhone),
+    escapeCsvValue(reg.guardianEmail),
+    escapeCsvValue(reg.room),
+    escapeCsvValue(reg.allergies),
+    escapeCsvValue(reg.specialNeeds),
+    escapeCsvValue(format(new Date(reg.createdAt), "yyyy-MM-dd")),
+  ]);
+
+  const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${formTitle.replace(/[^a-z0-9]/gi, "_")}_registrations.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function FormRegistrations() {
   const params = useParams<{ id: string }>();
@@ -26,7 +73,11 @@ export default function FormRegistrations() {
             <p className="text-muted-foreground mt-1">Form: {form?.title || "Loading..."}</p>
           </div>
         </div>
-        <Button variant="outline" disabled={!registrations?.length}>
+        <Button
+          variant="outline"
+          disabled={!registrations?.length}
+          onClick={() => exportToCsv(registrations!, form?.title ?? "registrations")}
+        >
           <Download className="w-4 h-4 mr-2" /> Export CSV
         </Button>
       </div>

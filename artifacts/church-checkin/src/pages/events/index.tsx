@@ -82,12 +82,6 @@ const EVENT_TYPES = [
   { value: "general", label: "General / Other" },
 ];
 
-const STATUS_OPTIONS = [
-  { value: "upcoming", label: "Upcoming" },
-  { value: "active", label: "Active" },
-  { value: "completed", label: "Completed" },
-];
-
 const REGISTRATION_TYPES = [
   {
     value: "child_checkin",
@@ -155,7 +149,6 @@ interface WizardState {
   isMultiDay: boolean;
   startDate: string;
   endDate: string;
-  status: string;
   // Step 3: form setup
   formTitle: string;
   formDescription: string;
@@ -175,7 +168,6 @@ const WIZARD_DEFAULTS: WizardState = {
   isMultiDay: false,
   startDate: "",
   endDate: "",
-  status: "upcoming",
   formTitle: "",
   formDescription: "",
   addDefaultQuestions: true,
@@ -244,7 +236,6 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
           registrationType: state.registrationType || undefined,
           startDate: state.startDate || undefined,
           endDate: state.endDate || undefined,
-          status: state.status,
           formTitle: state.formTitle,
           formDescription: state.formDescription || undefined,
           addDefaultQuestions: state.addDefaultQuestions,
@@ -414,17 +405,6 @@ function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardP
                 />
               </div>
             )}
-            <div className="space-y-1.5">
-              <Label>Status</Label>
-              <Select value={state.status} onValueChange={(v) => update("status", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         )}
 
@@ -593,7 +573,6 @@ interface EditEventDialogProps {
     registrationType?: string | null;
     startDate?: string | null;
     endDate?: string | null;
-    status: string;
     trackAttendance?: boolean | null;
     requireCheckout?: boolean | null;
     printLabels?: boolean | null;
@@ -618,7 +597,6 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
     eventType: event.eventType,
     startDate: event.startDate ?? "",
     endDate: event.endDate ?? "",
-    status: event.status,
     trackAttendance: event.trackAttendance ?? isChildCheckin,
     requireCheckout: event.requireCheckout ?? isChildCheckin,
     printLabels: event.printLabels ?? isChildCheckin,
@@ -705,18 +683,6 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
               <Input type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} />
             </div>
           )}
-          <div className="space-y-1.5">
-            <Label>Status</Label>
-            <Select value={form.status} onValueChange={(v) => setForm((p) => ({ ...p, status: v }))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* ── Check-In Settings ── */}
           <div className="space-y-2 pt-1 border-t border-border">
             <Label className="text-sm font-medium">Attendance &amp; Check-In</Label>

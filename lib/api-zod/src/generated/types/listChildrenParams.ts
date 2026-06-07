@@ -8,4 +8,5 @@
 
 export type ListChildrenParams = {
 search?: string;
+eventId?: number;
 };

@@ -5,9 +5,11 @@ import {
   useBatchCheckin,
   useCheckoutChild,
   useDeleteCheckin,
+  useListEvents,
   getListChildrenQueryKey,
   LabelData,
   Child,
+  Event,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -15,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Search,
   AlertCircle,
@@ -25,6 +29,9 @@ import {
   LogOut,
   Undo2,
   LayoutDashboard,
+  UserPlus,
+  Calendar,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
@@ -205,23 +212,190 @@ function FamilyCard({
   );
 }
 
+interface WalkInDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: (labelData: LabelData) => void;
+  eventId: number;
+}
+
+function WalkInDialog({ open, onOpenChange, onSuccess, eventId }: WalkInDialogProps) {
+  const { toast } = useToast();
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    childFirstName: "",
+    childLastName: "",
+    guardianName: "",
+    guardianPhone: "",
+  });
+
+  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/checkins/walkin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventId,
+          childFirstName: form.childFirstName.trim(),
+          childLastName: form.childLastName.trim(),
+          guardianName: form.guardianName.trim(),
+          guardianPhone: form.guardianPhone.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error("Walk-in failed");
+      const data = await res.json() as { labelData: LabelData };
+      onSuccess(data.labelData);
+      onOpenChange(false);
+      setForm({ childFirstName: "", childLastName: "", guardianName: "", guardianPhone: "" });
+    } catch {
+      toast({ title: "Walk-in failed — please try again.", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const isValid = form.childFirstName.trim() && form.childLastName.trim() && form.guardianName.trim() && form.guardianPhone.trim();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-serif">Walk-In Check-In</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Child First Name</Label>
+              <Input value={form.childFirstName} onChange={set("childFirstName")} placeholder="First name" autoComplete="off" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Child Last Name</Label>
+              <Input value={form.childLastName} onChange={set("childLastName")} placeholder="Last name" autoComplete="off" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Guardian Name</Label>
+            <Input value={form.guardianName} onChange={set("guardianName")} placeholder="Parent / guardian full name" autoComplete="off" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Guardian Phone</Label>
+            <Input value={form.guardianPhone} onChange={set("guardianPhone")} placeholder="(555) 000-0000" type="tel" autoComplete="off" />
+          </div>
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={!isValid || submitting} className="gap-2">
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCheck className="w-4 h-4" />}
+              Register &amp; Check In
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface EventSelectorProps {
+  onSelect: (event: Event) => void;
+}
+
+function EventSelector({ onSelect }: EventSelectorProps) {
+  const { data: events, isLoading } = useListEvents();
+  const eligibleEvents = events?.filter((e) => e.formId && (e.status === "active" || e.status === "upcoming")) ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-center p-8">
+      <div className="w-full max-w-lg space-y-6">
+        <div className="text-center space-y-2">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <Calendar className="w-8 h-8 text-primary" />
+          </div>
+          <h1 className="text-4xl font-serif font-bold text-primary">Select Event</h1>
+          <p className="text-muted-foreground text-lg">Choose which event this kiosk is for</p>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12 gap-3">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <span className="text-muted-foreground">Loading events...</span>
+          </div>
+        ) : eligibleEvents.length === 0 ? (
+          <Card className="shadow-sm">
+            <CardContent className="py-12 text-center">
+              <Calendar className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-40" />
+              <p className="text-xl text-muted-foreground font-serif mb-1">No active events</p>
+              <p className="text-sm text-muted-foreground">Create an event and attach a form to use the kiosk.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {eligibleEvents.map((event) => (
+              <button
+                key={event.id}
+                type="button"
+                onClick={() => onSelect(event)}
+                className="w-full text-left"
+              >
+                <Card className="border-2 border-transparent hover:border-primary hover:shadow-md transition-all cursor-pointer">
+                  <CardContent className="px-6 py-4 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-lg text-foreground truncate">{event.name}</p>
+                      {event.startDate && (
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          {new Date(event.startDate).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+                        </p>
+                      )}
+                      <Badge
+                        variant={event.status === "active" ? "default" : "secondary"}
+                        className="mt-1.5 text-xs"
+                      >
+                        {event.status}
+                      </Badge>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                  </CardContent>
+                </Card>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CheckinKiosk() {
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
-  const childrenParams = { search: debouncedSearch || undefined };
+  const childrenParams = {
+    search: debouncedSearch || undefined,
+    eventId: selectedEvent?.id,
+  };
   const { data: children, isLoading: searching } = useListChildren(
     childrenParams,
-    { query: { enabled: debouncedSearch.length > 1, queryKey: getListChildrenQueryKey(childrenParams) } }
+    { query: { enabled: debouncedSearch.length > 1 && selectedEvent !== null, queryKey: getListChildrenQueryKey(childrenParams) } }
   );
 
   const { toast } = useToast();
   const [collectedLabels, setCollectedLabels] = useState<LabelData[]>([]);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [walkInOpen, setWalkInOpen] = useState(false);
   const [checkingInGuardian, setCheckingInGuardian] = useState<string | null>(null);
   const [loadingCheckinId, setLoadingCheckinId] = useState<number | null>(null);
+
+  const handleWalkInSuccess = (labelData: LabelData) => {
+    setCollectedLabels([labelData]);
+    setPrintDialogOpen(true);
+    toast({ title: `${labelData.childName} checked in!` });
+  };
 
   const batchCheckin = useBatchCheckin();
   const checkoutChild = useCheckoutChild();
@@ -294,9 +468,13 @@ export default function CheckinKiosk() {
   const families = children ? groupByFamily(children) : [];
   const showResults = debouncedSearch.length > 1;
 
+  if (!selectedEvent) {
+    return <EventSelector onSelect={setSelectedEvent} />;
+  }
+
   return (
     <div className="flex flex-col flex-1 min-h-screen bg-muted/30">
-      {/* Top bar with back button */}
+      {/* Top bar */}
       <div className="flex items-center justify-between px-6 py-3 bg-background border-b border-border shadow-sm">
         <Link href="/">
           <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
@@ -304,8 +482,18 @@ export default function CheckinKiosk() {
             Dashboard
           </Button>
         </Link>
-        <span className="text-sm font-medium text-muted-foreground">Check-In Kiosk</span>
-        <div className="w-28" />
+        <button
+          type="button"
+          onClick={() => { setSelectedEvent(null); setSearch(""); setDebouncedSearch(""); }}
+          className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Calendar className="w-4 h-4" />
+          {selectedEvent.name}
+          <span className="text-xs text-muted-foreground/60">(change)</span>
+        </button>
+        <Button variant="outline" size="sm" className="gap-2 w-28" onClick={() => setWalkInOpen(true)}>
+          <UserPlus className="w-4 h-4" /> Walk-in
+        </Button>
       </div>
 
       {/* Main centered content */}
@@ -360,9 +548,12 @@ export default function CheckinKiosk() {
                     <p className="text-2xl text-muted-foreground font-serif mb-2">
                       No matches for "{debouncedSearch}"
                     </p>
-                    <p className="text-muted-foreground text-sm">
-                      Try a different name, or register the family first.
+                    <p className="text-muted-foreground text-sm mb-6">
+                      This family may not be registered yet.
                     </p>
+                    <Button onClick={() => setWalkInOpen(true)} className="gap-2">
+                      <UserPlus className="w-4 h-4" /> Register as Walk-in
+                    </Button>
                   </CardContent>
                 </Card>
               ) : (
@@ -401,6 +592,14 @@ export default function CheckinKiosk() {
         onOpenChange={setPrintDialogOpen}
         labels={collectedLabels}
       />
+      {selectedEvent && (
+        <WalkInDialog
+          open={walkInOpen}
+          onOpenChange={setWalkInOpen}
+          onSuccess={handleWalkInSuccess}
+          eventId={selectedEvent.id}
+        />
+      )}
     </div>
   );
 }

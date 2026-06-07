@@ -546,6 +546,7 @@ export interface UpdateEventInput {
 
 export type ListChildrenParams = {
 search?: string;
+eventId?: number;
 };
 
 export type ListCheckinsParams = {

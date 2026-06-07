@@ -1,5 +1,5 @@
 import { Link, useParams, useSearch } from "wouter";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   useGetEvent,
   useUpdateEvent,
@@ -34,6 +34,7 @@ import {
   Undo2,
   FileEdit,
   Download,
+  BarChart2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -128,6 +129,20 @@ export default function EventDetail() {
       labelType: event.labelType ?? (isChild ? "child_security" : "simple_name"),
     });
   }, [event?.id]);
+
+  // Must be before any early returns to satisfy Rules of Hooks
+  const attendanceSessions = useMemo(() => {
+    if (!checkins?.length) return [];
+    const byDate = new Map<string, typeof checkins>();
+    for (const c of checkins) {
+      const dateKey = format(new Date(c.checkinAt), "yyyy-MM-dd");
+      if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+      byDate.get(dateKey)!.push(c);
+    }
+    return [...byDate.entries()]
+      .map(([date, items]) => ({ date, items }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [checkins]);
 
   const copyEmbedCode = () => {
     if (!event?.formEmbedSlug) return;
@@ -261,14 +276,16 @@ export default function EventDetail() {
     "registrations",
     ...(trackAttendance ? ["checked-in"] : []),
     ...(requireCheckout ? ["checked-out"] : []),
+    ...(trackAttendance ? ["attendance"] : []),
     "form",
   ];
   const tabGridClass: Record<number, string> = {
     2: "grid-cols-2",
     3: "grid-cols-3",
     4: "grid-cols-4",
+    5: "grid-cols-5",
   };
-  const tabGrid = tabGridClass[visibleTabs.length] ?? "grid-cols-4";
+  const tabGrid = tabGridClass[visibleTabs.length] ?? "grid-cols-5";
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">
@@ -361,6 +378,12 @@ export default function EventDetail() {
               <LogOut className="w-4 h-4 shrink-0" />
               <span className="hidden sm:inline">Checked Out</span>
               <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
+            </TabsTrigger>
+          )}
+          {trackAttendance && (
+            <TabsTrigger value="attendance" className="gap-1.5 text-xs sm:text-sm">
+              <BarChart2 className="w-4 h-4 shrink-0" />
+              <span className="hidden sm:inline">Attendance</span>
             </TabsTrigger>
           )}
           <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
@@ -532,6 +555,59 @@ export default function EventDetail() {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* ── Attendance History ── */}
+            <TabsContent value="attendance">
+              {checkinsLoading ? (
+                <div className="p-8 text-center text-muted-foreground">Loading...</div>
+              ) : !attendanceSessions.length ? (
+                <div className="p-10 text-center text-muted-foreground">
+                  <BarChart2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p>No attendance recorded yet.</p>
+                  <p className="text-sm mt-1">Check-ins will appear here grouped by date.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {attendanceSessions.length} session{attendanceSessions.length !== 1 ? "s" : ""} · {checkins?.length ?? 0} total check-ins
+                  </p>
+                  {attendanceSessions.map(({ date, items }) => (
+                    <Card key={date}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base">
+                            {format(new Date(date + "T00:00:00"), "EEEE, MMMM d, yyyy")}
+                          </CardTitle>
+                          <span className="text-sm font-medium text-muted-foreground">
+                            {items.length} {items.length === 1 ? "child" : "children"}
+                          </span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <div className="divide-y divide-border">
+                          {items
+                            .sort((a, b) => new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime())
+                            .map((c) => (
+                              <div key={c.id} className="px-5 py-2.5 flex items-center justify-between gap-4">
+                                <div>
+                                  <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
+                                  {c.room && <p className="text-xs text-muted-foreground">{c.room}</p>}
+                                </div>
+                                <div className="text-right text-xs text-muted-foreground flex-shrink-0">
+                                  <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
+                                  {c.checkoutAt && (
+                                    <p className="text-amber-700">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             {/* ── Form Builder ── */}

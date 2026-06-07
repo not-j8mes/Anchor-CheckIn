@@ -711,7 +711,8 @@ export const GetRegistrationResponse = zod.object({
  * @summary List all children
  */
 export const ListChildrenQueryParams = zod.object({
-  "search": zod.coerce.string().optional()
+  "search": zod.coerce.string().optional(),
+  "eventId": zod.coerce.number().optional()
 })
 
 export const ListChildrenResponseItem = zod.object({
