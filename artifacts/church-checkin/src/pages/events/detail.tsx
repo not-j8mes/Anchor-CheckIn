@@ -1040,7 +1040,7 @@ export default function EventDetail() {
             </TabsTrigger>
             <TabsTrigger value="families" className="gap-1.5 text-xs sm:text-sm">
               <Users className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Families</span>
+              <span className="hidden sm:inline">Families/Groups</span>
             </TabsTrigger>
             <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
               <FileEdit className="w-4 h-4 shrink-0" />

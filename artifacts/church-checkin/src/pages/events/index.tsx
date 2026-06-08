@@ -120,8 +120,15 @@ function registrationTypeBadge(type?: string | null) {
   if (!type) return null;
   if (type === "child_checkin") return <Badge className="bg-purple-100 text-purple-800 border-purple-200">Child Check-In</Badge>;
   if (type === "family_group") return <Badge className="bg-teal-100 text-teal-800 border-teal-200">Family / Group</Badge>;
-  if (type === "individual") return <Badge className="bg-slate-100 text-slate-700 border-slate-200">Individual</Badge>;
+  if (type === "individual") return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Individual</Badge>;
   return null;
+}
+
+function registrationTypeStripe(type?: string | null) {
+  if (!type || type === "child_checkin") return "bg-purple-500";
+  if (type === "family_group") return "bg-teal-500";
+  if (type === "individual") return "bg-blue-500";
+  return "bg-primary";
 }
 
 function eventTypeLabel(type: string) {
@@ -776,14 +783,7 @@ function EventCard({ event, onEdit, onDelete }: {
     <Card className="overflow-hidden hover-elevate transition-all border-card-border" data-testid={`event-card-${event.id}`}>
       <CardContent className="p-0">
         <div className="flex items-stretch">
-          <div className={`w-1.5 flex-shrink-0 ${
-            event.eventType === "vbs" ? "bg-yellow-400" :
-            event.eventType === "awana" ? "bg-blue-500" :
-            event.eventType === "sunday_school" ? "bg-purple-500" :
-            event.eventType === "youth_group" ? "bg-green-500" :
-            event.eventType === "camp" ? "bg-orange-500" :
-            "bg-primary"
-          }`} />
+          <div className={`w-1.5 flex-shrink-0 ${registrationTypeStripe(event.registrationType)}`} />
           <div className="flex-1 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
