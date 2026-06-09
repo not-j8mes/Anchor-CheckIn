@@ -53,13 +53,7 @@ function Router() {
       <Route path="/" component={EventSelectionScreen} />
 
       {/* Settings */}
-      <Route path="/settings">
-        <SidebarProvider>
-          <AppLayout>
-            <SettingsPage />
-          </AppLayout>
-        </SidebarProvider>
-      </Route>
+      <Route path="/settings" component={SettingsPage} />
 
       <Route component={NotFound} />
     </Switch>

@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { useGetOrganization, useUpdateOrganization, useResetAllData, getGetOrganizationQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Moon, Sun, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Church, Moon, Sun, Trash2 } from "lucide-react";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 
 export default function Settings() {
@@ -81,17 +81,43 @@ export default function Settings() {
 
   if (isLoading) {
     return (
-      <div className="p-6 md:p-10 max-w-3xl mx-auto w-full">
-        <div className="animate-pulse space-y-6">
-          <div className="h-10 w-48 bg-muted rounded"></div>
-          <div className="h-64 bg-muted/50 rounded-xl"></div>
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
+          <div className="max-w-3xl mx-auto px-6 h-14 flex items-center gap-4">
+            <div className="flex items-center gap-2 text-foreground">
+              <Church className="w-5 h-5 text-primary" />
+              <span className="font-serif font-bold text-base">Church Check-In</span>
+            </div>
+          </div>
+        </header>
+        <div className="max-w-3xl mx-auto px-6 py-10">
+          <div className="animate-pulse space-y-6">
+            <div className="h-10 w-48 bg-muted rounded"></div>
+            <div className="h-64 bg-muted/50 rounded-xl"></div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 md:p-10 max-w-3xl mx-auto w-full space-y-8">
+    <div className="min-h-screen bg-background">
+      {/* Top bar */}
+      <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
+        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-foreground">
+            <Church className="w-5 h-5 text-primary" />
+            <span className="font-serif font-bold text-base">Church Check-In</span>
+          </div>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/events">
+              <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
+            </Link>
+          </Button>
+        </div>
+      </header>
+
+    <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
       <div>
         <h1 className="text-3xl font-serif font-bold text-foreground">Organization Settings</h1>
         <p className="text-muted-foreground mt-1">Configure your church identity and default styling</p>
@@ -282,6 +308,7 @@ export default function Settings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }
