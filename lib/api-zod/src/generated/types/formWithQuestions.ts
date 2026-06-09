@@ -21,6 +21,10 @@ export interface FormWithQuestions {
   createdAt?: string;
   /** @nullable */
   registrationType?: string | null;
+  /** @nullable */
+  eventId?: number | null;
+  /** @nullable */
+  roomAssignmentMode?: string | null;
   questions: Question[];
   formFields?: FormField[];
 }

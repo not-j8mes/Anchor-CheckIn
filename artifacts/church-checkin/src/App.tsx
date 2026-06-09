@@ -3,64 +3,64 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { EventWorkspaceLayout } from "@/components/layout/EventWorkspaceLayout";
 import { AppLayout } from "@/components/layout/AppLayout";
 
 import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/dashboard";
-import EventsPage from "@/pages/events";
-import EventDetail from "@/pages/events/detail";
-import FormsList from "@/pages/forms";
-import FormBuilder from "@/pages/forms/builder";
-import FormRegistrations from "@/pages/forms/registrations";
-import FormEmbed from "@/pages/forms/embed";
+import EventSelectionScreen from "@/pages/events";
+import EventWorkspace from "@/pages/events/detail";
+import EventSetupWizard from "@/pages/events/setup";
 import PublicRegistrationForm from "@/pages/register";
-import ChildrenDirectory from "@/pages/children";
-import Settings from "@/pages/settings";
 import CheckinKiosk from "@/pages/checkin";
-import RoomsPage from "@/pages/rooms";
+import SettingsPage from "@/pages/settings";
 
 const queryClient = new QueryClient();
+
+function EventWorkspaceRoute() {
+  return (
+    <SidebarProvider>
+      <EventWorkspaceLayout>
+        <EventWorkspace />
+      </EventWorkspaceLayout>
+    </SidebarProvider>
+  );
+}
 
 function Router() {
   return (
     <Switch>
-      {/* Public Routes without sidebar */}
+      {/* Public routes — no layout */}
       <Route path="/register/:embedSlug" component={PublicRegistrationForm} />
 
-      {/* Kiosk Mode (clean layout, no sidebar) */}
+      {/* Standalone kiosk mode */}
       <Route path="/checkin" component={CheckinKiosk} />
 
-      {/* Admin Routes with Sidebar */}
-      <Route path="/events/:id">
-        <AppLayout><EventDetail /></AppLayout>
-      </Route>
-      <Route path="/events">
-        <AppLayout><EventsPage /></AppLayout>
-      </Route>
-      <Route path="/forms/:id/builder">
-        <AppLayout><FormBuilder /></AppLayout>
-      </Route>
-      <Route path="/forms/:id/registrations">
-        <AppLayout><FormRegistrations /></AppLayout>
-      </Route>
-      <Route path="/forms/:id/embed">
-        <AppLayout><FormEmbed /></AppLayout>
-      </Route>
-      <Route path="/forms">
-        <AppLayout><FormsList /></AppLayout>
-      </Route>
-      <Route path="/children">
-        <AppLayout><ChildrenDirectory /></AppLayout>
-      </Route>
-      <Route path="/rooms">
-        <AppLayout><RoomsPage /></AppLayout>
-      </Route>
+      {/* New event setup wizard — must be before /:id routes */}
+      <Route path="/events/new" component={EventSetupWizard} />
+
+      {/* Event workspace — all sections under /events/:id/* */}
+      <Route path="/events/:id/checkin" component={EventWorkspaceRoute} />
+      <Route path="/events/:id/registrations" component={EventWorkspaceRoute} />
+      <Route path="/events/:id/groups" component={EventWorkspaceRoute} />
+      <Route path="/events/:id/rooms" component={EventWorkspaceRoute} />
+      <Route path="/events/:id/form" component={EventWorkspaceRoute} />
+      <Route path="/events/:id/reports" component={EventWorkspaceRoute} />
+      <Route path="/events/:id/settings" component={EventWorkspaceRoute} />
+      <Route path="/events/:id" component={EventWorkspaceRoute} />
+
+      {/* Event selection home screen */}
+      <Route path="/events" component={EventSelectionScreen} />
+      <Route path="/" component={EventSelectionScreen} />
+
+      {/* Settings */}
       <Route path="/settings">
-        <AppLayout><Settings /></AppLayout>
+        <SidebarProvider>
+          <AppLayout>
+            <SettingsPage />
+          </AppLayout>
+        </SidebarProvider>
       </Route>
-      <Route path="/">
-        <AppLayout><Dashboard /></AppLayout>
-      </Route>
+
       <Route component={NotFound} />
     </Switch>
   );
@@ -71,9 +71,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <SidebarProvider>
-            <Router />
-          </SidebarProvider>
+          <Router />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

@@ -619,11 +619,42 @@ paths:
               schema:
                 $ref: "#/components/schemas/Registration"
 
-  /rooms:
+  /registrations/{registrationId}/room:
+    patch:
+      operationId: updateRegistrationRoom
+      tags: [registrations]
+      summary: Assign or clear a room on a registration
+      parameters:
+        - name: registrationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRoomInput"
+      responses:
+        "200":
+          description: Updated registration room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Registration"
+
+  /events/{eventId}/rooms:
     get:
       operationId: listRooms
       tags: [rooms]
-      summary: List all rooms
+      summary: List rooms for an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
       responses:
         "200":
           description: List of rooms
@@ -636,7 +667,13 @@ paths:
     post:
       operationId: createRoom
       tags: [rooms]
-      summary: Create a room
+      summary: Create a room for an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
       requestBody:
         required: true
         content:
@@ -651,12 +688,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Room"
 
-  /rooms/{roomId}:
+  /events/{eventId}/rooms/{roomId}:
     put:
       operationId: updateRoom
       tags: [rooms]
       summary: Update a room
       parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
         - name: roomId
           in: path
           required: true
@@ -680,6 +722,11 @@ paths:
       tags: [rooms]
       summary: Delete a room
       parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
         - name: roomId
           in: path
           required: true
@@ -791,8 +838,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CheckInWithLabel"
+        "409":
+          description: Child is already checked in (active check-in exists)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, checkinId]
+                properties:
+                  error:
+                    type: string
+                  checkinId:
+                    type: integer
 
   /checkins/{checkinId}:
+    patch:
+      operationId: updateCheckin
+      tags: [checkins]
+      summary: Update a check-in record (e.g. add notes)
+      parameters:
+        - name: checkinId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCheckinInput"
+      responses:
+        "200":
+          description: Updated check-in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckIn"
     delete:
       operationId: deleteCheckin
       tags: [checkins]
@@ -818,6 +900,12 @@ paths:
           required: true
           schema:
             type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
       responses:
         "200":
           description: Updated check-in
@@ -1000,6 +1088,10 @@ components:
         createdAt:
           type: string
         registrationType:
+          type: ["string", "null"]
+        eventId:
+          type: ["integer", "null"]
+        roomAssignmentMode:
           type: ["string", "null"]
         questions:
           type: array
@@ -1277,6 +1369,16 @@ components:
             Custom question answers are stored in registration_custom_answers.
           items:
             $ref: "#/components/schemas/FieldSubmission"
+        room:
+          type: string
+          description: Room name chosen by the registrant (used when roomAssignmentMode is registrant_chooses)
+
+    UpdateRoomInput:
+      type: object
+      required: [room]
+      properties:
+        room:
+          type: ["string", "null"]
 
     FieldSubmission:
       type: object
@@ -1370,6 +1472,12 @@ components:
           type: string
         labelPrinted:
           type: boolean
+        pickupPersonName:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
 
     CheckInInput:
       type: object
@@ -1378,6 +1486,20 @@ components:
         registrationId:
           type: integer
         room:
+          type: string
+
+    CheckoutInput:
+      type: object
+      properties:
+        pickupPersonName:
+          type: string
+        notes:
+          type: string
+
+    UpdateCheckinInput:
+      type: object
+      properties:
+        notes:
           type: string
 
     CheckInWithLabel:
@@ -1479,6 +1601,10 @@ components:
           type: string
         checkoutAt:
           type: ["string", "null"]
+        pickupPersonName:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
 
     DayCount:
       type: object
@@ -1564,6 +1690,8 @@ components:
           type: ["boolean", "null"]
         labelType:
           type: ["string", "null"]
+        roomAssignmentMode:
+          type: ["string", "null"]
         createdAt:
           type: string
         form:
@@ -1603,17 +1731,29 @@ components:
           type: boolean
         labelType:
           type: string
+        roomAssignmentMode:
+          type: string
 
     Room:
       type: object
-      required: [id, name, createdAt]
+      required: [id, eventId, name, isActive, sortOrder, createdAt]
       properties:
         id:
           type: integer
+        eventId:
+          type: integer
         name:
           type: string
+        description:
+          type: ["string", "null"]
         capacity:
           type: ["integer", "null"]
+        isActive:
+          type: boolean
+        sortOrder:
+          type: integer
+        participantCount:
+          type: integer
         createdAt:
           type: string
 
@@ -1623,7 +1763,13 @@ components:
       properties:
         name:
           type: string
+        description:
+          type: string
         capacity:
+          type: integer
+        isActive:
+          type: boolean
+        sortOrder:
           type: integer
 
     RegistrationUpdateInput:
@@ -1674,4 +1820,6 @@ components:
         printLabels:
           type: boolean
         labelType:
+          type: string
+        roomAssignmentMode:
           type: string

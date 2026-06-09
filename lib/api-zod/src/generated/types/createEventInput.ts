@@ -21,4 +21,5 @@ export interface CreateEventInput {
   requireCheckout?: boolean;
   printLabels?: boolean;
   labelType?: string;
+  roomAssignmentMode?: string;
 }

@@ -11,4 +11,6 @@ export interface RegistrationInput {
   /** One entry per form field submitted. System fields are routed to the appropriate participant/guardian/emergency_contact columns server-side. Custom question answers are stored in registration_custom_answers.
    */
   fields: FieldSubmission[];
+  /** Room name chosen by the registrant (used when roomAssignmentMode is registrant_chooses) */
+  room?: string;
 }

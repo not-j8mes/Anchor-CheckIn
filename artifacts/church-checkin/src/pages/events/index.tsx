@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import {
   useListEvents,
-  useCreateEvent,
   useDeleteEvent,
   useUpdateEvent,
   getListEventsQueryKey,
@@ -23,7 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -46,17 +44,14 @@ import {
   Plus,
   Calendar,
   Users,
-  User,
-  Baby,
   ArrowRight,
   Trash2,
   Pencil,
-  CheckSquare,
   ChevronRight,
   ChevronLeft,
-  Check,
-  List,
-  CalendarDays,
+  Search,
+  Church,
+  FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -80,33 +75,6 @@ const EVENT_TYPES = [
   { value: "camp", label: "Camp" },
   { value: "special_event", label: "Special Event" },
   { value: "general", label: "General / Other" },
-];
-
-const REGISTRATION_TYPES = [
-  {
-    value: "child_checkin",
-    label: "Child Check-In",
-    Icon: Baby,
-    description: "For kids programs where parents register children and staff check children in and out securely.",
-    features: ["Child profiles", "Guardian and pickup info", "Check-in / check-out"],
-    defaultCheckin: true,
-  },
-  {
-    value: "family_group",
-    label: "Family or Group",
-    Icon: Users,
-    description: "For events where one person registers multiple people, such as a family, couple, team, or group.",
-    features: ["Primary contact", "Add additional people", "Grouped registration"],
-    defaultCheckin: false,
-  },
-  {
-    value: "individual",
-    label: "Individual",
-    Icon: User,
-    description: "For events where each person signs up for themselves.",
-    features: ["Simple signup", "One person per registration", "Optional attendance tracking"],
-    defaultCheckin: false,
-  },
 ];
 
 function statusBadge(status: string) {
@@ -144,431 +112,6 @@ function eventChipClass(type: string) {
   return "bg-primary/10 text-primary";
 }
 
-// ─── Create Event Wizard ────────────────────────────────────────────────────
-
-interface WizardState {
-  // Step 1: registration type
-  registrationType: string;
-  // Step 2: event details
-  name: string;
-  description: string;
-  eventType: string;
-  isMultiDay: boolean;
-  startDate: string;
-  endDate: string;
-  // Step 3: form setup
-  formTitle: string;
-  formDescription: string;
-  addDefaultQuestions: boolean;
-  // Step 3: check-in / attendance settings
-  trackAttendance: boolean;
-  requireCheckout: boolean;
-  printLabels: boolean;
-  labelType: string;
-}
-
-const WIZARD_DEFAULTS: WizardState = {
-  registrationType: "",
-  name: "",
-  description: "",
-  eventType: "general",
-  isMultiDay: false,
-  startDate: "",
-  endDate: "",
-  formTitle: "",
-  formDescription: "",
-  addDefaultQuestions: true,
-  trackAttendance: false,
-  requireCheckout: false,
-  printLabels: false,
-  labelType: "simple_name",
-};
-
-interface CreateEventWizardProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onCreated: () => void;
-}
-
-function CreateEventWizard({ open, onOpenChange, onCreated }: CreateEventWizardProps) {
-  const [step, setStep] = useState(1);
-  const [state, setState] = useState<WizardState>(WIZARD_DEFAULTS);
-  const { toast } = useToast();
-  const [, navigate] = useLocation();
-  const createEvent = useCreateEvent();
-
-  const update = (key: keyof WizardState, value: string | boolean) =>
-    setState((prev) => ({ ...prev, [key]: value }));
-
-  const handleClose = () => {
-    onOpenChange(false);
-    setTimeout(() => { setStep(1); setState(WIZARD_DEFAULTS); }, 300);
-  };
-
-  const handleSelectType = (typeValue: string) => {
-    const isChild = typeValue === "child_checkin";
-    setState((prev) => ({
-      ...prev,
-      registrationType: typeValue,
-      trackAttendance: isChild,
-      requireCheckout: isChild,
-      printLabels: isChild,
-      labelType: isChild ? "child_security" : "simple_name",
-    }));
-    setStep(2);
-  };
-
-  const handleStep2Next = () => {
-    if (!state.name.trim()) {
-      toast({ title: "Event name is required", variant: "destructive" });
-      return;
-    }
-    if (!state.formTitle) {
-      setState((prev) => ({ ...prev, formTitle: `${state.name} Registration` }));
-    }
-    setStep(3);
-  };
-
-  const handleCreate = () => {
-    if (!state.formTitle.trim()) {
-      toast({ title: "Form title is required", variant: "destructive" });
-      return;
-    }
-    createEvent.mutate(
-      {
-        data: {
-          name: state.name,
-          description: state.description || undefined,
-          eventType: state.eventType,
-          registrationType: state.registrationType || undefined,
-          startDate: state.startDate || undefined,
-          endDate: state.endDate || undefined,
-          formTitle: state.formTitle,
-          formDescription: state.formDescription || undefined,
-          addDefaultQuestions: state.addDefaultQuestions,
-          trackAttendance: state.trackAttendance,
-          requireCheckout: state.requireCheckout,
-          printLabels: state.printLabels,
-          labelType: state.labelType,
-        },
-      },
-      {
-        onSuccess: (data) => {
-          toast({ title: `"${state.name}" event created!` });
-          handleClose();
-          onCreated();
-          navigate(`/events/${data.id}?tab=form`);
-        },
-        onError: () => {
-          toast({ title: "Failed to create event", variant: "destructive" });
-        },
-      }
-    );
-  };
-
-  const stepTitles: Record<number, React.ReactNode> = {
-    1: <><Calendar className="w-5 h-5 text-primary" /> What kind of registration do you need?</>,
-    2: <><Calendar className="w-5 h-5 text-primary" /> Event Details</>,
-    3: <><CheckSquare className="w-5 h-5 text-primary" /> Registration Setup</>,
-  };
-
-  const stepDescriptions: Record<number, string> = {
-    1: "Choose the setup that best matches this event. You can customize the form after it is created.",
-    2: "Step 2 of 3 — Fill in the event details.",
-    3: "Step 3 of 3 — Set up the registration form for this event.",
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className={step === 1 ? "max-w-2xl" : "max-w-lg"} aria-describedby={undefined}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-serif text-xl">
-            {stepTitles[step]}
-          </DialogTitle>
-          <DialogDescription>{stepDescriptions[step]}</DialogDescription>
-        </DialogHeader>
-
-        {/* Step indicator — only steps 2 and 3 show the bar */}
-        {step > 1 && (
-          <div className="flex gap-2 pt-1">
-            {[1, 2, 3].map((n) => (
-              <div
-                key={n}
-                className={`h-1.5 flex-1 rounded-full transition-colors ${
-                  n <= step ? "bg-primary" : "bg-muted"
-                }`}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* ── Step 1: Registration Type Picker ── */}
-        {step === 1 && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-2">
-            {REGISTRATION_TYPES.map(({ value, label, Icon, description, features }) => (
-              <button
-                key={value}
-                type="button"
-                data-testid={`reg-type-${value}`}
-                onClick={() => handleSelectType(value)}
-                className="group text-left rounded-xl border-2 border-border bg-background p-4 hover:border-primary hover:bg-primary/5 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
-                  <Icon className="w-5 h-5 text-primary" />
-                </div>
-                <p className="font-semibold text-foreground text-sm mb-1">{label}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed mb-3">{description}</p>
-                <ul className="space-y-1">
-                  {features.map((f) => (
-                    <li key={f} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Check className="w-3 h-3 text-primary flex-shrink-0" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* ── Step 2: Event Details ── */}
-        {step === 2 && (
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Event Name <span className="text-destructive">*</span></Label>
-              <Input
-                placeholder="e.g. VBS Summer 2025"
-                value={state.name}
-                onChange={(e) => update("name", e.target.value)}
-                data-testid="input-event-name"
-                autoFocus
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Event Category</Label>
-              <Select value={state.eventType} onValueChange={(v) => update("eventType", v)}>
-                <SelectTrigger data-testid="select-event-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EVENT_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Textarea
-                placeholder="Optional description..."
-                rows={2}
-                value={state.description}
-                onChange={(e) => update("description", e.target.value)}
-              />
-            </div>
-            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
-              <div>
-                <p className="text-sm font-medium">Multi-day event</p>
-                <p className="text-xs text-muted-foreground">Spans more than one day</p>
-              </div>
-              <Switch
-                checked={state.isMultiDay}
-                onCheckedChange={(v) => {
-                  update("isMultiDay", v);
-                  if (!v) update("endDate", "");
-                }}
-              />
-            </div>
-            {state.isMultiDay ? (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={state.startDate}
-                    onChange={(e) => {
-                      update("startDate", e.target.value);
-                      if (state.endDate && e.target.value > state.endDate) update("endDate", "");
-                    }}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>End Date</Label>
-                  <Input
-                    type="date"
-                    value={state.endDate}
-                    min={state.startDate || undefined}
-                    onChange={(e) => update("endDate", e.target.value)}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <Label>Date</Label>
-                <Input
-                  type="date"
-                  value={state.startDate}
-                  onChange={(e) => update("startDate", e.target.value)}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Step 3: Registration Setup ── */}
-        {step === 3 && (
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Form Title <span className="text-destructive">*</span></Label>
-              <Input
-                value={state.formTitle}
-                onChange={(e) => update("formTitle", e.target.value)}
-                data-testid="input-form-title"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Form Description</Label>
-              <Textarea
-                placeholder="What registrants will see at the top of the form..."
-                rows={2}
-                value={state.formDescription}
-                onChange={(e) => update("formDescription", e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Form fields</Label>
-              <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
-                <Switch
-                  id="default-questions"
-                  checked={state.addDefaultQuestions}
-                  onCheckedChange={(v) => update("addDefaultQuestions", v)}
-                />
-                <div>
-                  <Label htmlFor="default-questions" className="cursor-pointer font-medium text-sm">
-                    Start from template
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {state.registrationType === "child_checkin"
-                      ? "Includes child name, DOB, guardian, emergency contact, allergies, and more."
-                      : state.registrationType === "family_group"
-                      ? "Includes primary contact and fields for adding family members."
-                      : "Includes name, contact info, and basic attendee fields."}
-                    {" "}Turn off to start with a blank form.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Attendance &amp; Check-In</Label>
-              <div className="space-y-2">
-                <div className="flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
-                  <Switch
-                    id="track-attendance"
-                    checked={state.trackAttendance}
-                    onCheckedChange={(v) => {
-                      update("trackAttendance", v);
-                      if (!v) { update("requireCheckout", false); update("printLabels", false); }
-                    }}
-                  />
-                  <div>
-                    <Label htmlFor="track-attendance" className="cursor-pointer font-medium text-sm">
-                      Track attendance with check-ins
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Staff can check attendees in at the kiosk. Shows Checked In tab and count.
-                    </p>
-                  </div>
-                </div>
-
-                {state.trackAttendance && state.registrationType === "child_checkin" && (
-                  <div className="ml-4 flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
-                    <Switch
-                      id="require-checkout"
-                      checked={state.requireCheckout}
-                      onCheckedChange={(v) => update("requireCheckout", v)}
-                    />
-                    <div>
-                      <Label htmlFor="require-checkout" className="cursor-pointer font-medium text-sm">
-                        Require check-out
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Staff must check children out. Enables pickup security codes.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {state.trackAttendance && (
-                  <div className="ml-4 flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
-                    <Switch
-                      id="print-labels"
-                      checked={state.printLabels}
-                      onCheckedChange={(v) => update("printLabels", v)}
-                    />
-                    <div className="flex-1">
-                      <Label htmlFor="print-labels" className="cursor-pointer font-medium text-sm">
-                        Print name labels at check-in
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Print a label when each attendee checks in.
-                      </p>
-                      {state.printLabels && (
-                        <div className="mt-2">
-                          <Select
-                            value={state.labelType}
-                            onValueChange={(v) => update("labelType", v)}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="simple_name">Simple name label</SelectItem>
-                              <SelectItem value="child_security" disabled={state.registrationType !== "child_checkin"}>
-                                Child security label {state.registrationType !== "child_checkin" ? "(kids events only)" : ""}
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <DialogFooter className="gap-2">
-          {step === 1 && (
-            <Button variant="outline" onClick={handleClose}>Cancel</Button>
-          )}
-          {step === 2 && (
-            <>
-              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={handleStep2Next} data-testid="button-wizard-next">
-                Next <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </>
-          )}
-          {step === 3 && (
-            <>
-              <Button variant="outline" onClick={() => setStep(2)}>Back</Button>
-              <Button
-                onClick={handleCreate}
-                disabled={createEvent.isPending}
-                data-testid="button-wizard-create"
-              >
-                {createEvent.isPending ? "Creating..." : "Create Event"}
-              </Button>
-            </>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ─── Edit Event Dialog ──────────────────────────────────────────────────────
 
 interface EditEventDialogProps {
@@ -593,7 +136,6 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Safe defaults for check-in settings (null = derive from registrationType)
   const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
   const [isMultiDay, setIsMultiDay] = useState(
     !!(event.startDate && event.endDate && event.startDate !== event.endDate)
@@ -690,14 +232,13 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
               <Input type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} />
             </div>
           )}
-          {/* ── Check-In Settings ── */}
           <div className="space-y-2 pt-1 border-t border-border">
             <Label className="text-sm font-medium">Attendance &amp; Check-In</Label>
             <div className="space-y-2">
               <div className="flex items-center justify-between py-1.5">
                 <div>
                   <span className="text-sm font-medium">Track attendance with check-ins</span>
-                  <p className="text-xs text-muted-foreground">Show Checked In tab and kiosk button</p>
+                  <p className="text-xs text-muted-foreground">Show Check-In Desk and kiosk button</p>
                 </div>
                 <Switch
                   checked={form.trackAttendance}
@@ -772,57 +313,76 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
   );
 }
 
-// ─── Event card (shared between list view and other places) ──────────────────
+// ─── Event card ──────────────────────────────────────────────────────────────
 
 function EventCard({ event, onEdit, onDelete }: {
   event: ChurchEvent;
   onEdit: (e: ChurchEvent) => void;
   onDelete: (id: number) => void;
 }) {
+  const trackAttendance = event.trackAttendance ?? (event.registrationType === "child_checkin" || !event.registrationType);
+  const checkinBadge = trackAttendance
+    ? <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px]">Check-In On</Badge>
+    : <Badge variant="outline" className="text-[10px] text-muted-foreground">No Check-In</Badge>;
+
+  const formBadge = event.formId
+    ? <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px]">Form Ready</Badge>
+    : <Badge variant="outline" className="text-[10px] text-muted-foreground">No Form</Badge>;
+
   return (
-    <Card className="overflow-hidden hover-elevate transition-all border-card-border" data-testid={`event-card-${event.id}`}>
+    <Card className="overflow-hidden hover:shadow-md transition-all border" data-testid={`event-card-${event.id}`}>
       <CardContent className="p-0">
         <div className="flex items-stretch">
           <div className={`w-1.5 flex-shrink-0 ${registrationTypeStripe(event.registrationType)}`} />
-          <div className="flex-1 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-lg font-serif font-bold truncate">{event.name}</h3>
-                {statusBadge(event.status)}
-                {registrationTypeBadge(event.registrationType)}
-              </div>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {eventTypeLabel(event.eventType)}
-                {(event.startDate || event.endDate) && (
-                  <span className="ml-3">
-                    {event.startDate && format(new Date(event.startDate + "T00:00:00"), "MMM d, yyyy")}
-                    {event.startDate && event.endDate && event.startDate !== event.endDate && " – "}
-                    {event.endDate && event.startDate !== event.endDate && format(new Date(event.endDate + "T00:00:00"), "MMM d, yyyy")}
-                  </span>
+          <div className="flex-1 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h3 className="text-lg font-serif font-bold truncate">{event.name}</h3>
+                  {statusBadge(event.status)}
+                  {registrationTypeBadge(event.registrationType)}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {eventTypeLabel(event.eventType)}
+                  {event.startDate && (
+                    <span className="ml-3">
+                      {format(new Date(event.startDate + "T00:00:00"), "MMM d, yyyy")}
+                      {event.endDate && event.startDate !== event.endDate && (
+                        <> – {format(new Date(event.endDate + "T00:00:00"), "MMM d, yyyy")}</>
+                      )}
+                    </span>
+                  )}
+                </p>
+                {event.description && (
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{event.description}</p>
                 )}
-              </p>
-              {event.description && (
-                <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{event.description}</p>
-              )}
-              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5" />
-                  {event.registrationCount} registered
-                </span>
-                {event.formTitle && <span className="truncate">Form: {event.formTitle}</span>}
+                <div className="flex items-center flex-wrap gap-3 mt-2.5">
+                  <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Users className="w-3.5 h-3.5" />
+                    <span className="font-medium text-foreground">{event.registrationCount}</span> registered
+                  </span>
+                  {checkinBadge}
+                  {formBadge}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8"
+                  onClick={() => onEdit(event)} data-testid={`button-edit-event-${event.id}`}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8"
+                  onClick={() => onDelete(event.id)} data-testid={`button-delete-event-${event.id}`}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground"
-                onClick={() => onEdit(event)} data-testid={`button-edit-event-${event.id}`}>
-                <Pencil className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive"
-                onClick={() => onDelete(event.id)} data-testid={`button-delete-event-${event.id}`}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
-              <Button asChild variant="outline" size="sm">
-                <Link href={`/events/${event.id}`}>View <ArrowRight className="w-3.5 h-3.5 ml-1" /></Link>
+
+            <div className="mt-3 pt-3 border-t border-border">
+              <Button asChild size="sm" className="w-full sm:w-auto">
+                <Link href={`/events/${event.id}`}>
+                  Open Event <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </Link>
               </Button>
             </div>
           </div>
@@ -842,7 +402,6 @@ function CalendarView({ events }: { events: ChurchEvent[] }) {
     end: endOfWeek(endOfMonth(month), { weekStartsOn: 0 }),
   });
 
-  // Index events by every date they cover (start through end)
   const eventsByDate = new Map<string, ChurchEvent[]>();
   for (const event of events) {
     if (!event.startDate) continue;
@@ -859,7 +418,6 @@ function CalendarView({ events }: { events: ChurchEvent[] }) {
 
   return (
     <div>
-      {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
         <Button variant="outline" size="icon" onClick={() => setMonth((m) => subMonths(m, 1))}>
           <ChevronLeft className="w-4 h-4" />
@@ -870,14 +428,12 @@ function CalendarView({ events }: { events: ChurchEvent[] }) {
         </Button>
       </div>
 
-      {/* Day-of-week headers */}
       <div className="grid grid-cols-7 mb-1">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
           <div key={d} className="text-center text-xs font-medium text-muted-foreground py-2">{d}</div>
         ))}
       </div>
 
-      {/* Calendar grid */}
       <div className="grid grid-cols-7 border-l border-t border-border rounded-lg overflow-hidden">
         {days.map((day) => {
           const key = format(day, "yyyy-MM-dd");
@@ -921,7 +477,7 @@ function CalendarView({ events }: { events: ChurchEvent[] }) {
   );
 }
 
-// ─── Events Page ─────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function isPast(event: ChurchEvent): boolean {
   if (event.status === "completed") return true;
@@ -932,16 +488,18 @@ function isPast(event: ChurchEvent): boolean {
   return d < new Date();
 }
 
-export default function EventsPage() {
+// ─── Event Selection Screen ───────────────────────────────────────────────────
+
+export default function EventSelectionScreen() {
   const { data: events, isLoading } = useListEvents();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [wizardOpen, setWizardOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<ChurchEvent | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [showPast, setShowPast] = useState(false);
+  const [search, setSearch] = useState("");
 
   const deleteEvent = useDeleteEvent({
     mutation: {
@@ -954,142 +512,173 @@ export default function EventsPage() {
     },
   });
 
-  // Sort by startDate descending (most recent first); undated events go last
   const sorted = [...(events ?? [])].sort((a, b) => {
     const aT = a.startDate ? new Date(a.startDate + "T00:00:00").getTime() : -Infinity;
     const bT = b.startDate ? new Date(b.startDate + "T00:00:00").getTime() : -Infinity;
     return bT - aT;
   });
 
-  const pastCount = sorted.filter(isPast).length;
-  const visible = viewMode === "list"
-    ? sorted.filter((e) => showPast || !isPast(e))
+  const filtered = search.trim()
+    ? sorted.filter((e) =>
+        e.name.toLowerCase().includes(search.toLowerCase()) ||
+        eventTypeLabel(e.eventType).toLowerCase().includes(search.toLowerCase())
+      )
     : sorted;
 
+  const pastCount = filtered.filter(isPast).length;
+  const visible = viewMode === "list"
+    ? filtered.filter((e) => showPast || !isPast(e))
+    : filtered;
+
   return (
-    <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground">Events</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage church events — each linked to its own registration form.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {/* View toggle */}
-          <div className="flex items-center border border-border rounded-lg overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              className={`px-3 py-2 flex items-center gap-1.5 text-sm transition-colors ${
-                viewMode === "list"
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted text-muted-foreground"
-              }`}
-              aria-label="List view"
-            >
-              <List className="w-4 h-4" />
-              <span className="hidden sm:inline">List</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("calendar")}
-              className={`px-3 py-2 flex items-center gap-1.5 text-sm transition-colors ${
-                viewMode === "calendar"
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted text-muted-foreground"
-              }`}
-              aria-label="Calendar view"
-            >
-              <CalendarDays className="w-4 h-4" />
-              <span className="hidden sm:inline">Calendar</span>
-            </button>
+    <div className="min-h-screen bg-background">
+      {/* Top bar */}
+      <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-foreground">
+            <Church className="w-5 h-5 text-primary" />
+            <span className="font-serif font-bold text-base">Church Check-In</span>
           </div>
-          <Button onClick={() => setWizardOpen(true)} data-testid="button-create-event">
-            <Plus className="w-4 h-4 mr-2" /> New Event
+          <Button asChild size="sm" data-testid="button-create-event">
+            <Link href="/events/new">
+              <Plus className="w-4 h-4 mr-1.5" /> New Event
+            </Link>
           </Button>
         </div>
-      </div>
+      </header>
 
-      {isLoading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse h-36" />)}
+      <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+        {/* Hero header */}
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-serif font-bold text-foreground">Select an Event</h1>
+          <p className="text-muted-foreground text-lg max-w-md mx-auto">
+            Choose an event to manage registrations, forms, check-in, and reports.
+          </p>
         </div>
-      ) : !events?.length ? (
-        <Card className="border-dashed">
-          <CardContent className="py-20 flex flex-col items-center text-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Calendar className="w-8 h-8 text-primary" />
+
+        {/* Search + view controls */}
+        {(events?.length ?? 0) > 0 && (
+          <div className="flex flex-col sm:flex-row gap-3 items-center">
+            <div className="relative flex-1 max-w-md w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Search events…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
-            <div>
-              <h3 className="text-xl font-serif font-bold">No events yet</h3>
-              <p className="text-muted-foreground mt-1 max-w-sm">
-                Create your first event — a registration form will be set up automatically.
-              </p>
-            </div>
-            <Button onClick={() => setWizardOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" /> Create First Event
-            </Button>
-          </CardContent>
-        </Card>
-      ) : viewMode === "calendar" ? (
-        <CalendarView events={sorted} />
-      ) : (
-        /* ── List view ── */
-        <div className="space-y-4">
-          {/* Past-events toggle */}
-          {pastCount > 0 && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                {showPast
-                  ? `Showing all ${sorted.length} events`
-                  : `${sorted.length - pastCount} upcoming event${sorted.length - pastCount !== 1 ? "s" : ""}`}
-              </span>
+            {/* View toggle */}
+            <div className="flex items-center border border-border rounded-lg overflow-hidden shrink-0">
               <button
                 type="button"
-                onClick={() => setShowPast((v) => !v)}
-                className="text-primary hover:underline text-sm font-medium"
+                onClick={() => setViewMode("list")}
+                className={`px-3 py-2 flex items-center gap-1.5 text-sm transition-colors ${
+                  viewMode === "list"
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted text-muted-foreground"
+                }`}
+                aria-label="List view"
               >
-                {showPast ? "Hide past events" : `Show ${pastCount} past event${pastCount !== 1 ? "s" : ""}`}
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">List</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("calendar")}
+                className={`px-3 py-2 flex items-center gap-1.5 text-sm transition-colors ${
+                  viewMode === "calendar"
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted text-muted-foreground"
+                }`}
+                aria-label="Calendar view"
+              >
+                <Calendar className="w-4 h-4" />
+                <span className="hidden sm:inline">Calendar</span>
               </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {visible.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-10 text-center text-muted-foreground">
-                <p>No upcoming events.</p>
+        {/* Content */}
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse h-40" />)}
+          </div>
+        ) : !events?.length ? (
+          <Card className="border-dashed">
+            <CardContent className="py-24 flex flex-col items-center text-center gap-5">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                <Calendar className="w-10 h-10 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-serif font-bold">No events yet</h3>
+                <p className="text-muted-foreground mt-2 max-w-sm">
+                  Create your first event — a registration form will be set up automatically.
+                </p>
+              </div>
+              <Button asChild size="lg">
+                <Link href="/events/new">
+                  <Plus className="w-4 h-4 mr-2" /> Create First Event
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : viewMode === "calendar" ? (
+          <CalendarView events={filtered} />
+        ) : (
+          <div className="space-y-4">
+            {/* Past-events toggle */}
+            {pastCount > 0 && !search && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {showPast
+                    ? `Showing all ${filtered.length} events`
+                    : `${filtered.length - pastCount} upcoming event${filtered.length - pastCount !== 1 ? "s" : ""}`}
+                </span>
                 <button
                   type="button"
-                  onClick={() => setShowPast(true)}
-                  className="text-primary hover:underline text-sm mt-1"
+                  onClick={() => setShowPast((v) => !v)}
+                  className="text-primary hover:underline text-sm font-medium"
                 >
-                  Show past events
+                  {showPast ? "Hide past events" : `Show ${pastCount} past event${pastCount !== 1 ? "s" : ""}`}
                 </button>
-              </CardContent>
-            </Card>
-          ) : (
-            visible.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                onEdit={setEditEvent}
-                onDelete={setDeleteId}
-              />
-            ))
-          )}
-        </div>
-      )}
+              </div>
+            )}
 
-      {/* Wizard */}
-      <CreateEventWizard
-        open={wizardOpen}
-        onOpenChange={setWizardOpen}
-        onCreated={() => queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() })}
-      />
+            {visible.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="py-10 text-center text-muted-foreground">
+                  {search ? (
+                    <p>No events match "<strong>{search}</strong>"</p>
+                  ) : (
+                    <>
+                      <p>No upcoming events.</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowPast(true)}
+                        className="text-primary hover:underline text-sm mt-1"
+                      >
+                        Show past events
+                      </button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              visible.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onEdit={setEditEvent}
+                  onDelete={setDeleteId}
+                />
+              ))
+            )}
+          </div>
+        )}
+      </div>
 
-      {/* Edit dialog */}
       {editEvent && (
         <EditEventDialog
           event={editEvent}
@@ -1098,7 +687,6 @@ export default function EventsPage() {
         />
       )}
 
-      {/* Delete confirmation */}
       <AlertDialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

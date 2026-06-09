@@ -18,4 +18,8 @@ export interface EventCheckin {
   checkinAt: string;
   /** @nullable */
   checkoutAt?: string | null;
+  /** @nullable */
+  pickupPersonName?: string | null;
+  /** @nullable */
+  notes?: string | null;
 }

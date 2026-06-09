@@ -126,7 +126,8 @@ export const CreateEventBody = zod.object({
   "trackAttendance": zod.boolean().optional(),
   "requireCheckout": zod.boolean().optional(),
   "printLabels": zod.boolean().optional(),
-  "labelType": zod.string().optional()
+  "labelType": zod.string().optional(),
+  "roomAssignmentMode": zod.string().optional()
 })
 
 
@@ -146,7 +147,9 @@ export const ListEventCheckinsResponseItem = zod.object({
   "room": zod.string().nullish(),
   "labelCode": zod.string(),
   "checkinAt": zod.string(),
-  "checkoutAt": zod.string().nullish()
+  "checkoutAt": zod.string().nullish(),
+  "pickupPersonName": zod.string().nullish(),
+  "notes": zod.string().nullish()
 })
 export const ListEventCheckinsResponse = zod.array(ListEventCheckinsResponseItem)
 
@@ -175,6 +178,7 @@ export const GetEventResponse = zod.object({
   "requireCheckout": zod.boolean().nullish(),
   "printLabels": zod.boolean().nullish(),
   "labelType": zod.string().nullish(),
+  "roomAssignmentMode": zod.string().nullish(),
   "createdAt": zod.string(),
   "form": zod.union([zod.object({
   "id": zod.number(),
@@ -187,6 +191,8 @@ export const GetEventResponse = zod.object({
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
   "registrationType": zod.string().nullish(),
+  "eventId": zod.number().nullish(),
+  "roomAssignmentMode": zod.string().nullish(),
   "questions": zod.array(zod.object({
   "id": zod.number(),
   "formId": zod.number(),
@@ -233,7 +239,8 @@ export const UpdateEventBody = zod.object({
   "trackAttendance": zod.boolean().optional(),
   "requireCheckout": zod.boolean().optional(),
   "printLabels": zod.boolean().optional(),
-  "labelType": zod.string().optional()
+  "labelType": zod.string().optional(),
+  "roomAssignmentMode": zod.string().optional()
 })
 
 export const UpdateEventResponse = zod.object({
@@ -283,6 +290,8 @@ export const GetFormBySlugResponse = zod.object({
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
   "registrationType": zod.string().nullish(),
+  "eventId": zod.number().nullish(),
+  "roomAssignmentMode": zod.string().nullish(),
   "questions": zod.array(zod.object({
   "id": zod.number(),
   "formId": zod.number(),
@@ -328,6 +337,8 @@ export const GetFormResponse = zod.object({
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
   "registrationType": zod.string().nullish(),
+  "eventId": zod.number().nullish(),
+  "roomAssignmentMode": zod.string().nullish(),
   "questions": zod.array(zod.object({
   "id": zod.number(),
   "formId": zod.number(),
@@ -620,7 +631,8 @@ export const SubmitRegistrationBody = zod.object({
   "fields": zod.array(zod.object({
   "fieldId": zod.number().describe('The form_fields.id this answer is for.'),
   "value": zod.string().describe('The submitted value (always a string; checkboxes use \"true\"\/\"false\").')
-})).describe('One entry per form field submitted. System fields are routed to the appropriate participant\/guardian\/emergency_contact columns server-side. Custom question answers are stored in registration_custom_answers.\n')
+})).describe('One entry per form field submitted. System fields are routed to the appropriate participant\/guardian\/emergency_contact columns server-side. Custom question answers are stored in registration_custom_answers.\n'),
+  "room": zod.string().optional().describe('Room name chosen by the registrant (used when roomAssignmentMode is registrant_chooses)')
 })
 
 
@@ -745,23 +757,67 @@ export const UpdateRegistrationResponse = zod.object({
 
 
 /**
- * @summary List all rooms
+ * @summary Assign or clear a room on a registration
  */
+export const UpdateRegistrationRoomParams = zod.object({
+  "registrationId": zod.coerce.number()
+})
+
+export const UpdateRegistrationRoomBody = zod.object({
+  "room": zod.string().nullable()
+})
+
+export const UpdateRegistrationRoomResponse = zod.object({
+  "id": zod.number(),
+  "formId": zod.number(),
+  "formVersionId": zod.number().nullish(),
+  "childFirstName": zod.string(),
+  "childLastName": zod.string(),
+  "childDateOfBirth": zod.string().nullish(),
+  "guardianName": zod.string().optional(),
+  "guardianPhone": zod.string().optional(),
+  "guardianEmail": zod.string().nullish(),
+  "allergies": zod.string().nullish(),
+  "specialNeeds": zod.string().nullish(),
+  "room": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary List rooms for an event
+ */
+export const ListRoomsParams = zod.object({
+  "eventId": zod.coerce.number()
+})
+
 export const ListRoomsResponseItem = zod.object({
   "id": zod.number(),
+  "eventId": zod.number(),
   "name": zod.string(),
+  "description": zod.string().nullish(),
   "capacity": zod.number().nullish(),
+  "isActive": zod.boolean(),
+  "sortOrder": zod.number(),
+  "participantCount": zod.number().optional(),
   "createdAt": zod.string()
 })
 export const ListRoomsResponse = zod.array(ListRoomsResponseItem)
 
 
 /**
- * @summary Create a room
+ * @summary Create a room for an event
  */
+export const CreateRoomParams = zod.object({
+  "eventId": zod.coerce.number()
+})
+
 export const CreateRoomBody = zod.object({
   "name": zod.string(),
-  "capacity": zod.number().optional()
+  "description": zod.string().optional(),
+  "capacity": zod.number().optional(),
+  "isActive": zod.boolean().optional(),
+  "sortOrder": zod.number().optional()
 })
 
 
@@ -769,18 +825,27 @@ export const CreateRoomBody = zod.object({
  * @summary Update a room
  */
 export const UpdateRoomParams = zod.object({
+  "eventId": zod.coerce.number(),
   "roomId": zod.coerce.number()
 })
 
 export const UpdateRoomBody = zod.object({
   "name": zod.string(),
-  "capacity": zod.number().optional()
+  "description": zod.string().optional(),
+  "capacity": zod.number().optional(),
+  "isActive": zod.boolean().optional(),
+  "sortOrder": zod.number().optional()
 })
 
 export const UpdateRoomResponse = zod.object({
   "id": zod.number(),
+  "eventId": zod.number(),
   "name": zod.string(),
+  "description": zod.string().nullish(),
   "capacity": zod.number().nullish(),
+  "isActive": zod.boolean(),
+  "sortOrder": zod.number(),
+  "participantCount": zod.number().optional(),
   "createdAt": zod.string()
 })
 
@@ -789,6 +854,7 @@ export const UpdateRoomResponse = zod.object({
  * @summary Delete a room
  */
 export const DeleteRoomParams = zod.object({
+  "eventId": zod.coerce.number(),
   "roomId": zod.coerce.number()
 })
 
@@ -876,7 +942,10 @@ export const ListCheckinsResponseItem = zod.object({
   "checkoutAt": zod.string().nullish(),
   "room": zod.string().nullish(),
   "labelCode": zod.string().optional(),
-  "labelPrinted": zod.boolean().optional()
+  "labelPrinted": zod.boolean().optional(),
+  "pickupPersonName": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "updatedAt": zod.string().optional()
 })
 export const ListCheckinsResponse = zod.array(ListCheckinsResponseItem)
 
@@ -887,6 +956,34 @@ export const ListCheckinsResponse = zod.array(ListCheckinsResponseItem)
 export const CreateCheckinBody = zod.object({
   "registrationId": zod.number(),
   "room": zod.string().optional()
+})
+
+
+/**
+ * @summary Update a check-in record (e.g. add notes)
+ */
+export const UpdateCheckinParams = zod.object({
+  "checkinId": zod.coerce.number()
+})
+
+export const UpdateCheckinBody = zod.object({
+  "notes": zod.string().optional()
+})
+
+export const UpdateCheckinResponse = zod.object({
+  "id": zod.number(),
+  "childId": zod.number(),
+  "childFirstName": zod.string(),
+  "childLastName": zod.string(),
+  "guardianName": zod.string().optional(),
+  "checkinAt": zod.string(),
+  "checkoutAt": zod.string().nullish(),
+  "room": zod.string().nullish(),
+  "labelCode": zod.string().optional(),
+  "labelPrinted": zod.boolean().optional(),
+  "pickupPersonName": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "updatedAt": zod.string().optional()
 })
 
 
@@ -905,6 +1002,11 @@ export const CheckoutChildParams = zod.object({
   "checkinId": zod.coerce.number()
 })
 
+export const CheckoutChildBody = zod.object({
+  "pickupPersonName": zod.string().optional(),
+  "notes": zod.string().optional()
+})
+
 export const CheckoutChildResponse = zod.object({
   "id": zod.number(),
   "childId": zod.number(),
@@ -915,7 +1017,10 @@ export const CheckoutChildResponse = zod.object({
   "checkoutAt": zod.string().nullish(),
   "room": zod.string().nullish(),
   "labelCode": zod.string().optional(),
-  "labelPrinted": zod.boolean().optional()
+  "labelPrinted": zod.boolean().optional(),
+  "pickupPersonName": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "updatedAt": zod.string().optional()
 })
 
 
@@ -936,7 +1041,10 @@ export const UndoCheckoutResponse = zod.object({
   "checkoutAt": zod.string().nullish(),
   "room": zod.string().nullish(),
   "labelCode": zod.string().optional(),
-  "labelPrinted": zod.boolean().optional()
+  "labelPrinted": zod.boolean().optional(),
+  "pickupPersonName": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "updatedAt": zod.string().optional()
 })
 
 

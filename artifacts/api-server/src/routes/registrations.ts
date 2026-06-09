@@ -160,6 +160,7 @@ router.post("/forms/:formId/register", async (req, res) => {
   }
 
   const { fields: submittedFields } = parsed.data;
+  const submittedRoom = (req.body as { room?: string }).room || null;
 
   try {
     // ── Load form ─────────────────────────────────────────────────────────────
@@ -286,6 +287,7 @@ router.post("/forms/:formId/register", async (req, res) => {
         guardianEmail: guardianCols["email"] ?? null,
         allergies:     participantCols["allergies"]    ?? null,
         specialNeeds:  participantCols["special_needs"] ?? null,
+        room:          submittedRoom,
       })
       .returning();
 
@@ -556,6 +558,24 @@ router.put("/registrations/:registrationId", async (req, res) => {
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Failed to update registration");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/registrations/:registrationId/room", async (req, res) => {
+  const registrationId = parseInt(req.params.registrationId, 10);
+  if (isNaN(registrationId)) { res.status(400).json({ error: "Invalid registrationId" }); return; }
+  const { room } = req.body as { room?: string | null };
+  try {
+    const [updated] = await db
+      .update(registrationsTable)
+      .set({ room: room || null })
+      .where(eq(registrationsTable.id, registrationId))
+      .returning();
+    if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+    res.json(updated);
+  } catch (err) {
+    req.log.error({ err }, "Failed to update registration room");
     res.status(500).json({ error: "Internal server error" });
   }
 });

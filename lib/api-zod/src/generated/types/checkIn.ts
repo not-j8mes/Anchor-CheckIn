@@ -19,4 +19,9 @@ export interface CheckIn {
   room?: string | null;
   labelCode?: string;
   labelPrinted?: boolean;
+  /** @nullable */
+  pickupPersonName?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  updatedAt?: string;
 }

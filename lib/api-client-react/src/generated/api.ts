@@ -25,7 +25,9 @@ import type {
   CheckIn,
   CheckInInput,
   CheckInWithLabel,
+  CheckoutInput,
   Child,
+  CreateCheckin409,
   CreateEventInput,
   DashboardStats,
   DayCount,
@@ -54,7 +56,9 @@ import type {
   ReorderInput,
   Room,
   RoomInput,
-  UpdateEventInput
+  UpdateCheckinInput,
+  UpdateEventInput,
+  UpdateRoomInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -2214,20 +2218,92 @@ export const useUpdateRegistration = <TError = ErrorType<unknown>,
       return useMutation(getUpdateRegistrationMutationOptions(options));
     }
 
-export const getListRoomsUrl = () => {
+export const getUpdateRegistrationRoomUrl = (registrationId: number,) => {
 
 
 
 
-  return `/api/rooms`
+  return `/api/registrations/${registrationId}/room`
 }
 
 /**
- * @summary List all rooms
+ * @summary Assign or clear a room on a registration
  */
-export const listRooms = async ( options?: RequestInit): Promise<Room[]> => {
+export const updateRegistrationRoom = async (registrationId: number,
+    updateRoomInput: UpdateRoomInput, options?: RequestInit): Promise<Registration> => {
 
-  return customFetch<Room[]>(getListRoomsUrl(),
+  return customFetch<Registration>(getUpdateRegistrationRoomUrl(registrationId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateRoomInput,)
+  }
+);}
+
+
+
+
+export const getUpdateRegistrationRoomMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRegistrationRoom>>, TError,{registrationId: number;data: BodyType<UpdateRoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRegistrationRoom>>, TError,{registrationId: number;data: BodyType<UpdateRoomInput>}, TContext> => {
+
+const mutationKey = ['updateRegistrationRoom'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRegistrationRoom>>, {registrationId: number;data: BodyType<UpdateRoomInput>}> = (props) => {
+          const {registrationId,data} = props ?? {};
+
+          return  updateRegistrationRoom(registrationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRegistrationRoomMutationResult = NonNullable<Awaited<ReturnType<typeof updateRegistrationRoom>>>
+    export type UpdateRegistrationRoomMutationBody = BodyType<UpdateRoomInput>
+    export type UpdateRegistrationRoomMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Assign or clear a room on a registration
+ */
+export const useUpdateRegistrationRoom = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRegistrationRoom>>, TError,{registrationId: number;data: BodyType<UpdateRoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRegistrationRoom>>,
+        TError,
+        {registrationId: number;data: BodyType<UpdateRoomInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateRegistrationRoomMutationOptions(options));
+    }
+
+export const getListRoomsUrl = (eventId: number,) => {
+
+
+
+
+  return `/api/events/${eventId}/rooms`
+}
+
+/**
+ * @summary List rooms for an event
+ */
+export const listRooms = async (eventId: number, options?: RequestInit): Promise<Room[]> => {
+
+  return customFetch<Room[]>(getListRoomsUrl(eventId),
   {
     ...options,
     method: 'GET'
@@ -2240,29 +2316,29 @@ export const listRooms = async ( options?: RequestInit): Promise<Room[]> => {
 
 
 
-export const getListRoomsQueryKey = () => {
+export const getListRoomsQueryKey = (eventId: number,) => {
     return [
-    `/api/rooms`
+    `/api/events/${eventId}/rooms`
     ] as const;
     }
 
 
-export const getListRoomsQueryOptions = <TData = Awaited<ReturnType<typeof listRooms>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRooms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListRoomsQueryOptions = <TData = Awaited<ReturnType<typeof listRooms>>, TError = ErrorType<unknown>>(eventId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRooms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListRoomsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListRoomsQueryKey(eventId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRooms>>> = ({ signal }) => listRooms({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listRooms>>> = ({ signal }) => listRooms(eventId, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRooms>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: !!(eventId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listRooms>>, TError, TData> & { queryKey: QueryKey }
 }
 
 export type ListRoomsQueryResult = NonNullable<Awaited<ReturnType<typeof listRooms>>>
@@ -2270,15 +2346,15 @@ export type ListRoomsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List all rooms
+ * @summary List rooms for an event
  */
 
 export function useListRooms<TData = Awaited<ReturnType<typeof listRooms>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRooms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ eventId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listRooms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListRoomsQueryOptions(options)
+  const queryOptions = getListRoomsQueryOptions(eventId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2291,20 +2367,21 @@ export function useListRooms<TData = Awaited<ReturnType<typeof listRooms>>, TErr
 
 
 
-export const getCreateRoomUrl = () => {
+export const getCreateRoomUrl = (eventId: number,) => {
 
 
 
 
-  return `/api/rooms`
+  return `/api/events/${eventId}/rooms`
 }
 
 /**
- * @summary Create a room
+ * @summary Create a room for an event
  */
-export const createRoom = async (roomInput: RoomInput, options?: RequestInit): Promise<Room> => {
+export const createRoom = async (eventId: number,
+    roomInput: RoomInput, options?: RequestInit): Promise<Room> => {
 
-  return customFetch<Room>(getCreateRoomUrl(),
+  return customFetch<Room>(getCreateRoomUrl(eventId),
   {
     ...options,
     method: 'POST',
@@ -2318,8 +2395,8 @@ export const createRoom = async (roomInput: RoomInput, options?: RequestInit): P
 
 
 export const getCreateRoomMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRoom>>, TError,{data: BodyType<RoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createRoom>>, TError,{data: BodyType<RoomInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRoom>>, TError,{eventId: number;data: BodyType<RoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRoom>>, TError,{eventId: number;data: BodyType<RoomInput>}, TContext> => {
 
 const mutationKey = ['createRoom'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -2331,10 +2408,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRoom>>, {data: BodyType<RoomInput>}> = (props) => {
-          const {data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRoom>>, {eventId: number;data: BodyType<RoomInput>}> = (props) => {
+          const {eventId,data} = props ?? {};
 
-          return  createRoom(data,requestOptions)
+          return  createRoom(eventId,data,requestOptions)
         }
 
 
@@ -2349,34 +2426,36 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateRoomMutationError = ErrorType<unknown>
 
     /**
- * @summary Create a room
+ * @summary Create a room for an event
  */
 export const useCreateRoom = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRoom>>, TError,{data: BodyType<RoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRoom>>, TError,{eventId: number;data: BodyType<RoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createRoom>>,
         TError,
-        {data: BodyType<RoomInput>},
+        {eventId: number;data: BodyType<RoomInput>},
         TContext
       > => {
       return useMutation(getCreateRoomMutationOptions(options));
     }
 
-export const getUpdateRoomUrl = (roomId: number,) => {
+export const getUpdateRoomUrl = (eventId: number,
+    roomId: number,) => {
 
 
 
 
-  return `/api/rooms/${roomId}`
+  return `/api/events/${eventId}/rooms/${roomId}`
 }
 
 /**
  * @summary Update a room
  */
-export const updateRoom = async (roomId: number,
+export const updateRoom = async (eventId: number,
+    roomId: number,
     roomInput: RoomInput, options?: RequestInit): Promise<Room> => {
 
-  return customFetch<Room>(getUpdateRoomUrl(roomId),
+  return customFetch<Room>(getUpdateRoomUrl(eventId,roomId),
   {
     ...options,
     method: 'PUT',
@@ -2390,8 +2469,8 @@ export const updateRoom = async (roomId: number,
 
 
 export const getUpdateRoomMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRoom>>, TError,{roomId: number;data: BodyType<RoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateRoom>>, TError,{roomId: number;data: BodyType<RoomInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRoom>>, TError,{eventId: number;roomId: number;data: BodyType<RoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRoom>>, TError,{eventId: number;roomId: number;data: BodyType<RoomInput>}, TContext> => {
 
 const mutationKey = ['updateRoom'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -2403,10 +2482,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRoom>>, {roomId: number;data: BodyType<RoomInput>}> = (props) => {
-          const {roomId,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRoom>>, {eventId: number;roomId: number;data: BodyType<RoomInput>}> = (props) => {
+          const {eventId,roomId,data} = props ?? {};
 
-          return  updateRoom(roomId,data,requestOptions)
+          return  updateRoom(eventId,roomId,data,requestOptions)
         }
 
 
@@ -2424,30 +2503,32 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Update a room
  */
 export const useUpdateRoom = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRoom>>, TError,{roomId: number;data: BodyType<RoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRoom>>, TError,{eventId: number;roomId: number;data: BodyType<RoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateRoom>>,
         TError,
-        {roomId: number;data: BodyType<RoomInput>},
+        {eventId: number;roomId: number;data: BodyType<RoomInput>},
         TContext
       > => {
       return useMutation(getUpdateRoomMutationOptions(options));
     }
 
-export const getDeleteRoomUrl = (roomId: number,) => {
+export const getDeleteRoomUrl = (eventId: number,
+    roomId: number,) => {
 
 
 
 
-  return `/api/rooms/${roomId}`
+  return `/api/events/${eventId}/rooms/${roomId}`
 }
 
 /**
  * @summary Delete a room
  */
-export const deleteRoom = async (roomId: number, options?: RequestInit): Promise<void> => {
+export const deleteRoom = async (eventId: number,
+    roomId: number, options?: RequestInit): Promise<void> => {
 
-  return customFetch<void>(getDeleteRoomUrl(roomId),
+  return customFetch<void>(getDeleteRoomUrl(eventId,roomId),
   {
     ...options,
     method: 'DELETE'
@@ -2460,8 +2541,8 @@ export const deleteRoom = async (roomId: number, options?: RequestInit): Promise
 
 
 export const getDeleteRoomMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRoom>>, TError,{roomId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteRoom>>, TError,{roomId: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRoom>>, TError,{eventId: number;roomId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteRoom>>, TError,{eventId: number;roomId: number}, TContext> => {
 
 const mutationKey = ['deleteRoom'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -2473,10 +2554,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteRoom>>, {roomId: number}> = (props) => {
-          const {roomId} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteRoom>>, {eventId: number;roomId: number}> = (props) => {
+          const {eventId,roomId} = props ?? {};
 
-          return  deleteRoom(roomId,requestOptions)
+          return  deleteRoom(eventId,roomId,requestOptions)
         }
 
 
@@ -2494,11 +2575,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Delete a room
  */
 export const useDeleteRoom = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRoom>>, TError,{roomId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRoom>>, TError,{eventId: number;roomId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteRoom>>,
         TError,
-        {roomId: number},
+        {eventId: number;roomId: number},
         TContext
       > => {
       return useMutation(getDeleteRoomMutationOptions(options));
@@ -2846,7 +2927,7 @@ export const createCheckin = async (checkInInput: CheckInInput, options?: Reques
 
 
 
-export const getCreateCheckinMutationOptions = <TError = ErrorType<unknown>,
+export const getCreateCheckinMutationOptions = <TError = ErrorType<CreateCheckin409>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCheckin>>, TError,{data: BodyType<CheckInInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof createCheckin>>, TError,{data: BodyType<CheckInInput>}, TContext> => {
 
@@ -2875,12 +2956,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type CreateCheckinMutationResult = NonNullable<Awaited<ReturnType<typeof createCheckin>>>
     export type CreateCheckinMutationBody = BodyType<CheckInInput>
-    export type CreateCheckinMutationError = ErrorType<unknown>
+    export type CreateCheckinMutationError = ErrorType<CreateCheckin409>
 
     /**
  * @summary Check in a child
  */
-export const useCreateCheckin = <TError = ErrorType<unknown>,
+export const useCreateCheckin = <TError = ErrorType<CreateCheckin409>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCheckin>>, TError,{data: BodyType<CheckInInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createCheckin>>,
@@ -2889,6 +2970,78 @@ export const useCreateCheckin = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateCheckinMutationOptions(options));
+    }
+
+export const getUpdateCheckinUrl = (checkinId: number,) => {
+
+
+
+
+  return `/api/checkins/${checkinId}`
+}
+
+/**
+ * @summary Update a check-in record (e.g. add notes)
+ */
+export const updateCheckin = async (checkinId: number,
+    updateCheckinInput: UpdateCheckinInput, options?: RequestInit): Promise<CheckIn> => {
+
+  return customFetch<CheckIn>(getUpdateCheckinUrl(checkinId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateCheckinInput,)
+  }
+);}
+
+
+
+
+export const getUpdateCheckinMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCheckin>>, TError,{checkinId: number;data: BodyType<UpdateCheckinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCheckin>>, TError,{checkinId: number;data: BodyType<UpdateCheckinInput>}, TContext> => {
+
+const mutationKey = ['updateCheckin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCheckin>>, {checkinId: number;data: BodyType<UpdateCheckinInput>}> = (props) => {
+          const {checkinId,data} = props ?? {};
+
+          return  updateCheckin(checkinId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCheckinMutationResult = NonNullable<Awaited<ReturnType<typeof updateCheckin>>>
+    export type UpdateCheckinMutationBody = BodyType<UpdateCheckinInput>
+    export type UpdateCheckinMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update a check-in record (e.g. add notes)
+ */
+export const useUpdateCheckin = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCheckin>>, TError,{checkinId: number;data: BodyType<UpdateCheckinInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCheckin>>,
+        TError,
+        {checkinId: number;data: BodyType<UpdateCheckinInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateCheckinMutationOptions(options));
     }
 
 export const getDeleteCheckinUrl = (checkinId: number,) => {
@@ -2972,14 +3125,16 @@ export const getCheckoutChildUrl = (checkinId: number,) => {
 /**
  * @summary Check out a child
  */
-export const checkoutChild = async (checkinId: number, options?: RequestInit): Promise<CheckIn> => {
+export const checkoutChild = async (checkinId: number,
+    checkoutInput?: CheckoutInput, options?: RequestInit): Promise<CheckIn> => {
 
   return customFetch<CheckIn>(getCheckoutChildUrl(checkinId),
   {
     ...options,
-    method: 'PUT'
-
-
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      checkoutInput,)
   }
 );}
 
@@ -2987,8 +3142,8 @@ export const checkoutChild = async (checkinId: number, options?: RequestInit): P
 
 
 export const getCheckoutChildMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkoutChild>>, TError,{checkinId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof checkoutChild>>, TError,{checkinId: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkoutChild>>, TError,{checkinId: number;data?: BodyType<CheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkoutChild>>, TError,{checkinId: number;data?: BodyType<CheckoutInput>}, TContext> => {
 
 const mutationKey = ['checkoutChild'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -3000,10 +3155,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkoutChild>>, {checkinId: number}> = (props) => {
-          const {checkinId} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkoutChild>>, {checkinId: number;data?: BodyType<CheckoutInput>}> = (props) => {
+          const {checkinId,data} = props ?? {};
 
-          return  checkoutChild(checkinId,requestOptions)
+          return  checkoutChild(checkinId,data,requestOptions)
         }
 
 
@@ -3014,18 +3169,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CheckoutChildMutationResult = NonNullable<Awaited<ReturnType<typeof checkoutChild>>>
-
+    export type CheckoutChildMutationBody = BodyType<CheckoutInput> | undefined
     export type CheckoutChildMutationError = ErrorType<unknown>
 
     /**
  * @summary Check out a child
  */
 export const useCheckoutChild = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkoutChild>>, TError,{checkinId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkoutChild>>, TError,{checkinId: number;data?: BodyType<CheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof checkoutChild>>,
         TError,
-        {checkinId: number},
+        {checkinId: number;data?: BodyType<CheckoutInput>},
         TContext
       > => {
       return useMutation(getCheckoutChildMutationOptions(options));

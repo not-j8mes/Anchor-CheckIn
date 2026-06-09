@@ -56,10 +56,12 @@ router.get("/forms/by-slug/:embedSlug", async (req, res) => {
       db.select().from(questionsTable).where(eq(questionsTable.formId, form[0].id)).orderBy(asc(questionsTable.order)),
       db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, form[0].id)).orderBy(asc(formFieldsTable.sortOrder)),
       db.select({ count: sql<number>`count(*)::int` }).from(registrationsTable).where(eq(registrationsTable.formId, form[0].id)),
-      db.select({ registrationType: eventsTable.registrationType }).from(eventsTable).where(eq(eventsTable.formId, form[0].id)).limit(1),
+      db.select({ registrationType: eventsTable.registrationType, eventId: eventsTable.id, roomAssignmentMode: eventsTable.roomAssignmentMode }).from(eventsTable).where(eq(eventsTable.formId, form[0].id)).limit(1),
     ]);
     const registrationType = linkedEvent[0]?.registrationType ?? null;
-    res.json({ ...form[0], submissionCount: count, questions, formFields, registrationType });
+    const eventId = linkedEvent[0]?.eventId ?? null;
+    const roomAssignmentMode = linkedEvent[0]?.roomAssignmentMode ?? null;
+    res.json({ ...form[0], submissionCount: count, questions, formFields, registrationType, eventId, roomAssignmentMode });
   } catch (err) {
     req.log.error({ err }, "Failed to get form by slug");
     res.status(500).json({ error: "Internal server error" });

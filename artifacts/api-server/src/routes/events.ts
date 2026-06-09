@@ -126,7 +126,7 @@ router.get("/events", async (req, res) => {
 });
 
 router.post("/events", async (req, res) => {
-  const { name, description, eventType, registrationType, startDate, endDate, formTitle, formDescription, addDefaultQuestions, trackAttendance, requireCheckout, printLabels, labelType } = req.body;
+  const { name, description, eventType, registrationType, startDate, endDate, formTitle, formDescription, addDefaultQuestions, trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode } = req.body;
 
   if (!name || !eventType || !formTitle) {
     res.status(400).json({ error: "name, eventType, and formTitle are required" });
@@ -183,6 +183,7 @@ router.post("/events", async (req, res) => {
         requireCheckout: resolvedRequireCheckout,
         printLabels: resolvedPrintLabels,
         labelType: resolvedLabelType,
+        roomAssignmentMode: roomAssignmentMode || null,
       })
       .returning();
 
@@ -224,6 +225,7 @@ router.get("/events/:eventId/checkins", async (req, res) => {
       ...c,
       checkinAt: c.checkinAt.toISOString(),
       checkoutAt: c.checkoutAt?.toISOString() ?? null,
+      updatedAt: c.updatedAt.toISOString(),
     })));
   } catch (err) {
     req.log.error({ err }, "Failed to list event checkins");
@@ -367,7 +369,7 @@ router.put("/events/:eventId", async (req, res) => {
     res.status(400).json({ error: "Invalid eventId" });
     return;
   }
-  const { name, description, eventType, registrationType, startDate, endDate, trackAttendance, requireCheckout, printLabels, labelType } = req.body;
+  const { name, description, eventType, registrationType, startDate, endDate, trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode } = req.body;
   try {
     const [updated] = await db
       .update(eventsTable)
@@ -382,6 +384,7 @@ router.put("/events/:eventId", async (req, res) => {
         ...(requireCheckout !== undefined && { requireCheckout }),
         ...(printLabels !== undefined && { printLabels }),
         ...(labelType !== undefined && { labelType }),
+        ...(roomAssignmentMode !== undefined && { roomAssignmentMode }),
       })
       .where(eq(eventsTable.id, eventId))
       .returning();

@@ -35,6 +35,8 @@ export interface EventWithForm {
   printLabels?: boolean | null;
   /** @nullable */
   labelType?: string | null;
+  /** @nullable */
+  roomAssignmentMode?: string | null;
   createdAt: string;
   form?: FormWithQuestions | null;
 }

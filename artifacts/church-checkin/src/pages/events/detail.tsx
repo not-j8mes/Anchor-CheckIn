@@ -1,27 +1,42 @@
-import { Link, useParams, useSearch } from "wouter";
+import { Link, useParams, useLocation } from "wouter";
 import { useState, useEffect, useMemo } from "react";
 import {
   useGetEvent,
   useUpdateEvent,
+  useUpdateForm,
+  useSubmitRegistration,
   useListRegistrations,
   useListEventCheckins,
+  useListFormFields,
   useCheckoutChild,
   useDeleteCheckin,
   useUndoCheckout,
+  useCreateCheckin,
+  useGetRegistration,
   useListChildren,
   useUpdateRegistration,
   useListRooms,
   useCreateRoom,
   useUpdateRoom,
   useDeleteRoom,
+  useUpdateRegistrationRoom,
+  useUpdateCheckin,
   getGetEventQueryKey,
+  getGetFormQueryKey,
+  getListFormFieldsQueryKey,
   getListRegistrationsQueryKey,
   getListEventCheckinsQueryKey,
   getListChildrenQueryKey,
   getListRoomsQueryKey,
   type Child,
   type Room,
+  type LabelData,
+  type EventCheckin,
+  type Registration,
+  type EventWithForm,
+  type FormField,
 } from "@workspace/api-client-react";
+import { SYSTEM_FIELDS_BY_KEY } from "@/lib/systemFields";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,7 +68,22 @@ import {
   Trash2,
   Search,
   Baby,
+  AlertTriangle,
+  ShieldCheck,
+  Phone,
+  Mail,
+  MapPin,
+  Info,
+  Printer,
+  StickyNote,
+  Settings,
+  Tag,
+  ChevronRight,
+  User,
 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { FormBuilderPanel } from "@/components/forms/FormBuilderPanel";
@@ -77,23 +107,25 @@ function statusBadge(status: string) {
 
 // ─── Rooms tab ─────────────────────────────────────────────────────────────────
 
-function EventRoomFormDialog({ room, open, onOpenChange }: { room?: Room; open: boolean; onOpenChange: (v: boolean) => void }) {
+function EventRoomFormDialog({ room, eventId, open, onOpenChange }: { room?: Room; eventId: number; open: boolean; onOpenChange: (v: boolean) => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const isEdit = !!room;
   const [name, setName] = useState(room?.name ?? "");
+  const [description, setDescription] = useState(room?.description ?? "");
   const [capacity, setCapacity] = useState(room?.capacity != null ? String(room.capacity) : "");
 
-  const createRoom = useCreateRoom({ mutation: { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListRoomsQueryKey() }); toast({ title: "Room created" }); onOpenChange(false); }, onError: () => toast({ title: "Failed to create room", variant: "destructive" }) } });
-  const updateRoom = useUpdateRoom({ mutation: { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListRoomsQueryKey() }); toast({ title: "Room updated" }); onOpenChange(false); }, onError: () => toast({ title: "Failed to update room", variant: "destructive" }) } });
+  const inv = () => queryClient.invalidateQueries({ queryKey: getListRoomsQueryKey(eventId) });
+  const createRoom = useCreateRoom({ mutation: { onSuccess: () => { inv(); toast({ title: "Room created" }); onOpenChange(false); }, onError: () => toast({ title: "Failed to create room", variant: "destructive" }) } });
+  const updateRoom = useUpdateRoom({ mutation: { onSuccess: () => { inv(); toast({ title: "Room updated" }); onOpenChange(false); }, onError: () => toast({ title: "Failed to update room", variant: "destructive" }) } });
   const isPending = createRoom.isPending || updateRoom.isPending;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     const cap = capacity ? parseInt(capacity, 10) : undefined;
-    if (isEdit) updateRoom.mutate({ roomId: room!.id, data: { name: name.trim(), capacity: cap } });
-    else createRoom.mutate({ data: { name: name.trim(), capacity: cap } });
+    if (isEdit) updateRoom.mutate({ eventId, roomId: room!.id, data: { name: name.trim(), description: description.trim() || undefined, capacity: cap } });
+    else createRoom.mutate({ eventId, data: { name: name.trim(), description: description.trim() || undefined, capacity: cap } });
   };
 
   return (
@@ -104,6 +136,10 @@ function EventRoomFormDialog({ room, open, onOpenChange }: { room?: Room; open: 
           <div className="space-y-1.5">
             <Label>Room Name <span className="text-destructive">*</span></Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Nursery, K–2nd Grade" autoFocus />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Description <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Age range, grade, etc." />
           </div>
           <div className="space-y-1.5">
             <Label>Capacity <span className="text-muted-foreground text-xs">(optional)</span></Label>
@@ -122,20 +158,25 @@ function EventRoomFormDialog({ room, open, onOpenChange }: { room?: Room; open: 
   );
 }
 
-function RoomsTabContent() {
+function RoomsTabContent({ eventId }: { eventId: number }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { data: rooms, isLoading } = useListRooms();
+  const { data: rooms, isLoading } = useListRooms(eventId, {
+    query: { enabled: !!eventId, queryKey: getListRoomsQueryKey(eventId) },
+  });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | undefined>(undefined);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const deleteRoom = useDeleteRoom({
     mutation: {
-      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListRoomsQueryKey() }); toast({ title: "Room deleted" }); setDeletingId(null); },
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: getListRoomsQueryKey(eventId) }); toast({ title: "Room deleted" }); setDeletingId(null); },
       onError: () => { toast({ title: "Failed to delete room", variant: "destructive" }); setDeletingId(null); },
     },
   });
+
+  const activeRooms = rooms?.filter((r) => r.isActive) ?? [];
+  const inactiveRooms = rooms?.filter((r) => !r.isActive) ?? [];
 
   return (
     <div className="space-y-4">
@@ -157,20 +198,27 @@ function RoomsTabContent() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {rooms.map((room) => (
-            <Card key={room.id}>
+          {[...activeRooms, ...inactiveRooms].map((room) => (
+            <Card key={room.id} className={!room.isActive ? "opacity-60" : undefined}>
               <CardContent className="px-4 py-3 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <DoorOpen className="w-4 h-4 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium">{room.name}</p>
-                    {room.capacity != null && (
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{room.name}</p>
+                      {!room.isActive && <Badge variant="secondary" className="text-[10px] py-0">Inactive</Badge>}
+                    </div>
+                    {room.description && <p className="text-xs text-muted-foreground">{room.description}</p>}
+                    <div className="flex items-center gap-3 mt-0.5">
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Users className="w-3 h-3" /> Capacity: {room.capacity}
+                        <Users className="w-3 h-3" /> {room.participantCount ?? 0} registered
                       </p>
-                    )}
+                      {room.capacity != null && (
+                        <p className="text-xs text-muted-foreground">· max {room.capacity}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -181,7 +229,7 @@ function RoomsTabContent() {
                     variant="ghost" size="sm"
                     className="text-muted-foreground hover:text-destructive"
                     disabled={deletingId === room.id}
-                    onClick={() => { setDeletingId(room.id); deleteRoom.mutate({ roomId: room.id }); }}
+                    onClick={() => { setDeletingId(room.id); deleteRoom.mutate({ eventId, roomId: room.id }); }}
                   >
                     {deletingId === room.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                   </Button>
@@ -195,6 +243,7 @@ function RoomsTabContent() {
       <EventRoomFormDialog
         key={editingRoom?.id ?? "new"}
         room={editingRoom}
+        eventId={eventId}
         open={dialogOpen}
         onOpenChange={(v) => { setDialogOpen(v); if (!v) setEditingRoom(undefined); }}
       />
@@ -207,7 +256,11 @@ function RoomsTabContent() {
 function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; open: boolean; onOpenChange: (v: boolean) => void }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { data: rooms } = useListRooms();
+  const { id: eventIdStr } = useParams<{ id: string }>();
+  const _editChildEventId = parseInt(eventIdStr || "0", 10);
+  const { data: rooms } = useListRooms(_editChildEventId, {
+    query: { enabled: !!_editChildEventId, queryKey: getListRoomsQueryKey(_editChildEventId) },
+  });
 
   const guardianParts = (child.guardianName ?? "").trim().split(/\s+/);
   const [form, setForm] = useState({
@@ -308,91 +361,639 @@ function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; ope
   );
 }
 
-function ChildrenTabContent({
-  eventId,
-  searchPlaceholder = "Search children…",
-  emptyMessage = "No children registered for this event yet.",
-  emptyIcon: EmptyIcon = Baby,
+// ─── Manual Registration Dialog ───────────────────────────────────────────────
+
+function isGuardianOrSafetyField(field: FormField): boolean {
+  if (field.fieldKind !== "system" || !field.systemKey) return false;
+  const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
+  return def?.category === "guardian" || def?.category === "emergency_safety";
+}
+
+function ManualRegFieldInput({
+  field,
+  value,
+  onChange,
 }: {
-  eventId: number;
-  searchPlaceholder?: string;
-  emptyMessage?: string;
-  emptyIcon?: React.ComponentType<{ className?: string }>;
+  field: FormField;
+  value: string;
+  onChange: (v: string) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [editingChild, setEditingChild] = useState<Child | null>(null);
+  const { fieldType, placeholder, options, required } = field;
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
+  if (fieldType === "textarea") {
+    return (
+      <Textarea
+        required={required}
+        placeholder={placeholder ?? ""}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={2}
+      />
+    );
+  }
 
-  const { data: children, isLoading } = useListChildren({ eventId, search: debouncedSearch || undefined });
+  if ((fieldType === "select" || fieldType === "multiselect") && options) {
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue placeholder={placeholder ?? "Select…"} />
+        </SelectTrigger>
+        <SelectContent>
+          {options.split(",").map((opt) => (
+            <SelectItem key={opt.trim()} value={opt.trim()}>{opt.trim()}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
 
   return (
+    <Input
+      type={
+        fieldType === "date" ? "date"
+          : fieldType === "email" ? "email"
+          : fieldType === "phone" ? "tel"
+          : "text"
+      }
+      required={required}
+      placeholder={placeholder ?? ""}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+function ManualRegistrationDialog({
+  formId,
+  isChildCheckin,
+  eventId,
+  open,
+  onOpenChange,
+}: {
+  formId: number | null | undefined;
+  isChildCheckin: boolean;
+  eventId: number;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: formFields = [], isLoading: fieldsLoading } = useListFormFields(formId ?? 0, {
+    query: { enabled: !!formId, queryKey: getListFormFieldsQueryKey(formId ?? 0) },
+  });
+
+  const guardianFields = formFields.filter(isGuardianOrSafetyField);
+  const participantFields = formFields.filter((f) => !isGuardianOrSafetyField(f));
+
+  const [guardianAnswers, setGuardianAnswers] = useState<Record<number, string>>({});
+  const [participantAnswers, setParticipantAnswers] = useState<Record<number, string>>({});
+
+  const submitReg = useSubmitRegistration({
+    mutation: {
+      onSuccess: () => {
+        if (formId) queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(formId) });
+        queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey({ eventId }) });
+        toast({ title: isChildCheckin ? "Child registered" : "Registrant added" });
+        onOpenChange(false);
+        setGuardianAnswers({});
+        setParticipantAnswers({});
+      },
+      onError: () => toast({ title: "Failed to add registration", variant: "destructive" }),
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formId) return;
+    const fields: { fieldId: number; value: string }[] = [
+      ...participantFields.map((f) => ({ fieldId: f.id, value: participantAnswers[f.id] ?? "" })),
+      ...guardianFields.map((f) => ({ fieldId: f.id, value: guardianAnswers[f.id] ?? "" })),
+    ];
+    submitReg.mutate({ formId, data: { fields } });
+  };
+
+  const renderSection = (
+    fields: FormField[],
+    answers: Record<number, string>,
+    setAnswers: React.Dispatch<React.SetStateAction<Record<number, string>>>,
+    heading: string
+  ) => (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder={searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} />
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{heading}</p>
+      {fields.map((field) => (
+        <div key={field.id} className="space-y-1.5">
+          <Label className="text-sm font-medium flex items-center gap-1">
+            {field.label}
+            {field.required && <span className="text-destructive">*</span>}
+          </Label>
+          <ManualRegFieldInput
+            field={field}
+            value={answers[field.id] ?? ""}
+            onChange={(v) => setAnswers((p) => ({ ...p, [field.id]: v }))}
+          />
         </div>
-        <p className="text-sm text-muted-foreground shrink-0">
-          {children?.length ?? 0} registered
+      ))}
+    </div>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add {isChildCheckin ? "Child" : "Registrant"}</DialogTitle>
+        </DialogHeader>
+
+        {!formId ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            No registration form is linked to this event.
+          </p>
+        ) : fieldsLoading ? (
+          <div className="py-8 flex justify-center">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-6 pt-1">
+            {participantFields.length > 0 &&
+              renderSection(
+                participantFields,
+                participantAnswers,
+                setParticipantAnswers,
+                isChildCheckin ? "Child Information" : "Attendee Information"
+              )}
+            {guardianFields.length > 0 &&
+              renderSection(
+                guardianFields,
+                guardianAnswers,
+                setGuardianAnswers,
+                "Parent / Guardian"
+              )}
+            <DialogFooter>
+              <Button type="submit" className="w-full" disabled={submitReg.isPending}>
+                {submitReg.isPending ? "Saving…" : `Add ${isChildCheckin ? "Child" : "Registrant"}`}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Registration detail sheet ────────────────────────────────────────────────
+
+function RegistrationDetailSheet({
+  reg,
+  open,
+  onOpenChange,
+  isChildCheckin,
+  formId,
+  eventId,
+}: {
+  reg: Registration;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  isChildCheckin: boolean;
+  formId?: number | null;
+  eventId: number;
+}) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [editOpen, setEditOpen] = useState(false);
+  const [assigningRoom, setAssigningRoom] = useState(false);
+
+  const { data: rooms } = useListRooms(eventId, {
+    query: { enabled: open && !!eventId, queryKey: getListRoomsQueryKey(eventId) },
+  });
+
+  const updateRoom = useUpdateRegistrationRoom({
+    mutation: {
+      onSuccess: (updated) => {
+        if (formId) queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(formId) });
+        queryClient.invalidateQueries({ queryKey: [`/api/registrations/${reg.id}`] });
+        toast({ title: updated.room ? `Room set to ${updated.room}` : "Room cleared" });
+        setAssigningRoom(false);
+      },
+      onError: () => { toast({ title: "Failed to assign room", variant: "destructive" }); setAssigningRoom(false); },
+    },
+  });
+
+  const { data: regDetail } = useGetRegistration(reg.id, {
+    query: { enabled: open, queryKey: [`/api/registrations/${reg.id}`] },
+  });
+
+  const handleEditClose = (v: boolean) => {
+    setEditOpen(v);
+    if (!v && formId) {
+      queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(formId) });
+    }
+  };
+
+  const age = reg.childDateOfBirth
+    ? (() => {
+        const birth = new Date(reg.childDateOfBirth);
+        const today = new Date();
+        let years = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) years--;
+        if (years === 0) {
+          const months = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+          return `${Math.max(0, months)} mo`;
+        }
+        return `${years} yr`;
+      })()
+    : null;
+
+  const childForEdit: Child = {
+    id: reg.id,
+    firstName: reg.childFirstName,
+    lastName: reg.childLastName,
+    dateOfBirth: reg.childDateOfBirth,
+    guardianName: reg.guardianName,
+    guardianPhone: reg.guardianPhone,
+    guardianEmail: reg.guardianEmail,
+    allergies: reg.allergies,
+    specialNeeds: reg.specialNeeds,
+    room: reg.room,
+    registrationId: reg.id,
+  };
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
+          <SheetTitle className="sr-only">{reg.childFirstName} {reg.childLastName}</SheetTitle>
+
+          {/* Header */}
+          <div className="flex items-start gap-3 px-5 pt-5 pb-4 pr-14 border-b shrink-0">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-lg shrink-0">
+              {reg.childFirstName[0]}{reg.childLastName[0]}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-bold font-serif truncate">
+                {reg.childFirstName} {reg.childLastName}
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Registered {format(new Date(reg.createdAt), "MMM d, yyyy")}
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {reg.room && (
+                  <Badge variant="outline" className="text-xs">{reg.room}</Badge>
+                )}
+                {reg.allergies && (
+                  <Badge className="text-xs bg-red-100 text-red-800 border-none hover:bg-red-100 gap-1">
+                    <AlertTriangle className="w-3 h-3" /> Allergy
+                  </Badge>
+                )}
+                {reg.specialNeeds && (
+                  <Badge className="text-xs bg-amber-100 text-amber-800 border-none hover:bg-amber-100 gap-1">
+                    <Info className="w-3 h-3" /> Special Needs
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
+            {/* Child / participant info */}
+            <section className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                {isChildCheckin ? "Child Information" : "Participant Information"}
+              </p>
+              {age && (
+                <div className="flex justify-between text-sm py-1.5 border-b border-border/50">
+                  <span className="text-muted-foreground">Date of Birth</span>
+                  <span>{format(new Date(reg.childDateOfBirth! + "T00:00:00"), "MMM d, yyyy")} · {age}</span>
+                </div>
+              )}
+              {isChildCheckin && rooms && rooms.length > 0 && (
+                <div className="flex justify-between items-center text-sm py-1.5 border-b border-border/50">
+                  <span className="text-muted-foreground">Room / Group</span>
+                  <Select
+                    value={reg.room ?? "__none__"}
+                    disabled={assigningRoom || updateRoom.isPending}
+                    onValueChange={(v) => {
+                      setAssigningRoom(true);
+                      updateRoom.mutate({ registrationId: reg.id, data: { room: v === "__none__" ? null : v } });
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-auto min-w-28 text-xs border-dashed">
+                      <SelectValue placeholder="Unassigned" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Unassigned</SelectItem>
+                      {rooms.filter((r) => r.isActive).map((r) => (
+                        <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {(!isChildCheckin || !rooms?.length) && reg.room && (
+                <div className="flex justify-between text-sm py-1.5 border-b border-border/50">
+                  <span className="text-muted-foreground">Room / Group</span>
+                  <span>{reg.room}</span>
+                </div>
+              )}
+              {reg.allergies && (
+                <div className="space-y-1 py-1">
+                  <p className="text-xs text-muted-foreground">Allergies</p>
+                  <p className="text-sm bg-red-50 text-red-900 rounded-md px-3 py-2">{reg.allergies}</p>
+                </div>
+              )}
+              {reg.specialNeeds && (
+                <div className="space-y-1 py-1">
+                  <p className="text-xs text-muted-foreground">Special Needs / Accommodations</p>
+                  <p className="text-sm bg-amber-50 text-amber-900 rounded-md px-3 py-2">{reg.specialNeeds}</p>
+                </div>
+              )}
+              {!age && !reg.room && !reg.allergies && !reg.specialNeeds && (
+                <p className="text-sm text-muted-foreground">No additional details on record.</p>
+              )}
+            </section>
+
+            {/* Guardian / contact */}
+            {(reg.guardianName || reg.guardianPhone || reg.guardianEmail) && (
+              <section className="space-y-2.5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {isChildCheckin ? "Parent / Guardian" : "Contact"}
+                </p>
+                {reg.guardianName && (
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span>{reg.guardianName}</span>
+                  </div>
+                )}
+                {reg.guardianPhone && (
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <a href={`tel:${reg.guardianPhone}`} className="hover:underline">{reg.guardianPhone}</a>
+                  </div>
+                )}
+                {reg.guardianEmail && (
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <a href={`mailto:${reg.guardianEmail}`} className="hover:underline truncate">{reg.guardianEmail}</a>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Custom answers */}
+            {(regDetail?.customAnswers?.length ?? 0) > 0 && (
+              <section className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Additional Information</p>
+                {regDetail!.customAnswers.map((a) => (
+                  <div key={a.id} className="py-1.5 border-b border-border/50 last:border-0">
+                    <p className="text-xs text-muted-foreground">{a.fieldLabel}</p>
+                    <p className="text-sm mt-0.5">{a.value}</p>
+                  </div>
+                ))}
+              </section>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="border-t p-4 shrink-0">
+            <Button variant="outline" className="w-full gap-2" onClick={() => setEditOpen(true)}>
+              <Pencil className="w-4 h-4" /> Edit Registration
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {editOpen && (
+        <EventEditChildDialog
+          child={childForEdit}
+          open={editOpen}
+          onOpenChange={handleEditClose}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Registrations list ────────────────────────────────────────────────────────
+
+function ChildrenTabContent({
+  eventId,
+  formId,
+  isChildCheckin = true,
+  onExportCsv,
+  isExporting = false,
+}: {
+  eventId: number;
+  formId?: number | null;
+  isChildCheckin?: boolean;
+  onExportCsv?: () => void;
+  isExporting?: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const [roomFilter, setRoomFilter] = useState("all");
+  const [alertsOnly, setAlertsOnly] = useState(false);
+  const [sort, setSort] = useState<"name" | "date">("date");
+  const [selectedReg, setSelectedReg] = useState<Registration | null>(null);
+  const [addRegOpen, setAddRegOpen] = useState(false);
+
+  const { data: registrations = [], isLoading } = useListRegistrations(formId ?? 0, {
+    query: { enabled: !!formId, queryKey: getListRegistrationsQueryKey(formId ?? 0) },
+  });
+
+  const rooms = useMemo(() => {
+    const set = new Set(registrations.map((r) => r.room).filter((r): r is string => !!r));
+    return Array.from(set).sort();
+  }, [registrations]);
+
+  const alertCount = useMemo(
+    () => registrations.filter((r) => r.allergies || r.specialNeeds).length,
+    [registrations]
+  );
+
+  const filtered = useMemo(() => {
+    let result = registrations;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (r) =>
+          `${r.childFirstName} ${r.childLastName}`.toLowerCase().includes(q) ||
+          (r.guardianName ?? "").toLowerCase().includes(q) ||
+          (r.guardianPhone ?? "").toLowerCase().includes(q) ||
+          (r.room ?? "").toLowerCase().includes(q)
+      );
+    }
+    if (roomFilter !== "all") result = result.filter((r) => r.room === roomFilter);
+    if (alertsOnly) result = result.filter((r) => r.allergies || r.specialNeeds);
+    if (sort === "name") {
+      result = [...result].sort((a, b) =>
+        `${a.childLastName} ${a.childFirstName}`.localeCompare(`${b.childLastName} ${b.childFirstName}`)
+      );
+    } else {
+      result = [...result].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+    return result;
+  }, [registrations, search, roomFilter, alertsOnly, sort]);
+
+  return (
+    <div className="space-y-3">
+      {/* Row 1: search + actions */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder={isChildCheckin ? "Search by name, guardian, phone, or room…" : "Search by name or contact…"}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {onExportCsv && (
+          <Button variant="outline" size="sm" onClick={onExportCsv} disabled={isExporting} className="shrink-0 gap-1.5">
+            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            <span className="hidden sm:inline">Export CSV</span>
+          </Button>
+        )}
+        <Button size="sm" className="shrink-0 gap-1.5" onClick={() => setAddRegOpen(true)}>
+          <Plus className="w-4 h-4" />
+          <span className="hidden sm:inline">{isChildCheckin ? "Add Child" : "Add Registrant"}</span>
+          <span className="sm:hidden">Add</span>
+        </Button>
+      </div>
+
+      {/* Row 2: filters + sort + count */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {rooms.length > 0 && (
+          <Select value={roomFilter} onValueChange={setRoomFilter}>
+            <SelectTrigger className="h-8 text-xs w-auto min-w-[110px]">
+              <SelectValue placeholder="All rooms" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All rooms</SelectItem>
+              {rooms.map((room) => (
+                <SelectItem key={room} value={room}>{room}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {alertCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setAlertsOnly((v) => !v)}
+            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium border transition-colors ${
+              alertsOnly
+                ? "bg-red-50 text-red-700 border-red-200"
+                : "bg-background text-muted-foreground border-border hover:border-red-200 hover:text-red-700"
+            }`}
+          >
+            <AlertTriangle className="w-3 h-3" />
+            Alerts only
+            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${alertsOnly ? "bg-red-100" : "bg-muted"}`}>
+              {alertCount}
+            </span>
+          </button>
+        )}
+        <Select value={sort} onValueChange={(v) => setSort(v as "name" | "date")}>
+          <SelectTrigger className="h-8 text-xs w-auto min-w-[110px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="date">Newest first</SelectItem>
+            <SelectItem value="name">Name A–Z</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground ml-auto">
+          {filtered.length !== registrations.length
+            ? `${filtered.length} of ${registrations.length} `
+            : `${registrations.length} `}
+          {registrations.length === 1
+            ? isChildCheckin ? "child" : "registrant"
+            : isChildCheckin ? "children" : "registrants"}
         </p>
       </div>
 
+      {/* List */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
-      ) : !children?.length ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+        </div>
+      ) : !registrations.length ? (
+        <Card>
+          <CardContent className="py-14 text-center text-muted-foreground">
+            {isChildCheckin
+              ? <Baby className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              : <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />}
+            <p className="font-medium">No registrations yet</p>
+            <p className="text-sm mt-1">
+              Use "{isChildCheckin ? "Add Child" : "Add Registrant"}" above to add the first one.
+            </p>
+          </CardContent>
+        </Card>
+      ) : !filtered.length ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
-            <EmptyIcon className="w-8 h-8 mx-auto mb-3 opacity-30" />
-            <p>{search ? `No results matching "${search}"` : emptyMessage}</p>
+            <p className="text-sm">No registrations match the current filters.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
-          {children.map((child) => (
-            <Card key={child.id} className="group">
-              <CardContent className="px-4 py-3 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-sm flex-shrink-0">
-                    {child.firstName[0]}{child.lastName[0]}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium">{child.firstName} {child.lastName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {child.guardianName}{child.room ? ` · ${child.room}` : ""}
-                    </p>
-                  </div>
+        <Card className="overflow-hidden p-0">
+          <div className="divide-y divide-border">
+            {filtered.map((reg) => (
+              <button
+                key={reg.id}
+                type="button"
+                onClick={() => setSelectedReg(reg)}
+                className="w-full text-left flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors group"
+              >
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-sm shrink-0">
+                  {reg.childFirstName[0]}{reg.childLastName[0]}
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {child.allergies && (
-                    <Badge className="text-[10px] bg-red-100 text-red-800 hover:bg-red-100 border-none">Allergy</Badge>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{reg.childFirstName} {reg.childLastName}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {reg.guardianName}
+                    {reg.guardianPhone ? ` · ${reg.guardianPhone}` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {reg.room && (
+                    <Badge variant="outline" className="text-[10px] hidden sm:flex">{reg.room}</Badge>
                   )}
-                  <Button
-                    variant="ghost" size="sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => setEditingChild(child)}
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </Button>
+                  {(reg.allergies || reg.specialNeeds) && (
+                    <Badge className="text-[10px] bg-red-100 text-red-800 border-none hover:bg-red-100 gap-1">
+                      <AlertTriangle className="w-2.5 h-2.5" /> Alert
+                    </Badge>
+                  )}
+                  <span className="text-xs text-muted-foreground hidden sm:block w-10 text-right">
+                    {format(new Date(reg.createdAt), "MMM d")}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </button>
+            ))}
+          </div>
+        </Card>
       )}
 
-      {editingChild && (
-        <EventEditChildDialog
-          key={editingChild.id}
-          child={editingChild}
-          open={!!editingChild}
-          onOpenChange={(v) => { if (!v) setEditingChild(null); }}
+      {selectedReg && (
+        <RegistrationDetailSheet
+          reg={selectedReg}
+          open={!!selectedReg}
+          onOpenChange={(v) => { if (!v) setSelectedReg(null); }}
+          isChildCheckin={isChildCheckin}
+          formId={formId}
+          eventId={eventId}
         />
       )}
+
+      <ManualRegistrationDialog
+        formId={formId}
+        isChildCheckin={isChildCheckin}
+        eventId={eventId}
+        open={addRegOpen}
+        onOpenChange={setAddRegOpen}
+      />
     </div>
   );
 }
@@ -470,52 +1071,1984 @@ function FamiliesTabContent({ eventId }: { eventId: number }) {
   );
 }
 
-// ─── Main page ─────────────────────────────────────────────────────────────────
+// ─── Check-In Confirm Dialog ───────────────────────────────────────────────────
 
-export default function EventDetail() {
-  const params = useParams<{ id: string }>();
-  const eventId = parseInt(params.id || "0", 10);
-  const search = useSearch();
+function CheckInConfirmDialog({
+  reg,
+  open,
+  onConfirm,
+  onCancel,
+  isPending,
+}: {
+  reg: Registration;
+  open: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v && !isPending) onCancel(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            Medical Alert — Check In {reg.childFirstName} {reg.childLastName}?
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-1">
+          {reg.allergies && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+              <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">Allergies</p>
+              <p className="text-sm text-red-800">{reg.allergies}</p>
+            </div>
+          )}
+          {reg.specialNeeds && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Medical / Special Needs</p>
+              <p className="text-sm text-blue-800">{reg.specialNeeds}</p>
+            </div>
+          )}
+          <p className="text-sm text-muted-foreground pt-1">
+            Please review the above notes with the supervising volunteer before checking in this child.
+          </p>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+          <Button onClick={onConfirm} disabled={isPending} className="gap-2">
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+            Check In Anyway
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Check-Out Dialog ──────────────────────────────────────────────────────────
+
+function CheckOutDialog({
+  reg,
+  checkin,
+  open,
+  onConfirm,
+  onCancel,
+  isPending,
+}: {
+  reg: Registration;
+  checkin: EventCheckin;
+  open: boolean;
+  onConfirm: (pickupPersonName: string, notes: string) => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const [pickupPerson, setPickupPerson] = useState("");
+  const [notes, setNotes] = useState("");
+
+  // Fetch registration detail to get authorized pickup names
+  const { data: regDetail } = useGetRegistration(reg.id, {
+    query: { enabled: open, queryKey: [`/api/registrations/${reg.id}`] },
+  });
+
+  const authorizedPickup = regDetail?.customAnswers?.find(
+    (a) => a.fieldLabel.toLowerCase().includes("pickup")
+  )?.value ?? null;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v && !isPending) onCancel(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-amber-600" />
+            Check Out — {reg.childFirstName} {reg.childLastName}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-1">
+          {/* Child info */}
+          <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Guardian</span>
+              <span className="font-medium">{reg.guardianName}</span>
+            </div>
+            {reg.guardianPhone && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Phone</span>
+                <span className="font-medium">{reg.guardianPhone}</span>
+              </div>
+            )}
+            {reg.room && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Room</span>
+                <span className="font-medium">{reg.room}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center pt-1 border-t border-border">
+              <span className="text-muted-foreground">Pickup Code</span>
+              <span className="font-mono font-bold tracking-widest text-green-700 bg-green-100 px-2 py-0.5 rounded text-base">
+                {checkin.labelCode}
+              </span>
+            </div>
+          </div>
+
+          {/* Alerts */}
+          {reg.allergies && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
+              <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-red-700">Allergy Alert</p>
+                <p className="text-xs text-red-700">{reg.allergies}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Authorized pickup names */}
+          {authorizedPickup && (
+            <div className="rounded-lg border border-border px-3 py-2.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Authorized Pickup</p>
+              <p className="text-sm">{authorizedPickup}</p>
+            </div>
+          )}
+
+          {/* Pickup person input */}
+          <div className="space-y-1.5">
+            <Label htmlFor="pickup-person" className="text-sm font-medium">
+              Who is picking up? <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Input
+              id="pickup-person"
+              placeholder="Enter name of person picking up"
+              value={pickupPerson}
+              onChange={(e) => setPickupPerson(e.target.value)}
+              disabled={isPending}
+              autoFocus
+            />
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1.5">
+            <Label htmlFor="checkout-notes" className="text-sm font-medium">
+              Notes <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Textarea
+              id="checkout-notes"
+              placeholder="Any notes for this checkout…"
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={isPending}
+              className="resize-none"
+            />
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+          <Button
+            onClick={() => onConfirm(pickupPerson.trim(), notes.trim())}
+            disabled={isPending}
+            className="gap-2 border-amber-400 bg-amber-500 text-white hover:bg-amber-600"
+          >
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+            Confirm Check-Out
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Registration Edit Dialog ────────────────────────────────────────────────
+
+function RegistrationEditDialog({
+  reg,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  reg: Registration;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSaved: () => void;
+}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [loadingId, setLoadingId] = useState<number | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
-
-  const initialTab = new URLSearchParams(search).get("tab") ?? "registrations";
-  const [activeTab, setActiveTab] = useState(initialTab);
-  const [view, setView] = useState<"activity" | "manage">("activity");
-  const [manageTab, setManageTab] = useState("children");
-
-  const invalidateCheckins = () =>
-    queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
-
-  const { data: event, isLoading } = useGetEvent(eventId, {
-    query: { enabled: !!eventId, queryKey: getGetEventQueryKey(eventId) },
-  });
-  const regFormId = event?.formId ?? 0;
-  const { data: registrations, isLoading: regsLoading } = useListRegistrations(regFormId, {
-    query: { enabled: !!event?.formId, queryKey: getListRegistrationsQueryKey(regFormId) },
-  });
-  const { data: checkins, isLoading: checkinsLoading } = useListEventCheckins(eventId, {
-    query: { enabled: !!eventId, queryKey: getListEventCheckinsQueryKey(eventId) },
+  const { id: _regEditEventIdStr } = useParams<{ id: string }>();
+  const _regEditEventId = parseInt(_regEditEventIdStr || "0", 10);
+  const { data: rooms } = useListRooms(_regEditEventId, {
+    query: { enabled: !!_regEditEventId, queryKey: getListRoomsQueryKey(_regEditEventId) },
   });
 
-  const checkoutChild = useCheckoutChild({
+  const guardianParts = (reg.guardianName ?? "").trim().split(/\s+/);
+  const [form, setForm] = useState({
+    childFirstName: reg.childFirstName,
+    childLastName: reg.childLastName,
+    childDateOfBirth: reg.childDateOfBirth ?? "",
+    guardianFirstName: guardianParts[0] ?? "",
+    guardianLastName: guardianParts.slice(1).join(" "),
+    guardianPhone: reg.guardianPhone ?? "",
+    guardianEmail: reg.guardianEmail ?? "",
+    allergies: reg.allergies ?? "",
+    specialNeeds: reg.specialNeeds ?? "",
+    room: reg.room ?? "",
+  });
+
+  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((p) => ({ ...p, [field]: e.target.value }));
+
+  const updateRegistration = useUpdateRegistration({
     mutation: {
-      onSuccess: () => { invalidateCheckins(); toast({ title: "Child checked out" }); setLoadingId(null); },
-      onError: () => { toast({ title: "Check-out failed", variant: "destructive" }); setLoadingId(null); },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(reg.formId) });
+        queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey() });
+        queryClient.invalidateQueries({ queryKey: [`/api/registrations/${reg.id}`] });
+        toast({ title: "Changes saved" });
+        onSaved();
+        onOpenChange(false);
+      },
+      onError: () => toast({ title: "Failed to save changes", variant: "destructive" }),
     },
   });
-  const deleteCheckin = useDeleteCheckin({
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateRegistration.mutate({
+      registrationId: reg.id,
+      data: {
+        childFirstName: form.childFirstName.trim() || undefined,
+        childLastName: form.childLastName.trim() || undefined,
+        childDateOfBirth: form.childDateOfBirth || undefined,
+        guardianFirstName: form.guardianFirstName.trim() || undefined,
+        guardianLastName: form.guardianLastName.trim() || undefined,
+        guardianPhone: form.guardianPhone.trim() || undefined,
+        guardianEmail: form.guardianEmail.trim() || undefined,
+        allergies: form.allergies.trim() || undefined,
+        specialNeeds: form.specialNeeds.trim() || undefined,
+        room: form.room || undefined,
+      },
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!updateRegistration.isPending) onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-serif">
+            Edit — {reg.childFirstName} {reg.childLastName}
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-5 pt-2">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Child</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>First Name</Label><Input value={form.childFirstName} onChange={set("childFirstName")} /></div>
+              <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.childLastName} onChange={set("childLastName")} /></div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Date of Birth</Label>
+              <Input type="date" value={form.childDateOfBirth} onChange={set("childDateOfBirth")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Allergies</Label>
+              <Input value={form.allergies} onChange={set("allergies")} placeholder="e.g. peanuts, latex" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Special Needs / Medical Notes</Label>
+              <Input value={form.specialNeeds} onChange={set("specialNeeds")} placeholder="Any medical notes or accommodations" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Room</Label>
+              {rooms && rooms.length > 0 ? (
+                <Select
+                  value={form.room || "__none__"}
+                  onValueChange={(v) => setForm((p) => ({ ...p, room: v === "__none__" ? "" : v }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Unassigned</SelectItem>
+                    {rooms.map((r) => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={form.room} onChange={set("room")} placeholder="Room name" />
+              )}
+            </div>
+          </div>
+          <div className="space-y-3 pt-1 border-t border-border">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">Guardian</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>First Name</Label><Input value={form.guardianFirstName} onChange={set("guardianFirstName")} /></div>
+              <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.guardianLastName} onChange={set("guardianLastName")} /></div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input type="tel" value={form.guardianPhone} onChange={set("guardianPhone")} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input type="email" value={form.guardianEmail} onChange={set("guardianEmail")} />
+            </div>
+          </div>
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={updateRegistration.isPending} className="gap-2">
+              {updateRegistration.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Child Detail Sheet ──────────────────────────────────────────────────────
+
+function ChildDetailSheet({
+  open,
+  onOpenChange,
+  reg,
+  checkin,
+  allCheckins,
+  eventId,
+  labelType,
+  requireCheckout,
+  onCheckin,
+  onCheckout,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  reg: Registration;
+  checkin: EventCheckin | undefined;
+  allCheckins: EventCheckin[];
+  eventId: number;
+  labelType: string;
+  requireCheckout: boolean;
+  onCheckin: () => void;
+  onCheckout: () => void;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [noteText, setNoteText] = useState("");
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+
+  const { data: regDetail } = useGetRegistration(reg.id, {
+    query: { enabled: open, queryKey: [`/api/registrations/${reg.id}`] },
+  });
+
+  const updateCheckin = useUpdateCheckin({
     mutation: {
-      onSuccess: () => { invalidateCheckins(); toast({ title: "Check-in removed" }); setLoadingId(null); },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
+        toast({ title: "Note saved" });
+        setShowNoteForm(false);
+        setNoteText("");
+      },
+      onError: () => toast({ title: "Failed to save note", variant: "destructive" }),
+    },
+  });
+
+  useEffect(() => {
+    if (open) {
+      setShowNoteForm(false);
+      setEditOpen(false);
+      setNoteText(checkin?.notes ?? "");
+    }
+  }, [open, reg.id, checkin?.id]);
+
+  const status: Exclude<DeskFilter, "all"> = !checkin
+    ? "not_checked_in"
+    : !checkin.checkoutAt
+    ? "checked_in"
+    : "checked_out";
+
+  const age = reg.childDateOfBirth
+    ? (() => {
+        const birth = new Date(reg.childDateOfBirth);
+        const today = new Date();
+        let years = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) years--;
+        if (years === 0) {
+          const months =
+            (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+          return `${months < 0 ? 0 : months} mo`;
+        }
+        return `${years} yr`;
+      })()
+    : null;
+
+  const customAnswers = regDetail?.customAnswers ?? [];
+  const findAnswer = (...keywords: string[]) =>
+    customAnswers.find((a) => keywords.some((kw) => a.fieldLabel.toLowerCase().includes(kw)))?.value ?? null;
+
+  const emergencyContactName = findAnswer("emergency contact", "emergency name");
+  const emergencyContactPhone = findAnswer("emergency phone", "emergency contact phone");
+  const authorizedPickup = findAnswer("authorized pickup", "pickup name");
+  const unauthorizedPickup = findAnswer("unauthorized", "not authorized", "not allowed");
+  const secondaryGuardian = findAnswer("secondary guardian", "second guardian");
+  const grade = findAnswer("grade");
+
+  const labelData: LabelData | null = checkin
+    ? {
+        childName: `${reg.childFirstName} ${reg.childLastName}`,
+        guardianName: reg.guardianName ?? "",
+        labelCode: checkin.labelCode,
+        checkinDate: checkin.checkinAt,
+        room: reg.room ?? null,
+        allergies: reg.allergies ?? null,
+        specialNeeds: reg.specialNeeds ?? null,
+      }
+    : null;
+
+  const statusColor = {
+    not_checked_in: "bg-muted text-muted-foreground",
+    checked_in: "bg-green-100 text-green-800",
+    checked_out: "bg-amber-100 text-amber-800",
+  }[status];
+  const statusLabel = {
+    not_checked_in: "Not Checked In",
+    checked_in: "Checked In",
+    checked_out: "Checked Out",
+  }[status];
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
+          <SheetTitle className="sr-only">{reg.childFirstName} {reg.childLastName} — Details</SheetTitle>
+
+          {/* Header (leave pr-12 for the built-in close button at right-4 top-4) */}
+          <div className="flex items-center gap-3 px-5 pt-5 pb-4 pr-14 border-b shrink-0">
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold font-serif flex-shrink-0 ${statusColor}`}>
+              {reg.childFirstName[0]}{reg.childLastName[0]}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-bold font-serif leading-tight truncate">
+                {reg.childFirstName} {reg.childLastName}
+              </h2>
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                <Badge className={`text-xs ${statusColor}`}>{statusLabel}</Badge>
+                {reg.room && <Badge variant="outline" className="text-xs">{reg.room}</Badge>}
+                {reg.allergies && (
+                  <Badge className="text-xs bg-red-100 text-red-800 border-red-200 hover:bg-red-100">Allergy</Badge>
+                )}
+                {reg.specialNeeds && (
+                  <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">Medical</Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="px-5 py-5 space-y-6">
+
+              {/* Child Info */}
+              <section className="space-y-2">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Child Info</p>
+                <div className="space-y-1.5 text-sm">
+                  {reg.childDateOfBirth && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span>{format(new Date(reg.childDateOfBirth + "T00:00:00"), "MMMM d, yyyy")}</span>
+                      {age && <span className="text-muted-foreground">({age} old)</span>}
+                    </div>
+                  )}
+                  {grade && (
+                    <div className="flex items-center gap-2">
+                      <Info className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span>Grade: {grade}</span>
+                    </div>
+                  )}
+                  {reg.room && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span>Room: <span className="font-medium">{reg.room}</span></span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar className="w-3.5 h-3.5 shrink-0" />
+                    <span>Registered {format(new Date(reg.createdAt), "MMM d, yyyy")}</span>
+                  </div>
+                </div>
+              </section>
+
+              {/* Guardian Info */}
+              {(reg.guardianName || reg.guardianPhone || reg.guardianEmail || secondaryGuardian) && (
+                <section className="space-y-2">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Guardian</p>
+                  <div className="space-y-1.5 text-sm">
+                    {reg.guardianName && (
+                      <div className="flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="font-medium">{reg.guardianName}</span>
+                      </div>
+                    )}
+                    {reg.guardianPhone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <a href={`tel:${reg.guardianPhone}`} className="text-primary hover:underline">
+                          {reg.guardianPhone}
+                        </a>
+                      </div>
+                    )}
+                    {reg.guardianEmail && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground truncate">{reg.guardianEmail}</span>
+                      </div>
+                    )}
+                    {secondaryGuardian && (
+                      <div className="flex items-start gap-2 pt-1 border-t border-border">
+                        <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Secondary Guardian</p>
+                          <p>{secondaryGuardian}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* Safety Info */}
+              {(reg.allergies || reg.specialNeeds || emergencyContactName || emergencyContactPhone || authorizedPickup || unauthorizedPickup) && (
+                <section className="space-y-2">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Safety</p>
+                  <div className="space-y-2">
+                    {reg.allergies && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                        <p className="text-xs font-bold text-red-700 uppercase tracking-wide flex items-center gap-1.5 mb-1">
+                          <AlertTriangle className="w-3.5 h-3.5" /> Allergies
+                        </p>
+                        <p className="text-sm text-red-800">{reg.allergies}</p>
+                      </div>
+                    )}
+                    {reg.specialNeeds && (
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                        <p className="text-xs font-bold text-blue-700 uppercase tracking-wide flex items-center gap-1.5 mb-1">
+                          <ShieldCheck className="w-3.5 h-3.5" /> Medical / Special Needs
+                        </p>
+                        <p className="text-sm text-blue-800">{reg.specialNeeds}</p>
+                      </div>
+                    )}
+                    {(emergencyContactName || emergencyContactPhone) && (
+                      <div className="rounded-lg border border-border px-4 py-3">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
+                          Emergency Contact
+                        </p>
+                        {emergencyContactName && <p className="text-sm font-medium">{emergencyContactName}</p>}
+                        {emergencyContactPhone && (
+                          <a href={`tel:${emergencyContactPhone}`} className="text-sm text-primary hover:underline">
+                            {emergencyContactPhone}
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {authorizedPickup && (
+                      <div className="rounded-lg border border-green-200 bg-green-50/50 px-4 py-3">
+                        <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">
+                          Authorized Pickup
+                        </p>
+                        <p className="text-sm text-green-800">{authorizedPickup}</p>
+                      </div>
+                    )}
+                    {unauthorizedPickup && (
+                      <div className="rounded-lg border border-red-200 bg-red-50/50 px-4 py-3">
+                        <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">
+                          Not Authorized for Pickup
+                        </p>
+                        <p className="text-sm text-red-800">{unauthorizedPickup}</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {/* Attendance */}
+              <section className="space-y-2">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Attendance</p>
+                <div className="rounded-lg border border-border divide-y divide-border text-sm">
+                  <div className="flex justify-between items-center px-4 py-2.5">
+                    <span className="text-muted-foreground">Status</span>
+                    <Badge className={`text-xs ${statusColor}`}>{statusLabel}</Badge>
+                  </div>
+                  {checkin && (
+                    <>
+                      <div className="flex justify-between px-4 py-2.5">
+                        <span className="text-muted-foreground">Checked In</span>
+                        <span className="font-medium">{format(new Date(checkin.checkinAt), "h:mm a, MMM d")}</span>
+                      </div>
+                      {checkin.checkoutAt && (
+                        <div className="flex justify-between px-4 py-2.5">
+                          <span className="text-muted-foreground">Checked Out</span>
+                          <span className="font-medium">{format(new Date(checkin.checkoutAt), "h:mm a, MMM d")}</span>
+                        </div>
+                      )}
+                      {checkin.pickupPersonName && (
+                        <div className="flex justify-between px-4 py-2.5">
+                          <span className="text-muted-foreground">Picked Up By</span>
+                          <span className="font-medium">{checkin.pickupPersonName}</span>
+                        </div>
+                      )}
+                      {checkin.labelCode && (
+                        <div className="flex justify-between items-center px-4 py-2.5">
+                          <span className="text-muted-foreground">Pickup Code</span>
+                          <span className="font-mono font-bold tracking-widest text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                            {checkin.labelCode}
+                          </span>
+                        </div>
+                      )}
+                      {checkin.notes && (
+                        <div className="px-4 py-2.5">
+                          <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                          <p>{checkin.notes}</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                {allCheckins.length > 1 && (
+                  <div className="space-y-1 mt-1">
+                    <p className="text-xs text-muted-foreground">Previous Sessions</p>
+                    {allCheckins.slice(1).map((c) => (
+                      <div key={c.id} className="flex justify-between text-xs text-muted-foreground rounded border border-border px-3 py-1.5">
+                        <span>{format(new Date(c.checkinAt), "MMM d, h:mm a")}</span>
+                        {c.checkoutAt && <span className="text-amber-700">Out {format(new Date(c.checkoutAt), "h:mm a")}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Add / Edit Note */}
+              {checkin && (
+                <section>
+                  {!showNoteForm ? (
+                    <button
+                      type="button"
+                      className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+                      onClick={() => setShowNoteForm(true)}
+                    >
+                      <StickyNote className="w-3.5 h-3.5" />
+                      {checkin.notes ? "Edit note" : "Add a note"}
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Note</Label>
+                      <Textarea
+                        placeholder="Add a note about this check-in…"
+                        rows={3}
+                        value={noteText}
+                        onChange={(e) => setNoteText(e.target.value)}
+                        className="resize-none"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="gap-1.5"
+                          disabled={updateCheckin.isPending}
+                          onClick={() => updateCheckin.mutate({ checkinId: checkin.id, data: { notes: noteText } })}
+                        >
+                          {updateCheckin.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          Save Note
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowNoteForm(false)}>Cancel</Button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )}
+
+            </div>
+          </div>
+
+          {/* Sticky footer */}
+          <div className="border-t border-border px-5 py-4 bg-background shrink-0 space-y-2">
+            <div className="flex gap-2">
+              {status === "not_checked_in" && (
+                <Button className="flex-1 gap-2" onClick={() => { onOpenChange(false); onCheckin(); }}>
+                  <LogIn className="w-4 h-4" /> Check In
+                </Button>
+              )}
+              {status === "checked_in" && requireCheckout && (
+                <Button
+                  onClick={() => { onOpenChange(false); onCheckout(); }}
+                  className="flex-1 gap-2 bg-amber-500 text-white hover:bg-amber-600 border-amber-400"
+                >
+                  <LogOut className="w-4 h-4" /> Check Out
+                </Button>
+              )}
+              {status === "checked_out" && (
+                <Button className="flex-1 gap-2" onClick={() => { onOpenChange(false); onCheckin(); }}>
+                  <LogIn className="w-4 h-4" /> Check In Again
+                </Button>
+              )}
+              {checkin && labelData && (
+                <Button variant="outline" className="flex-1 gap-2" onClick={() => setPrintOpen(true)}>
+                  <Printer className="w-4 h-4" /> Print Label
+                </Button>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              className="w-full gap-2 text-muted-foreground hover:text-foreground"
+              onClick={() => setEditOpen(true)}
+            >
+              <Pencil className="w-4 h-4" /> Edit Info
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {labelData && (
+        <LabelPrintDialog open={printOpen} onOpenChange={setPrintOpen} labels={[labelData]} />
+      )}
+
+      <RegistrationEditDialog
+        key={reg.id}
+        reg={reg}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={() => {}}
+      />
+    </>
+  );
+}
+
+// ─── Check-In Desk ─────────────────────────────────────────────────────────────
+
+type DeskFilter = "all" | "not_checked_in" | "checked_in" | "checked_out";
+
+const DESK_FILTER_LABELS: Record<DeskFilter, string> = {
+  all: "All Registered",
+  not_checked_in: "Not Checked In",
+  checked_in: "Checked In",
+  checked_out: "Checked Out",
+};
+
+function CheckInDeskContent({
+  eventId,
+  formId,
+  registrations,
+  checkins,
+  regsLoading,
+  checkinsLoading,
+  labelType,
+  requireCheckout,
+  isChildEvent,
+  attendanceSessions,
+  onExportCsv,
+  isExporting,
+}: {
+  eventId: number;
+  formId?: number | null;
+  registrations: Registration[] | undefined;
+  checkins: EventCheckin[] | undefined;
+  regsLoading: boolean;
+  checkinsLoading: boolean;
+  labelType: string;
+  requireCheckout: boolean;
+  isChildEvent: boolean;
+  attendanceSessions: Array<{ date: string; items: EventCheckin[] }>;
+  onExportCsv: () => void;
+  isExporting: boolean;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<DeskFilter>("all");
+  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [showAttendance, setShowAttendance] = useState(false);
+  const [selectedRegId, setSelectedRegId] = useState<number | null>(null);
+  const [addRegOpen, setAddRegOpen] = useState(false);
+
+  // Dialog state
+  const [pendingCheckinReg, setPendingCheckinReg] = useState<Registration | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<{ reg: Registration; checkin: EventCheckin } | null>(null);
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
+
+  const createCheckin = useCreateCheckin({
+    mutation: {
+      onSuccess: () => {
+        invalidate();
+        toast({ title: isChildEvent ? "Child checked in" : "Checked in" });
+        setLoadingId(null);
+        setPendingCheckinReg(null);
+      },
+      onError: (err: unknown) => {
+        setLoadingId(null);
+        setPendingCheckinReg(null);
+        const status = (err as { status?: number })?.status;
+        if (status === 409) {
+          toast({ title: "Already checked in", description: "This child already has an active check-in.", variant: "destructive" });
+          invalidate(); // refresh to show current state
+        } else {
+          toast({ title: "Check-in failed", variant: "destructive" });
+        }
+      },
+    },
+  });
+  const checkoutMutation = useCheckoutChild({
+    mutation: {
+      onSuccess: () => {
+        invalidate();
+        toast({ title: isChildEvent ? "Child checked out" : "Checked out" });
+        setLoadingId(null);
+        setPendingCheckout(null);
+      },
+      onError: () => { toast({ title: "Check-out failed", variant: "destructive" }); setLoadingId(null); setPendingCheckout(null); },
+    },
+  });
+  const deleteCheckinMutation = useDeleteCheckin({
+    mutation: {
+      onSuccess: () => { invalidate(); toast({ title: "Check-in removed" }); setLoadingId(null); },
       onError: () => { toast({ title: "Could not undo check-in", variant: "destructive" }); setLoadingId(null); },
     },
   });
-  const undoCheckout = useUndoCheckout({
+  const undoCheckoutMutation = useUndoCheckout({
     mutation: {
-      onSuccess: () => { invalidateCheckins(); toast({ title: "Check-out reversed — child is checked in again" }); setLoadingId(null); },
+      onSuccess: () => { invalidate(); toast({ title: "Check-out reversed" }); setLoadingId(null); },
       onError: () => { toast({ title: "Could not undo check-out", variant: "destructive" }); setLoadingId(null); },
+    },
+  });
+
+  const doCheckin = (reg: Registration) => {
+    setLoadingId(reg.id);
+    createCheckin.mutate({ data: { registrationId: reg.id } });
+  };
+
+  const handleCheckinClick = (reg: Registration) => {
+    if (reg.allergies || reg.specialNeeds) {
+      setPendingCheckinReg(reg);
+    } else {
+      doCheckin(reg);
+    }
+  };
+
+  // Latest checkin per registration (most recent first if multiple sessions)
+  const latestCheckinByRegId = useMemo(() => {
+    const map = new Map<number, EventCheckin>();
+    if (!checkins) return map;
+    for (const c of [...checkins].sort((a, b) => new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime())) {
+      if (!map.has(c.registrationId)) map.set(c.registrationId, c);
+    }
+    return map;
+  }, [checkins]);
+
+  const participants = useMemo(() => {
+    if (!registrations) return [] as Array<{ reg: Registration; checkin: EventCheckin | undefined; status: Exclude<DeskFilter, "all"> }>;
+    return registrations.map((reg) => {
+      const checkin = latestCheckinByRegId.get(reg.id);
+      const status: Exclude<DeskFilter, "all"> = !checkin ? "not_checked_in" : !checkin.checkoutAt ? "checked_in" : "checked_out";
+      return { reg, checkin, status };
+    });
+  }, [registrations, latestCheckinByRegId]);
+
+  // Derived — always stays fresh after edits because it reads from the `participants` memo
+  const selectedParticipant = selectedRegId !== null
+    ? (participants.find((p) => p.reg.id === selectedRegId) ?? null)
+    : null;
+
+  const counts = useMemo(() => ({
+    all: participants.length,
+    not_checked_in: participants.filter((p) => p.status === "not_checked_in").length,
+    checked_in: participants.filter((p) => p.status === "checked_in").length,
+    checked_out: participants.filter((p) => p.status === "checked_out").length,
+  }), [participants]);
+
+  const filtered = useMemo(() => {
+    let result = filter === "all" ? participants : participants.filter((p) => p.status === filter);
+    if (!search.trim()) return result;
+    const q = search.toLowerCase();
+    return result.filter(({ reg, checkin }) =>
+      `${reg.childFirstName} ${reg.childLastName}`.toLowerCase().includes(q) ||
+      (reg.guardianName ?? "").toLowerCase().includes(q) ||
+      (reg.guardianPhone ?? "").toLowerCase().includes(q) ||
+      (reg.room ?? "").toLowerCase().includes(q) ||
+      (checkin?.labelCode ?? "").toLowerCase().includes(q)
+    );
+  }, [participants, filter, search]);
+
+  const isLoading = regsLoading || checkinsLoading;
+
+  return (
+    <div className="space-y-5">
+      {/* Search + Export */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+          <Input
+            className="pl-11 h-12 text-base"
+            placeholder={
+              isChildEvent
+                ? "Search child, guardian, phone, room, or pickup code…"
+                : "Search participant, contact, phone, or room…"
+            }
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        {isChildEvent && (
+          <Button size="sm" className="shrink-0 gap-1.5" onClick={() => setAddRegOpen(true)}>
+            <Plus className="w-4 h-4" /> Add Registrant
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onExportCsv}
+          disabled={isExporting}
+          className="text-muted-foreground hover:text-foreground shrink-0 gap-1.5"
+        >
+          {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          <span className="hidden md:inline">Export CSV</span>
+        </Button>
+      </div>
+
+      {/* Filter pills */}
+      <div className="flex flex-wrap gap-2">
+        {(["all", "not_checked_in", "checked_in", "checked_out"] as DeskFilter[]).map((f) => {
+          const active = filter === f;
+          return (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                active
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
+              }`}
+            >
+              {DESK_FILTER_LABELS[f]}
+              <span className={`text-xs rounded-full px-1.5 py-0.5 font-bold min-w-[1.4rem] text-center ${
+                active ? "bg-white/20 text-white" : "bg-muted"
+              }`}>
+                {counts[f]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Participant cards */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">
+              {search
+                ? `No results for "${search}"`
+                : filter === "all"
+                ? `No ${isChildEvent ? "children" : "participants"} registered yet.`
+                : `No ${isChildEvent ? "children" : "participants"} — ${DESK_FILTER_LABELS[filter].toLowerCase()}.`}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(({ reg, checkin, status }) => {
+            const acting = loadingId === reg.id;
+            const avatarCls =
+              status === "checked_in" ? "bg-green-100 text-green-800" :
+              status === "checked_out" ? "bg-amber-100 text-amber-800" :
+              "bg-primary/10 text-primary";
+            const cardCls =
+              status === "checked_in" ? "border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-950/20" :
+              status === "checked_out" ? "border-amber-200 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/20" :
+              "";
+
+            return (
+              <Card
+                key={reg.id}
+                className={`transition-colors cursor-pointer ${cardCls}`}
+                onClick={() => setSelectedRegId(reg.id)}
+              >
+                <CardContent className="px-4 py-4 flex items-start gap-4">
+                  {/* Avatar */}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5 ${avatarCls}`}>
+                    {reg.childFirstName[0]}{reg.childLastName[0]}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
+                      {reg.allergies && (
+                        <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100">Allergy</Badge>
+                      )}
+                      {reg.specialNeeds && (
+                        <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">Medical</Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+                      {reg.guardianName && <span>{reg.guardianName}</span>}
+                      {reg.guardianPhone && <span>{reg.guardianPhone}</span>}
+                      {reg.room && (
+                        <span className="text-xs font-medium px-1.5 py-0.5 bg-primary/10 text-primary rounded">{reg.room}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-xs">
+                      {status === "not_checked_in" && (
+                        <span className="text-muted-foreground">
+                          Registered {format(new Date(reg.createdAt), "MMM d")}
+                        </span>
+                      )}
+                      {status === "checked_in" && checkin && (
+                        <span className="text-green-700 font-medium flex items-center gap-1.5">
+                          <LogIn className="w-3 h-3" />
+                          In {format(new Date(checkin.checkinAt), "h:mm a")}
+                          {labelType === "child_security" && checkin.labelCode && (
+                            <span className="font-mono font-bold tracking-wide bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
+                              {checkin.labelCode}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      {status === "checked_out" && checkin && (
+                        <span className="text-amber-700 font-medium flex items-center gap-1.5">
+                          <LogOut className="w-3 h-3" />
+                          Out {checkin.checkoutAt ? format(new Date(checkin.checkoutAt), "h:mm a") : ""}
+                          {checkin.labelCode && (
+                            <span className="font-mono text-muted-foreground ml-1">{checkin.labelCode}</span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action column — stop propagation so clicks here don't open the detail drawer */}
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {status === "not_checked_in" && (
+                      <Button
+                        size="sm"
+                        className="gap-1.5 min-w-[96px]"
+                        disabled={acting}
+                        onClick={() => handleCheckinClick(reg)}
+                      >
+                        {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogIn className="w-3.5 h-3.5" />}
+                        Check In
+                      </Button>
+                    )}
+
+                    {status === "checked_in" && checkin && (
+                      <>
+                        {requireCheckout ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1.5 min-w-[96px] border-amber-300 text-amber-800 hover:bg-amber-50 hover:border-amber-400"
+                            disabled={acting}
+                            onClick={() => setPendingCheckout({ reg, checkin })}
+                          >
+                            {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                            Check Out
+                          </Button>
+                        ) : (
+                          <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
+                        )}
+                        <button
+                          type="button"
+                          className="text-[11px] text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+                          disabled={acting}
+                          onClick={() => { setLoadingId(reg.id); deleteCheckinMutation.mutate({ checkinId: checkin.id }); }}
+                        >
+                          <Undo2 className="w-3 h-3" /> Undo
+                        </button>
+                      </>
+                    )}
+
+                    {status === "checked_out" && checkin && (
+                      <>
+                        <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Checked Out</Badge>
+                        {checkin.pickupPersonName && (
+                          <p className="text-[11px] text-muted-foreground text-right max-w-[120px] truncate">
+                            Picked up by {checkin.pickupPersonName}
+                          </p>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 text-xs h-7 min-w-[96px]"
+                          disabled={acting}
+                          onClick={() => handleCheckinClick(reg)}
+                        >
+                          {acting ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogIn className="w-3 h-3" />}
+                          Check In Again
+                        </Button>
+                        <button
+                          type="button"
+                          className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                          disabled={acting}
+                          onClick={() => { setLoadingId(reg.id); undoCheckoutMutation.mutate({ checkinId: checkin.id }); }}
+                        >
+                          <Undo2 className="w-3 h-3" /> Undo Checkout
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Child detail drawer */}
+      {selectedParticipant && (
+        <ChildDetailSheet
+          open={!!selectedParticipant}
+          onOpenChange={(v) => { if (!v) setSelectedRegId(null); }}
+          reg={selectedParticipant.reg}
+          checkin={selectedParticipant.checkin}
+          allCheckins={(checkins ?? [])
+            .filter((c) => c.registrationId === selectedParticipant.reg.id)
+            .sort((a, b) => new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime())}
+          eventId={eventId}
+          labelType={labelType}
+          requireCheckout={requireCheckout}
+          onCheckin={() => handleCheckinClick(selectedParticipant.reg)}
+          onCheckout={() => {
+            if (selectedParticipant.checkin) {
+              setPendingCheckout({ reg: selectedParticipant.reg, checkin: selectedParticipant.checkin });
+            }
+          }}
+        />
+      )}
+
+      {/* Check-in confirmation dialog (allergies/medical) */}
+      {pendingCheckinReg && (
+        <CheckInConfirmDialog
+          reg={pendingCheckinReg}
+          open={!!pendingCheckinReg}
+          onConfirm={() => doCheckin(pendingCheckinReg)}
+          onCancel={() => setPendingCheckinReg(null)}
+          isPending={loadingId === pendingCheckinReg.id}
+        />
+      )}
+
+      {/* Check-out dialog (pickup person + notes) */}
+      {pendingCheckout && (
+        <CheckOutDialog
+          reg={pendingCheckout.reg}
+          checkin={pendingCheckout.checkin}
+          open={!!pendingCheckout}
+          onConfirm={(pickupPersonName, notes) => {
+            setLoadingId(pendingCheckout.reg.id);
+            checkoutMutation.mutate({ checkinId: pendingCheckout.checkin.id, data: { pickupPersonName: pickupPersonName || undefined, notes: notes || undefined } });
+          }}
+          onCancel={() => setPendingCheckout(null)}
+          isPending={loadingId === pendingCheckout.reg.id}
+        />
+      )}
+
+      {/* Attendance history (collapsible) */}
+      {attendanceSessions.length > 0 && (
+        <div className="pt-2 border-t border-border">
+          <button
+            type="button"
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors py-1"
+            onClick={() => setShowAttendance((v) => !v)}
+          >
+            <BarChart2 className="w-4 h-4" />
+            {showAttendance ? "Hide" : "View"} Attendance History
+            <Badge variant="secondary" className="text-xs">{attendanceSessions.length} session{attendanceSessions.length !== 1 ? "s" : ""}</Badge>
+          </button>
+          {showAttendance && (
+            <div className="space-y-3 mt-3">
+              {attendanceSessions.map(({ date, items }) => (
+                <Card key={date}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">
+                        {format(new Date(date + "T00:00:00"), "EEEE, MMMM d, yyyy")}
+                      </CardTitle>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        {items.length} {isChildEvent ? (items.length === 1 ? "child" : "children") : (items.length === 1 ? "attendee" : "attendees")}
+                      </span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-border">
+                      {[...items]
+                        .sort((a, b) => new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime())
+                        .map((c) => (
+                          <div key={c.id} className="px-5 py-2.5 flex items-center justify-between gap-4">
+                            <div>
+                              <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
+                              {c.room && <p className="text-xs text-muted-foreground">{c.room}</p>}
+                            </div>
+                            <div className="text-right text-xs text-muted-foreground flex-shrink-0">
+                              <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
+                              {c.checkoutAt && <p className="text-amber-700">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <ManualRegistrationDialog
+        formId={formId}
+        isChildCheckin={isChildEvent}
+        eventId={eventId}
+        open={addRegOpen}
+        onOpenChange={setAddRegOpen}
+      />
+    </div>
+  );
+}
+
+// ─── Section: Event Dashboard ──────────────────────────────────────────────────
+
+function EventDashboardSection({
+  event,
+  eventId,
+  registrations,
+  checkins,
+  checkedIn,
+  checkedOut,
+  isChildCheckin,
+  trackAttendance,
+  requireCheckout,
+  onExportCsv,
+  isExporting,
+}: {
+  event: EventWithForm;
+  eventId: number;
+  registrations: Registration[] | undefined;
+  checkins: EventCheckin[] | undefined;
+  checkedIn: EventCheckin[];
+  checkedOut: EventCheckin[];
+  isChildCheckin: boolean;
+  trackAttendance: boolean;
+  requireCheckout: boolean;
+  onExportCsv: () => void;
+  isExporting: boolean;
+}) {
+  const { toast } = useToast();
+  const registrationUrl = event.formEmbedSlug
+    ? `${window.location.origin}/register/${event.formEmbedSlug}`
+    : null;
+
+  const copyEmbedCode = () => {
+    if (!registrationUrl) return;
+    const code = `<iframe src="${registrationUrl}" width="100%" height="800" frameborder="0" style="border:none;"></iframe>`;
+    navigator.clipboard.writeText(code);
+    toast({ title: "Embed code copied!" });
+  };
+
+  const recentRegistrations = [...(registrations ?? [])]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
+
+  const recentCheckins = [...(checkedIn ?? [])]
+    .sort((a, b) => new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime())
+    .slice(0, 5);
+
+  return (
+    <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-8">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground">Registered</p>
+            <p className="text-3xl font-bold font-serif mt-1">{registrations?.length ?? 0}</p>
+          </CardContent>
+        </Card>
+        {trackAttendance && (
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Checked In</p>
+              <p className="text-3xl font-bold font-serif mt-1 text-green-700">{checkedIn.length}</p>
+            </CardContent>
+          </Card>
+        )}
+        {requireCheckout && (
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Checked Out</p>
+              <p className="text-3xl font-bold font-serif mt-1 text-amber-700">{checkedOut.length}</p>
+            </CardContent>
+          </Card>
+        )}
+        {event.startDate && (
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Date</p>
+              <p className="text-xl font-bold font-serif mt-1">{format(new Date(event.startDate + "T00:00:00"), "MMM d")}</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <div className="space-y-4">
+          <h2 className="text-lg font-serif font-bold">Quick Actions</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {registrationUrl && (
+              <a
+                href={registrationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center"
+              >
+                <ExternalLink className="w-5 h-5 text-primary" />
+                Open Public Form
+              </a>
+            )}
+            {registrationUrl && (
+              <button
+                type="button"
+                onClick={copyEmbedCode}
+                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center"
+              >
+                <Copy className="w-5 h-5 text-primary" />
+                Copy Embed Code
+              </button>
+            )}
+            {trackAttendance && (
+              <Link href={`/events/${eventId}/checkin`}>
+                <div className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center cursor-pointer">
+                  <CheckSquare className="w-5 h-5 text-primary" />
+                  Start Check-In
+                </div>
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={onExportCsv}
+              disabled={isExporting}
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center disabled:opacity-50"
+            >
+              {isExporting ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <Download className="w-5 h-5 text-primary" />}
+              Export CSV
+            </button>
+            <Link href={`/events/${eventId}/form`}>
+              <div className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center cursor-pointer">
+                <FileEdit className="w-5 h-5 text-primary" />
+                Edit Form
+              </div>
+            </Link>
+            <Link href={`/events/${eventId}/settings`}>
+              <div className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center cursor-pointer">
+                <Settings className="w-5 h-5 text-primary" />
+                Event Settings
+              </div>
+            </Link>
+          </div>
+
+          {/* Recent registrations */}
+          {recentRegistrations.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-semibold">Recent Registrations</h2>
+                <Link href={`/events/${eventId}/registrations`} className="text-sm text-primary hover:underline">View all</Link>
+              </div>
+              <Card>
+                <CardContent className="p-0 divide-y divide-border">
+                  {recentRegistrations.map((reg) => (
+                    <div key={reg.id} className="px-4 py-3 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-xs shrink-0">
+                        {reg.childFirstName[0]}{reg.childLastName[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{reg.childFirstName} {reg.childLastName}</p>
+                        <p className="text-xs text-muted-foreground">{reg.guardianName}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground shrink-0">
+                        {format(new Date(reg.createdAt), "MMM d")}
+                      </p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Recently checked in */}
+          {trackAttendance && recentCheckins.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-semibold">Recently Checked In</h2>
+                <Link href={`/events/${eventId}/checkin`} className="text-sm text-primary hover:underline">View all</Link>
+              </div>
+              <Card>
+                <CardContent className="p-0 divide-y divide-border">
+                  {recentCheckins.map((c) => (
+                    <div key={c.id} className="px-4 py-3 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center font-serif font-bold text-green-800 text-xs shrink-0">
+                        {c.childFirstName[0]}{c.childLastName[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
+                        {c.room && <p className="text-xs text-muted-foreground">{c.room}</p>}
+                      </div>
+                      <p className="text-xs text-green-700 shrink-0">
+                        {format(new Date(c.checkinAt), "h:mm a")}
+                      </p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Section: Non-child Check-In Activity (tabs) ───────────────────────────────
+
+function NonChildCheckinSection({
+  registrations,
+  checkins,
+  regsLoading,
+  checkinsLoading,
+  checkedIn,
+  checkedOut,
+  trackAttendance,
+  requireCheckout,
+  attendanceSessions,
+  onExportCsv,
+  isExporting,
+}: {
+  registrations: Registration[] | undefined;
+  checkins: EventCheckin[] | undefined;
+  regsLoading: boolean;
+  checkinsLoading: boolean;
+  checkedIn: EventCheckin[];
+  checkedOut: EventCheckin[];
+  trackAttendance: boolean;
+  requireCheckout: boolean;
+  attendanceSessions: Array<{ date: string; items: EventCheckin[] }>;
+  onExportCsv: () => void;
+  isExporting: boolean;
+}) {
+  const [activeTab, setActiveTab] = useState("registrations");
+
+  return (
+    <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-6">
+      <h1 className="text-2xl font-serif font-bold">Check-In Desk</h1>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="w-full flex flex-wrap h-auto gap-1">
+          <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm flex-1">
+            <ClipboardList className="w-4 h-4 shrink-0" />
+            Registrations
+            <Badge variant="secondary" className="text-xs ml-1">{registrations?.length ?? 0}</Badge>
+          </TabsTrigger>
+          {trackAttendance && (
+            <TabsTrigger value="checked-in" className="gap-1.5 text-xs sm:text-sm flex-1">
+              <LogIn className="w-4 h-4 shrink-0" />
+              Checked In
+              <Badge variant="secondary" className="text-xs ml-1">{checkedIn.length}</Badge>
+            </TabsTrigger>
+          )}
+          {requireCheckout && (
+            <TabsTrigger value="checked-out" className="gap-1.5 text-xs sm:text-sm flex-1">
+              <LogOut className="w-4 h-4 shrink-0" />
+              Checked Out
+              <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
+            </TabsTrigger>
+          )}
+          {trackAttendance && (
+            <TabsTrigger value="attendance" className="gap-1.5 text-xs sm:text-sm flex-1">
+              <BarChart2 className="w-4 h-4 shrink-0" />
+              Attendance
+            </TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="registrations">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm text-muted-foreground">
+              {registrations?.length ?? 0} registration{registrations?.length === 1 ? "" : "s"}
+            </p>
+            <Button variant="outline" size="sm" onClick={onExportCsv} disabled={isExporting}>
+              {isExporting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
+              Export CSV
+            </Button>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              {regsLoading ? (
+                <div className="p-8 text-center text-muted-foreground">Loading...</div>
+              ) : !registrations?.length ? (
+                <div className="p-10 text-center text-muted-foreground">
+                  <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p>No registrations yet.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {registrations.map((reg) => (
+                    <div key={reg.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium">{reg.childFirstName} {reg.childLastName}</p>
+                        <p className="text-sm text-muted-foreground">{reg.guardianName} · {reg.guardianPhone}</p>
+                      </div>
+                      <p className="text-sm text-muted-foreground shrink-0">{format(new Date(reg.createdAt), "MMM d")}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="checked-in">
+          <Card>
+            <CardContent className="p-0">
+              {checkinsLoading ? (
+                <div className="p-8 text-center text-muted-foreground">Loading...</div>
+              ) : !checkedIn.length ? (
+                <div className="p-10 text-center text-muted-foreground">
+                  <LogIn className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p>No one is checked in yet.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {checkedIn.map((c) => (
+                    <div key={c.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium">{c.childFirstName} {c.childLastName}</p>
+                        <p className="text-sm text-muted-foreground">{c.guardianName}{c.room ? ` · ${c.room}` : ""}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{format(new Date(c.checkinAt), "h:mm a")}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="checked-out">
+          <Card>
+            <CardContent className="p-0">
+              {checkinsLoading ? (
+                <div className="p-8 text-center text-muted-foreground">Loading...</div>
+              ) : !checkedOut.length ? (
+                <div className="p-10 text-center text-muted-foreground">
+                  <LogOut className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p>No check-outs recorded yet.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {checkedOut.map((c) => (
+                    <div key={c.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium">{c.childFirstName} {c.childLastName}</p>
+                        <p className="text-sm text-muted-foreground">{c.guardianName}{c.room ? ` · ${c.room}` : ""}</p>
+                      </div>
+                      <div className="text-xs text-muted-foreground text-right">
+                        <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
+                        {c.checkoutAt && <p className="text-amber-700">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="attendance">
+          {!attendanceSessions.length ? (
+            <div className="p-10 text-center text-muted-foreground">
+              <BarChart2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p>No attendance recorded yet.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {attendanceSessions.length} session{attendanceSessions.length !== 1 ? "s" : ""}
+              </p>
+              {attendanceSessions.map(({ date, items }) => (
+                <Card key={date}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">
+                        {format(new Date(date + "T00:00:00"), "EEEE, MMMM d, yyyy")}
+                      </CardTitle>
+                      <span className="text-sm text-muted-foreground">{items.length} attendees</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-border">
+                      {items
+                        .sort((a, b) => new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime())
+                        .map((c) => (
+                          <div key={c.id} className="px-5 py-2.5 flex items-center justify-between gap-4">
+                            <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
+                            <p className="text-xs text-muted-foreground">In: {format(new Date(c.checkinAt), "h:mm a")}</p>
+                          </div>
+                        ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ─── Section: Public Form ──────────────────────────────────────────────────────
+
+function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eventId: number }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
+
+  const registrationUrl = event.formEmbedSlug
+    ? `${window.location.origin}/register/${event.formEmbedSlug}`
+    : null;
+
+  const embedCode = registrationUrl
+    ? `<iframe src="${registrationUrl}" width="100%" height="800" frameborder="0" style="border:none;"></iframe>`
+    : null;
+
+  const copyUrl = () => {
+    if (!registrationUrl) return;
+    navigator.clipboard.writeText(registrationUrl);
+    toast({ title: "Form URL copied!" });
+  };
+
+  const copyEmbed = () => {
+    if (!embedCode) return;
+    navigator.clipboard.writeText(embedCode);
+    toast({ title: "Embed code copied!" });
+  };
+
+  const [formSettings, setFormSettings] = useState({
+    title: event.form?.title ?? event.formTitle ?? "",
+    description: event.form?.description ?? "",
+    isActive: event.form?.isActive ?? true,
+    isPublic: event.form?.isPublic ?? false,
+  });
+
+  const updateForm = useUpdateForm({
+    mutation: {
+      onSuccess: () => {
+        if (event.formId) {
+          queryClient.invalidateQueries({ queryKey: getGetFormQueryKey(event.formId) });
+          queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+        }
+        toast({ title: "Form settings saved" });
+      },
+      onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
+    },
+  });
+
+  return (
+    <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-5">
+      <div>
+        <h1 className="text-2xl font-serif font-bold">Registration Form</h1>
+        <p className="text-muted-foreground mt-1">Build your form, share it, and configure settings.</p>
+      </div>
+
+      <Tabs defaultValue="build">
+        <TabsList>
+          <TabsTrigger value="build">Build Form</TabsTrigger>
+          <TabsTrigger value="share">Share Form</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="build" className="mt-5">
+          {event.formId ? (
+            <FormBuilderPanel formId={event.formId} hideAdditionalPeople={isChildCheckin} />
+          ) : (
+            <Card>
+              <CardContent className="p-10 text-center text-muted-foreground">
+                No registration form is linked to this event.
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="share" className="mt-5">
+          {!registrationUrl ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <FileEdit className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p>No registration form is linked to this event.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-5 max-w-3xl">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Direct Link</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg font-mono text-sm break-all">
+                    {registrationUrl}
+                  </div>
+                  <div className="flex gap-2">
+                    <a href={registrationUrl} target="_blank" rel="noopener noreferrer">
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <ExternalLink className="w-3.5 h-3.5" /> Open Form
+                      </Button>
+                    </a>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={copyUrl}>
+                      <Copy className="w-3.5 h-3.5" /> Copy URL
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Embed Code</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Paste this into your website to embed the registration form directly.
+                  </p>
+                  <div className="p-3 bg-muted rounded-lg font-mono text-xs break-all">
+                    {embedCode}
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-2" onClick={copyEmbed}>
+                    <Copy className="w-3.5 h-3.5" /> Copy Embed Code
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="settings" className="mt-5">
+          <div className="space-y-5 max-w-2xl">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Form Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label>Form Title</Label>
+                  <Input
+                    value={formSettings.title}
+                    onChange={(e) => setFormSettings((p) => ({ ...p, title: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Header Text</Label>
+                  <Textarea
+                    rows={2}
+                    placeholder="Optional intro shown at the top of the form"
+                    value={formSettings.description}
+                    onChange={(e) => setFormSettings((p) => ({ ...p, description: e.target.value }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between py-0.5">
+                  <div>
+                    <Label className="text-sm font-medium">Form is active</Label>
+                    <p className="text-xs text-muted-foreground">Accepting new registrations</p>
+                  </div>
+                  <Switch
+                    checked={formSettings.isActive}
+                    onCheckedChange={(v) => setFormSettings((p) => ({ ...p, isActive: v }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between py-0.5">
+                  <div>
+                    <Label className="text-sm font-medium">Form is public</Label>
+                    <p className="text-xs text-muted-foreground">Visible via the public registration link</p>
+                  </div>
+                  <Switch
+                    checked={formSettings.isPublic}
+                    onCheckedChange={(v) => setFormSettings((p) => ({ ...p, isPublic: v }))}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter className="border-t border-border pt-4">
+                <Button
+                  disabled={updateForm.isPending || !event.formId}
+                  onClick={() => {
+                    if (event.formId) updateForm.mutate({ formId: event.formId, data: formSettings });
+                  }}
+                >
+                  {updateForm.isPending ? "Saving…" : "Save Settings"}
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+// ─── Section: Reports ──────────────────────────────────────────────────────────
+
+function ReportsSection({
+  checkins,
+  checkedIn,
+  checkedOut,
+  attendanceSessions,
+  trackAttendance,
+  requireCheckout,
+}: {
+  checkins: EventCheckin[] | undefined;
+  checkedIn: EventCheckin[];
+  checkedOut: EventCheckin[];
+  attendanceSessions: Array<{ date: string; items: EventCheckin[] }>;
+  trackAttendance: boolean;
+  requireCheckout: boolean;
+}) {
+  return (
+    <div className="p-6 md:p-8 max-w-4xl mx-auto w-full space-y-6">
+      <div>
+        <h1 className="text-2xl font-serif font-bold">Reports</h1>
+        <p className="text-muted-foreground mt-1">Attendance history and check-in summaries.</p>
+      </div>
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground">Total Check-ins</p>
+            <p className="text-3xl font-bold font-serif mt-1">{checkins?.length ?? 0}</p>
+          </CardContent>
+        </Card>
+        {trackAttendance && (
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Currently In</p>
+              <p className="text-3xl font-bold font-serif mt-1 text-green-700">{checkedIn.length}</p>
+            </CardContent>
+          </Card>
+        )}
+        {requireCheckout && (
+          <Card>
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Checked Out</p>
+              <p className="text-3xl font-bold font-serif mt-1 text-amber-700">{checkedOut.length}</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Attendance sessions */}
+      {!attendanceSessions.length ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <BarChart2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p>No attendance recorded yet.</p>
+            <p className="text-sm mt-1">Check-ins will appear here grouped by date.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {attendanceSessions.length} session{attendanceSessions.length !== 1 ? "s" : ""} · {checkins?.length ?? 0} total check-ins
+          </p>
+          {attendanceSessions.map(({ date, items }) => (
+            <Card key={date}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">
+                    {format(new Date(date + "T00:00:00"), "EEEE, MMMM d, yyyy")}
+                  </CardTitle>
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {items.length} {items.length === 1 ? "attendee" : "attendees"}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border">
+                  {[...items]
+                    .sort((a, b) => new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime())
+                    .map((c) => (
+                      <div key={c.id} className="px-5 py-2.5 flex items-center justify-between gap-4">
+                        <div>
+                          <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
+                          {c.room && <p className="text-xs text-muted-foreground">{c.room}</p>}
+                        </div>
+                        <div className="text-right text-xs text-muted-foreground flex-shrink-0">
+                          <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
+                          {c.checkoutAt && (
+                            <p className="text-amber-700">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Section: Labels ───────────────────────────────────────────────────────────
+
+// ─── Section: Event Settings ───────────────────────────────────────────────────
+
+function EventSettingsSection({
+  event,
+  eventId,
+}: {
+  event: EventWithForm;
+  eventId: number;
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const EVENT_TYPES_LIST = [
+    { value: "vbs", label: "Vacation Bible School (VBS)" },
+    { value: "awana", label: "AWANA" },
+    { value: "sunday_school", label: "Sunday School" },
+    { value: "youth_group", label: "Youth Group" },
+    { value: "camp", label: "Camp" },
+    { value: "special_event", label: "Special Event" },
+    { value: "general", label: "General / Other" },
+  ];
+
+  const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
+  const [isMultiDay, setIsMultiDay] = useState(
+    !!(event.startDate && event.endDate && event.startDate !== event.endDate)
+  );
+
+  const [form, setForm] = useState({
+    name: event.name,
+    description: event.description ?? "",
+    eventType: event.eventType,
+    startDate: event.startDate ?? "",
+    endDate: event.endDate ?? "",
+    trackAttendance: event.trackAttendance ?? isChildCheckin,
+  });
+
+  const [labelSettings, setLabelSettings] = useState({
+    printLabels: event.printLabels ?? isChildCheckin,
+    labelType: event.labelType ?? (isChildCheckin ? "child_security" : "simple_name"),
+    requireCheckout: event.requireCheckout ?? isChildCheckin,
+  });
+
+  const [roomMode, setRoomMode] = useState(event.roomAssignmentMode ?? "manual");
+
+  const updateRoomMode = useUpdateEvent({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+        toast({ title: "Room settings saved" });
+      },
+      onError: () => toast({ title: "Failed to save room settings", variant: "destructive" }),
     },
   });
 
@@ -529,25 +3062,259 @@ export default function EventDetail() {
     },
   });
 
-  const [checkinSettings, setCheckinSettings] = useState({
-    trackAttendance: false,
-    requireCheckout: false,
-    printLabels: false,
-    labelType: "simple_name",
+  const updateLabels = useUpdateEvent({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+        toast({ title: "Label settings saved" });
+      },
+      onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
+    },
   });
 
-  useEffect(() => {
-    if (!event) return;
-    const type = event.registrationType;
-    const isChild = !type || type === "child_checkin";
-    setManageTab(isChild ? "children" : type === "individual" ? "registrants" : "registrations");
-    setCheckinSettings({
-      trackAttendance: event.trackAttendance ?? isChild,
-      requireCheckout: event.requireCheckout ?? isChild,
-      printLabels: event.printLabels ?? isChild,
-      labelType: event.labelType ?? (isChild ? "child_security" : "simple_name"),
-    });
-  }, [event?.id]);
+  const set = <K extends keyof typeof form>(key: K) => (value: (typeof form)[K]) =>
+    setForm((p) => ({ ...p, [key]: value }));
+
+  return (
+    <div className="p-6 md:p-8 max-w-2xl mx-auto w-full space-y-6">
+      <div>
+        <h1 className="text-2xl font-serif font-bold">Event Settings</h1>
+        <p className="text-muted-foreground mt-1">Edit event details and check-in configuration.</p>
+      </div>
+
+      {/* Basic info */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Event Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Event Name</Label>
+            <Input value={form.name} onChange={(e) => set("name")(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Event Type</Label>
+            <Select value={form.eventType} onValueChange={set("eventType")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {EVENT_TYPES_LIST.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Textarea rows={2} value={form.description} onChange={(e) => set("description")(e.target.value)} />
+          </div>
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <p className="text-sm font-medium">Multi-day event</p>
+              <p className="text-xs text-muted-foreground">Spans more than one day</p>
+            </div>
+            <Switch
+              checked={isMultiDay}
+              onCheckedChange={(v) => { setIsMultiDay(v); if (!v) set("endDate")(""); }}
+            />
+          </div>
+          {isMultiDay ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Start Date</Label>
+                <Input type="date" value={form.startDate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm((p) => ({ ...p, startDate: val, endDate: p.endDate && val > p.endDate ? "" : p.endDate }));
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End Date</Label>
+                <Input type="date" value={form.endDate} min={form.startDate || undefined}
+                  onChange={(e) => set("endDate")(e.target.value)} />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label>Date</Label>
+              <Input type="date" value={form.startDate} onChange={(e) => set("startDate")(e.target.value)} />
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="border-t border-border pt-4">
+          <Button
+            className="w-full"
+            disabled={updateEvent.isPending}
+            onClick={() => updateEvent.mutate({ eventId, data: form })}
+          >
+            {updateEvent.isPending ? "Saving…" : "Save Event Details"}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* Attendance */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CheckSquare className="w-4 h-4 text-primary" /> Attendance &amp; Check-In
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between py-0.5">
+            <div>
+              <Label className="text-sm font-medium">Track attendance with check-ins</Label>
+              <p className="text-xs text-muted-foreground">Enable the check-in kiosk for this event</p>
+            </div>
+            <Switch
+              checked={form.trackAttendance}
+              onCheckedChange={set("trackAttendance")}
+            />
+          </div>
+        </CardContent>
+        <CardFooter className="border-t border-border pt-4">
+          <Button
+            className="w-full"
+            disabled={updateEvent.isPending}
+            onClick={() => updateEvent.mutate({ eventId, data: form })}
+          >
+            {updateEvent.isPending ? "Saving…" : "Save Settings"}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* Check-In & Labels */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Tag className="w-4 h-4 text-primary" /> Check-In &amp; Labels
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm font-medium">Print labels at check-in</Label>
+              <p className="text-xs text-muted-foreground">Print a label for each person when they check in.</p>
+            </div>
+            <Switch
+              checked={labelSettings.printLabels}
+              onCheckedChange={(v) => setLabelSettings((p) => ({ ...p, printLabels: v }))}
+            />
+          </div>
+
+          {labelSettings.printLabels && (
+            <div className="space-y-2 pl-3 border-l-2 border-border">
+              <Label className="text-sm text-muted-foreground">Label type</Label>
+              <Select
+                value={labelSettings.labelType}
+                onValueChange={(v) => setLabelSettings((p) => ({ ...p, labelType: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="simple_name">Simple name label</SelectItem>
+                  <SelectItem value="child_security" disabled={!isChildCheckin}>
+                    Child security label {!isChildCheckin ? "(kids events only)" : ""}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="pt-1 text-xs text-muted-foreground">
+                {labelSettings.labelType === "simple_name" && (
+                  <p>Prints the attendee name and event info on a 2″×4″ label.</p>
+                )}
+                {labelSettings.labelType === "child_security" && (
+                  <p>Prints child name, guardian, allergies, room, and a unique pickup security code.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {labelSettings.printLabels && isChildCheckin && (
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-sm font-medium">Require check-out</Label>
+                <p className="text-xs text-muted-foreground">Staff must scan the security code at pickup.</p>
+              </div>
+              <Switch
+                checked={labelSettings.requireCheckout}
+                onCheckedChange={(v) => setLabelSettings((p) => ({ ...p, requireCheckout: v }))}
+              />
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="border-t border-border pt-4">
+          <Button
+            className="w-full"
+            disabled={updateLabels.isPending}
+            onClick={() => updateLabels.mutate({ eventId, data: labelSettings })}
+          >
+            {updateLabels.isPending ? "Saving…" : "Save Label Settings"}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* Room Assignment */}
+      {isChildCheckin && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <DoorOpen className="w-4 h-4 text-primary" /> Room Assignment
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Assignment mode</Label>
+              <Select value={roomMode} onValueChange={setRoomMode}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual — staff assigns rooms</SelectItem>
+                  <SelectItem value="registrant_chooses">Registrant chooses — shown on registration form</SelectItem>
+                  <SelectItem value="auto_assign">Auto-assign — not yet implemented</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {roomMode === "manual" && "Admins and staff assign rooms to each child individually."}
+                {roomMode === "registrant_chooses" && "Families pick a room when registering. A room selector will appear on the public registration form."}
+                {roomMode === "auto_assign" && "Rooms will be assigned automatically based on age or grade when a registration is submitted."}
+              </p>
+            </div>
+          </CardContent>
+          <CardFooter className="border-t border-border pt-4">
+            <Button
+              className="w-full"
+              disabled={updateRoomMode.isPending}
+              onClick={() => updateRoomMode.mutate({ eventId, data: { roomAssignmentMode: roomMode } })}
+            >
+              {updateRoomMode.isPending ? "Saving…" : "Save Room Settings"}
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Workspace ─────────────────────────────────────────────────────────────
+
+export default function EventWorkspace() {
+  const params = useParams<{ id: string }>();
+  const eventId = parseInt(params.id || "0", 10);
+  const [location] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isExporting, setIsExporting] = useState(false);
+  const { data: event, isLoading } = useGetEvent(eventId, {
+    query: { enabled: !!eventId, queryKey: getGetEventQueryKey(eventId) },
+  });
+  const regFormId = event?.formId ?? 0;
+  const { data: registrations, isLoading: regsLoading } = useListRegistrations(regFormId, {
+    query: { enabled: !!event?.formId, queryKey: getListRegistrationsQueryKey(regFormId) },
+  });
+  const { data: checkins, isLoading: checkinsLoading } = useListEventCheckins(eventId, {
+    query: { enabled: !!eventId, queryKey: getListEventCheckinsQueryKey(eventId) },
+  });
 
   const attendanceSessions = useMemo(() => {
     if (!checkins?.length) return [];
@@ -561,14 +3328,6 @@ export default function EventDetail() {
       .map(([date, items]) => ({ date, items }))
       .sort((a, b) => b.date.localeCompare(a.date));
   }, [checkins]);
-
-  const copyEmbedCode = () => {
-    if (!event?.formEmbedSlug) return;
-    const url = `${window.location.origin}/register/${event.formEmbedSlug}`;
-    const code = `<iframe src="${url}" width="100%" height="800" frameborder="0" style="border:none;"></iframe>`;
-    navigator.clipboard.writeText(code);
-    toast({ title: "Embed code copied!" });
-  };
 
   const handleExportCsv = async () => {
     setIsExporting(true);
@@ -653,589 +3412,121 @@ export default function EventDetail() {
     return (
       <div className="p-10 text-center">
         <p className="text-muted-foreground">Event not found.</p>
-        <Button asChild variant="link" className="mt-2"><Link href="/events">Back to Events</Link></Button>
+        <Button asChild variant="link" className="mt-2"><Link href="/">Back to Events</Link></Button>
       </div>
     );
   }
-
-  const registrationUrl = event.formEmbedSlug
-    ? `${window.location.origin}/register/${event.formEmbedSlug}`
-    : null;
 
   const checkedIn = checkins?.filter((c) => !c.checkoutAt) ?? [];
   const checkedOut = checkins?.filter((c) => !!c.checkoutAt) ?? [];
 
   const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
-  const isFamilyGroup = event.registrationType === "family_group";
-  const isIndividual = event.registrationType === "individual";
   const trackAttendance = event.trackAttendance ?? isChildCheckin;
   const requireCheckout = event.requireCheckout ?? (isChildCheckin && trackAttendance);
   const labelType = event.labelType ?? (requireCheckout ? "child_security" : "simple_name");
 
+  // Determine which workspace section to render from the URL path
+  const sectionMatch = location.match(/^\/events\/\d+\/?(.*)$/);
+  const section = sectionMatch?.[1]?.split("?")[0] || "";
+
+  // ── Check-In Desk ──
+  if (section === "checkin") {
+    return (
+      <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-5">
+        <h1 className="text-2xl font-serif font-bold">Check-In Desk</h1>
+        <CheckInDeskContent
+          eventId={eventId}
+          formId={event.formId}
+          registrations={registrations}
+          checkins={checkins}
+          regsLoading={regsLoading}
+          checkinsLoading={checkinsLoading}
+          labelType={labelType}
+          requireCheckout={requireCheckout}
+          isChildEvent={isChildCheckin}
+          attendanceSessions={attendanceSessions}
+          onExportCsv={handleExportCsv}
+          isExporting={isExporting}
+        />
+      </div>
+    );
+  }
+
+  // ── Registrations ──
+  if (section === "registrations") {
+    return (
+      <div className="p-6 md:p-8 max-w-4xl mx-auto w-full space-y-5">
+        <h1 className="text-2xl font-serif font-bold">Registrations</h1>
+        <ChildrenTabContent
+          eventId={eventId}
+          formId={event.formId}
+          isChildCheckin={isChildCheckin}
+          onExportCsv={handleExportCsv}
+          isExporting={isExporting}
+        />
+      </div>
+    );
+  }
+
+  // ── Groups (family/group events) ──
+  if (section === "groups") {
+    return (
+      <div className="p-6 md:p-8 max-w-4xl mx-auto w-full space-y-5">
+        <h1 className="text-2xl font-serif font-bold">Groups</h1>
+        <FamiliesTabContent eventId={eventId} />
+      </div>
+    );
+  }
+
+  // ── Rooms ──
+  if (section === "rooms") {
+    return (
+      <div className="p-6 md:p-8 max-w-3xl mx-auto w-full space-y-5">
+        <h1 className="text-2xl font-serif font-bold">Rooms</h1>
+        <RoomsTabContent eventId={eventId} />
+      </div>
+    );
+  }
+
+  // ── Registration Form (Build / Share / Settings tabs) ──
+  if (section === "form") {
+    return <RegistrationFormSection event={event} eventId={eventId} />;
+  }
+
+  // ── Reports ──
+  if (section === "reports") {
+    return (
+      <ReportsSection
+        checkins={checkins}
+        checkedIn={checkedIn}
+        checkedOut={checkedOut}
+        attendanceSessions={attendanceSessions}
+        trackAttendance={trackAttendance}
+        requireCheckout={requireCheckout}
+      />
+    );
+  }
+
+  // ── Event Settings ──
+  if (section === "settings") {
+    return <EventSettingsSection event={event} eventId={eventId} />;
+  }
+
+  // ── Dashboard (default) ──
   return (
-    <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" asChild>
-          <Link href="/events"><ArrowLeft className="w-4 h-4" /></Link>
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-3xl font-serif font-bold truncate">{event.name}</h1>
-            {statusBadge(event.status)}
-          </div>
-          <p className="text-muted-foreground mt-1">{EVENT_TYPES[event.eventType] ?? event.eventType}</p>
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-5 flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{event.registrationCount}</p>
-              <p className="text-sm text-muted-foreground">Registered</p>
-            </div>
-          </CardContent>
-        </Card>
-        {trackAttendance && (
-          <Card>
-            <CardContent className="p-5 flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <LogIn className="w-5 h-5 text-green-700" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{checkedIn.length}</p>
-                <p className="text-sm text-muted-foreground">Checked In</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        {requireCheckout && (
-          <Card>
-            <CardContent className="p-5 flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
-                <LogOut className="w-5 h-5 text-amber-700" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{checkedOut.length}</p>
-                <p className="text-sm text-muted-foreground">Checked Out</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        {event.startDate && (
-          <Card>
-            <CardContent className="p-5 flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-base font-semibold">{format(new Date(event.startDate + "T00:00:00"), "MMM d")}</p>
-                <p className="text-sm text-muted-foreground">Starts</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* ── View toggle ── */}
-      <div className="flex items-center justify-center">
-        <div className="inline-flex rounded-lg border border-border bg-muted p-1 gap-1">
-          <button
-            type="button"
-            onClick={() => setView("activity")}
-            className={`px-5 py-1.5 rounded-md text-sm font-medium transition-all ${
-              view === "activity"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Activity
-          </button>
-          <button
-            type="button"
-            onClick={() => setView("manage")}
-            className={`px-5 py-1.5 rounded-md text-sm font-medium transition-all ${
-              view === "manage"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Manage
-          </button>
-        </div>
-      </div>
-
-      {/* ── Activity section ── */}
-      {view === "activity" && (
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="sr-only" />
-        <TabsList className="w-full flex flex-wrap h-auto gap-1 mb-4">
-          <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm flex-1">
-            <ClipboardList className="w-4 h-4 shrink-0" />
-            <span className="hidden sm:inline">Registrations</span>
-            <Badge variant="secondary" className="text-xs ml-1">{registrations?.length ?? 0}</Badge>
-          </TabsTrigger>
-          {trackAttendance && (
-            <TabsTrigger value="checked-in" className="gap-1.5 text-xs sm:text-sm flex-1">
-              <LogIn className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Checked In</span>
-              <Badge variant="secondary" className="text-xs ml-1">{checkedIn.length}</Badge>
-            </TabsTrigger>
-          )}
-          {requireCheckout && (
-            <TabsTrigger value="checked-out" className="gap-1.5 text-xs sm:text-sm flex-1">
-              <LogOut className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Checked Out</span>
-              <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
-            </TabsTrigger>
-          )}
-          {trackAttendance && (
-            <TabsTrigger value="attendance" className="gap-1.5 text-xs sm:text-sm flex-1">
-              <BarChart2 className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Attendance</span>
-            </TabsTrigger>
-          )}
-        </TabsList>
-
-        <div>
-
-            {/* ── Registrations ── */}
-            <TabsContent value="registrations">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm text-muted-foreground">
-                  {registrations?.length ?? 0} registration{registrations?.length === 1 ? "" : "s"}
-                </p>
-                <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={isExporting}>
-                  {isExporting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
-                  Export CSV
-                </Button>
-              </div>
-              <Card>
-                <CardContent className="p-0">
-                  {regsLoading ? (
-                    <div className="p-8 text-center text-muted-foreground">Loading...</div>
-                  ) : !registrations?.length ? (
-                    <div className="p-10 text-center text-muted-foreground">
-                      <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                      <p>No registrations yet.</p>
-                      {registrationUrl && (
-                        <p className="text-sm mt-1">
-                          Share the{" "}
-                          <a href={registrationUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">
-                            registration form
-                          </a>{" "}
-                          to get started.
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-border">
-                      {registrations.map((reg) => (
-                        <div key={reg.id} className="px-5 py-3 flex items-center justify-between gap-4">
-                          <div>
-                            <p className="font-medium">{reg.childFirstName} {reg.childLastName}</p>
-                            <p className="text-sm text-muted-foreground">{reg.guardianName} · {reg.guardianPhone}</p>
-                          </div>
-                          <div className="text-right text-sm text-muted-foreground flex-shrink-0">
-                            {reg.room && <p className="font-medium text-foreground">{reg.room}</p>}
-                            {format(new Date(reg.createdAt), "MMM d")}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* ── Checked In ── */}
-            <TabsContent value="checked-in">
-              <Card>
-                <CardContent className="p-0">
-                  {checkinsLoading ? (
-                    <div className="p-8 text-center text-muted-foreground">Loading...</div>
-                  ) : !checkedIn.length ? (
-                    <div className="p-10 text-center text-muted-foreground">
-                      <LogIn className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                      <p>No one is checked in yet.</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-border">
-                      {checkedIn.map((c) => (
-                        <div key={c.id} className="px-5 py-3 flex items-center justify-between gap-4">
-                          <div>
-                            <p className="font-medium">{c.childFirstName} {c.childLastName}</p>
-                            <p className="text-sm text-muted-foreground">{c.guardianName}{c.room ? ` · ${c.room}` : ""}</p>
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="text-right">
-                              {labelType === "child_security" && c.labelCode && (
-                                <p className="font-mono font-bold text-sm text-green-700 bg-green-50 px-2 py-0.5 rounded">{c.labelCode}</p>
-                              )}
-                              <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(c.checkinAt), "h:mm a")}</p>
-                            </div>
-                            <div className="flex flex-col gap-1 items-end">
-                              {requireCheckout && (
-                                <Button
-                                  variant="outline" size="sm"
-                                  className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
-                                  disabled={loadingId === c.id}
-                                  onClick={() => { setLoadingId(c.id); checkoutChild.mutate({ checkinId: c.id }); }}
-                                >
-                                  {loadingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
-                                  Check Out
-                                </Button>
-                              )}
-                              <button
-                                type="button"
-                                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
-                                onClick={() => { setLoadingId(c.id); deleteCheckin.mutate({ checkinId: c.id }); }}
-                              >
-                                <Undo2 className="w-3 h-3" /> Undo check-in
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* ── Checked Out ── */}
-            <TabsContent value="checked-out">
-              <Card>
-                <CardContent className="p-0">
-                  {checkinsLoading ? (
-                    <div className="p-8 text-center text-muted-foreground">Loading...</div>
-                  ) : !checkedOut.length ? (
-                    <div className="p-10 text-center text-muted-foreground">
-                      <LogOut className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                      <p>No check-outs recorded yet.</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-border">
-                      {checkedOut.map((c) => (
-                        <div key={c.id} className="px-5 py-3 flex items-center justify-between gap-4">
-                          <div>
-                            <p className="font-medium">{c.childFirstName} {c.childLastName}</p>
-                            <p className="text-sm text-muted-foreground">{c.guardianName}{c.room ? ` · ${c.room}` : ""}</p>
-                          </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="text-right">
-                              <p className="font-mono text-xs text-muted-foreground">{c.labelCode}</p>
-                              <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
-                                <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
-                                {c.checkoutAt && (
-                                  <p className="text-amber-700 font-medium">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>
-                                )}
-                              </div>
-                            </div>
-                            <Button
-                              variant="outline" size="sm"
-                              className="gap-1 text-muted-foreground hover:text-primary hover:border-primary"
-                              disabled={loadingId === c.id}
-                              onClick={() => { setLoadingId(c.id); undoCheckout.mutate({ checkinId: c.id }); }}
-                            >
-                              {loadingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Undo2 className="w-3.5 h-3.5" />}
-                              Undo Checkout
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* ── Attendance History ── */}
-            <TabsContent value="attendance">
-              {checkinsLoading ? (
-                <div className="p-8 text-center text-muted-foreground">Loading...</div>
-              ) : !attendanceSessions.length ? (
-                <div className="p-10 text-center text-muted-foreground">
-                  <BarChart2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p>No attendance recorded yet.</p>
-                  <p className="text-sm mt-1">Check-ins will appear here grouped by date.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {attendanceSessions.length} session{attendanceSessions.length !== 1 ? "s" : ""} · {checkins?.length ?? 0} total check-ins
-                  </p>
-                  {attendanceSessions.map(({ date, items }) => (
-                    <Card key={date}>
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-base">
-                            {format(new Date(date + "T00:00:00"), "EEEE, MMMM d, yyyy")}
-                          </CardTitle>
-                          <span className="text-sm font-medium text-muted-foreground">
-                            {items.length} {items.length === 1 ? "child" : "children"}
-                          </span>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="divide-y divide-border">
-                          {items
-                            .sort((a, b) => new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime())
-                            .map((c) => (
-                              <div key={c.id} className="px-5 py-2.5 flex items-center justify-between gap-4">
-                                <div>
-                                  <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
-                                  {c.room && <p className="text-xs text-muted-foreground">{c.room}</p>}
-                                </div>
-                                <div className="text-right text-xs text-muted-foreground flex-shrink-0">
-                                  <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
-                                  {c.checkoutAt && (
-                                    <p className="text-amber-700">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-        </div>
-      </Tabs>
-      )}
-
-      {/* ── Manage section ── */}
-      {view === "manage" && (
-      <Tabs value={manageTab} onValueChange={setManageTab}>
-        <div className="sr-only" />
-
-        {/* Tabs vary by registration type */}
-        {isChildCheckin ? (
-          <TabsList className="w-full grid grid-cols-3 mb-4">
-            <TabsTrigger value="children" className="gap-1.5 text-xs sm:text-sm">
-              <Baby className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Children</span>
-            </TabsTrigger>
-            <TabsTrigger value="rooms" className="gap-1.5 text-xs sm:text-sm">
-              <DoorOpen className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Rooms</span>
-            </TabsTrigger>
-            <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
-              <FileEdit className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Form Builder</span>
-            </TabsTrigger>
-          </TabsList>
-        ) : isFamilyGroup ? (
-          <TabsList className="w-full grid grid-cols-3 mb-4">
-            <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm">
-              <ClipboardList className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Registrations</span>
-            </TabsTrigger>
-            <TabsTrigger value="families" className="gap-1.5 text-xs sm:text-sm">
-              <Users className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Families/Groups</span>
-            </TabsTrigger>
-            <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
-              <FileEdit className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Form Builder</span>
-            </TabsTrigger>
-          </TabsList>
-        ) : (
-          <TabsList className="w-full grid grid-cols-2 mb-4">
-            <TabsTrigger value="registrants" className="gap-1.5 text-xs sm:text-sm">
-              <ClipboardList className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Registrants</span>
-            </TabsTrigger>
-            <TabsTrigger value="form" className="gap-1.5 text-xs sm:text-sm">
-              <FileEdit className="w-4 h-4 shrink-0" />
-              <span className="hidden sm:inline">Form Builder</span>
-            </TabsTrigger>
-          </TabsList>
-        )}
-
-        <div className={`grid grid-cols-1 gap-8 ${manageTab !== "form" ? "md:grid-cols-3" : ""}`}>
-          <div className={manageTab !== "form" ? "md:col-span-2" : ""}>
-            {/* Child check-in tabs */}
-            <TabsContent value="children">
-              <ChildrenTabContent eventId={eventId} />
-            </TabsContent>
-            <TabsContent value="rooms">
-              <RoomsTabContent />
-            </TabsContent>
-
-            {/* Family / Group tabs */}
-            <TabsContent value="registrations">
-              <ChildrenTabContent
-                eventId={eventId}
-                searchPlaceholder="Search registrants…"
-                emptyMessage="No registrants yet."
-                emptyIcon={Users}
-              />
-            </TabsContent>
-            <TabsContent value="families">
-              <FamiliesTabContent eventId={eventId} />
-            </TabsContent>
-
-            {/* Individual tab */}
-            <TabsContent value="registrants">
-              <ChildrenTabContent
-                eventId={eventId}
-                searchPlaceholder="Search registrants…"
-                emptyMessage="No registrants yet."
-                emptyIcon={Users}
-              />
-            </TabsContent>
-
-            {/* Shared Form Builder tab */}
-            <TabsContent value="form">
-              {event.formId ? (
-                <FormBuilderPanel formId={event.formId} hideAdditionalPeople={event.registrationType === "child_checkin"} />
-              ) : (
-                <Card>
-                  <CardContent className="p-10 text-center text-muted-foreground">
-                    No registration form is linked to this event.
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-          </div>
-
-          {/* Sidebar — shown alongside Children and Rooms, hidden for Form Builder */}
-          {manageTab !== "form" && (
-            <div className="space-y-4">
-              {event.formId && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Registration Form</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-sm font-medium">{event.formTitle}</p>
-                    {registrationUrl && (
-                      <>
-                        <a
-                          href={registrationUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-sm text-primary hover:underline"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" /> Open public form
-                        </a>
-                        <Button variant="outline" size="sm" className="w-full" onClick={copyEmbedCode}>
-                          <Copy className="w-3.5 h-3.5 mr-1.5" /> Copy embed code
-                        </Button>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {event.description && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">About this Event</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{event.description}</p>
-                  </CardContent>
-                </Card>
-              )}
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <CheckSquare className="w-4 h-4 text-primary" /> Check-In &amp; Labels
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between py-0.5">
-                    <div>
-                      <Label className="text-sm font-medium">Track attendance</Label>
-                      <p className="text-xs text-muted-foreground">Enable check-in kiosk</p>
-                    </div>
-                    <Switch
-                      checked={checkinSettings.trackAttendance}
-                      onCheckedChange={(v) => setCheckinSettings((p) => ({
-                        ...p,
-                        trackAttendance: v,
-                        requireCheckout: v ? p.requireCheckout : false,
-                        printLabels: v ? p.printLabels : false,
-                      }))}
-                    />
-                  </div>
-                  {checkinSettings.trackAttendance && isChildCheckin && (
-                    <div className="flex items-center justify-between py-0.5 ml-2 border-l-2 border-border pl-3">
-                      <div>
-                        <Label className="text-sm font-medium">Require check-out</Label>
-                        <p className="text-xs text-muted-foreground">Security codes at pickup</p>
-                      </div>
-                      <Switch
-                        checked={checkinSettings.requireCheckout}
-                        onCheckedChange={(v) => setCheckinSettings((p) => ({ ...p, requireCheckout: v }))}
-                      />
-                    </div>
-                  )}
-                  {checkinSettings.trackAttendance && (
-                    <div className="flex items-center justify-between py-0.5 ml-2 border-l-2 border-border pl-3">
-                      <div>
-                        <Label className="text-sm font-medium">Print labels</Label>
-                        <p className="text-xs text-muted-foreground">Label at check-in</p>
-                      </div>
-                      <Switch
-                        checked={checkinSettings.printLabels}
-                        onCheckedChange={(v) => setCheckinSettings((p) => ({ ...p, printLabels: v }))}
-                      />
-                    </div>
-                  )}
-                  {checkinSettings.trackAttendance && checkinSettings.printLabels && (
-                    <div className="ml-2 pl-3 border-l-2 border-border">
-                      <Label className="text-xs text-muted-foreground mb-1 block">Label type</Label>
-                      <Select
-                        value={checkinSettings.labelType}
-                        onValueChange={(v) => setCheckinSettings((p) => ({ ...p, labelType: v }))}
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="simple_name">Simple name label</SelectItem>
-                          <SelectItem value="child_security" disabled={!isChildCheckin}>
-                            Child security label {!isChildCheckin ? "(kids events only)" : ""}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </CardContent>
-                <CardFooter className="pt-0">
-                  <Button
-                    size="sm" className="w-full"
-                    disabled={updateEvent.isPending}
-                    onClick={() => updateEvent.mutate({ eventId, data: checkinSettings })}
-                  >
-                    {updateEvent.isPending ? "Saving…" : "Save Settings"}
-                  </Button>
-                </CardFooter>
-              </Card>
-
-              {checkinSettings.trackAttendance && (
-                <Button asChild className="w-full">
-                  <Link href="/checkin">
-                    <CheckSquare className="w-4 h-4 mr-2" /> Go to Check-In Kiosk
-                  </Link>
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      </Tabs>
-      )}
-    </div>
+    <EventDashboardSection
+      event={event}
+      eventId={eventId}
+      registrations={registrations}
+      checkins={checkins}
+      checkedIn={checkedIn}
+      checkedOut={checkedOut}
+      isChildCheckin={isChildCheckin}
+      trackAttendance={trackAttendance}
+      requireCheckout={requireCheckout}
+      onExportCsv={handleExportCsv}
+      isExporting={isExporting}
+    />
   );
 }
+

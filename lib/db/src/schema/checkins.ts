@@ -14,6 +14,9 @@ export const checkinsTable = pgTable("checkins", {
   room: text("room"),
   labelCode: text("label_code").notNull(),
   labelPrinted: boolean("label_printed").notNull().default(false),
+  pickupPersonName: text("pickup_person_name"),
+  notes: text("notes"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const insertCheckinSchema = createInsertSchema(checkinsTable).omit({ id: true, checkinAt: true });

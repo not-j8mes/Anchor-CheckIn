@@ -20,7 +20,13 @@
       "Bash(kill 127)",
       "Bash(git commit *)",
       "Bash(git push *)",
-      "Bash(xargs ls)"
+      "Bash(xargs ls)",
+      "Bash(head -n 2933 /home/runner/workspace/artifacts/church-checkin/src/pages/events/detail.tsx)",
+      "Bash(echo \"\")",
+      "Bash(cp /tmp/detail_trimmed.tsx /home/runner/workspace/artifacts/church-checkin/src/pages/events/detail.tsx)",
+      "Bash(grep -n \"pendingCheckout.*CheckOutDialog\\\\|CheckOutDialog\\\\|pendingCheckinReg.*CheckInConfirmDialog\\\\|attendanceSessions.*showAttendance\\\\|return null.*CheckInDeskContent\\\\|^\\\\s*}\\\\s*$\" /home/runner/workspace/artifacts/church-checkin/src/pages/events/detail.tsx)",
+      "Bash(sed -n '1672,1700p')",
+      "Bash(sed -n '1672,1710p' /home/runner/workspace/lib/api-spec/openapi.yaml)"
     ]
   }
 }

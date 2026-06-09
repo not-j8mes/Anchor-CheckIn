@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, gte, desc, and, inArray } from "drizzle-orm";
+import { eq, gte, desc, and, inArray, isNull } from "drizzle-orm";
 import {
   db,
   checkinsTable,
@@ -234,6 +234,18 @@ router.post("/checkins", async (req, res) => {
   }
   try {
     const { registrationId, room } = parsed.data;
+
+    // Prevent duplicate active check-ins for the same registration
+    const [activeCheckin] = await db
+      .select()
+      .from(checkinsTable)
+      .where(and(eq(checkinsTable.registrationId, registrationId), isNull(checkinsTable.checkoutAt)))
+      .limit(1);
+    if (activeCheckin) {
+      res.status(409).json({ error: "Already checked in", checkinId: activeCheckin.id });
+      return;
+    }
+
     const reg = await db
       .select()
       .from(registrationsTable)
@@ -291,13 +303,31 @@ router.delete("/checkins/:checkinId", async (req, res) => {
   }
 });
 
+router.patch("/checkins/:checkinId", async (req, res) => {
+  const checkinId = parseInt(req.params.checkinId, 10);
+  if (isNaN(checkinId)) { res.status(400).json({ error: "Invalid checkinId" }); return; }
+  const { notes } = (req.body ?? {}) as { notes?: string };
+  try {
+    const [updated] = await db
+      .update(checkinsTable)
+      .set({ notes: notes !== undefined ? (notes.trim() || null) : undefined, updatedAt: new Date() })
+      .where(eq(checkinsTable.id, checkinId))
+      .returning();
+    if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+    res.json(serializeCheckin(updated));
+  } catch (err) {
+    req.log.error({ err }, "Failed to update checkin");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.put("/checkins/:checkinId/undo-checkout", async (req, res) => {
   const checkinId = parseInt(req.params.checkinId, 10);
   if (isNaN(checkinId)) { res.status(400).json({ error: "Invalid checkinId" }); return; }
   try {
     const [updated] = await db
       .update(checkinsTable)
-      .set({ checkoutAt: null })
+      .set({ checkoutAt: null, pickupPersonName: null, updatedAt: new Date() })
       .where(eq(checkinsTable.id, checkinId))
       .returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
@@ -311,10 +341,16 @@ router.put("/checkins/:checkinId/undo-checkout", async (req, res) => {
 router.put("/checkins/:checkinId/checkout", async (req, res) => {
   const { checkinId: checkinIdStr } = CheckoutChildParams.parse(req.params);
   const checkinId = Number(checkinIdStr);
+  const { pickupPersonName, notes } = (req.body ?? {}) as { pickupPersonName?: string; notes?: string };
   try {
     const [updated] = await db
       .update(checkinsTable)
-      .set({ checkoutAt: new Date() })
+      .set({
+        checkoutAt: new Date(),
+        updatedAt: new Date(),
+        pickupPersonName: pickupPersonName?.trim() || null,
+        notes: notes?.trim() || null,
+      })
       .where(eq(checkinsTable.id, checkinId))
       .returning();
     if (!updated) {

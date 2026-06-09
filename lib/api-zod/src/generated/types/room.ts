@@ -8,8 +8,14 @@
 
 export interface Room {
   id: number;
+  eventId: number;
   name: string;
   /** @nullable */
+  description?: string | null;
+  /** @nullable */
   capacity?: number | null;
+  isActive: boolean;
+  sortOrder: number;
+  participantCount?: number;
   createdAt: string;
 }

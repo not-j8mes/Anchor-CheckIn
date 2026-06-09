@@ -138,6 +138,10 @@ export interface FormWithQuestions {
   createdAt?: string;
   /** @nullable */
   registrationType?: string | null;
+  /** @nullable */
+  eventId?: number | null;
+  /** @nullable */
+  roomAssignmentMode?: string | null;
   questions: Question[];
   formFields?: FormField[];
 }
@@ -336,6 +340,13 @@ export interface RegistrationInput {
   /** One entry per form field submitted. System fields are routed to the appropriate participant/guardian/emergency_contact columns server-side. Custom question answers are stored in registration_custom_answers.
    */
   fields: FieldSubmission[];
+  /** Room name chosen by the registrant (used when roomAssignmentMode is registrant_chooses) */
+  room?: string;
+}
+
+export interface UpdateRoomInput {
+  /** @nullable */
+  room: string | null;
 }
 
 export interface AnswerInput {
@@ -382,11 +393,25 @@ export interface CheckIn {
   room?: string | null;
   labelCode?: string;
   labelPrinted?: boolean;
+  /** @nullable */
+  pickupPersonName?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  updatedAt?: string;
 }
 
 export interface CheckInInput {
   registrationId: number;
   room?: string;
+}
+
+export interface CheckoutInput {
+  pickupPersonName?: string;
+  notes?: string;
+}
+
+export interface UpdateCheckinInput {
+  notes?: string;
 }
 
 export interface LabelData {
@@ -443,6 +468,10 @@ export interface EventCheckin {
   checkinAt: string;
   /** @nullable */
   checkoutAt?: string | null;
+  /** @nullable */
+  pickupPersonName?: string | null;
+  /** @nullable */
+  notes?: string | null;
 }
 
 export interface DayCount {
@@ -509,6 +538,8 @@ export interface EventWithForm {
   printLabels?: boolean | null;
   /** @nullable */
   labelType?: string | null;
+  /** @nullable */
+  roomAssignmentMode?: string | null;
   createdAt: string;
   form?: FormWithQuestions | null;
 }
@@ -528,19 +559,29 @@ export interface CreateEventInput {
   requireCheckout?: boolean;
   printLabels?: boolean;
   labelType?: string;
+  roomAssignmentMode?: string;
 }
 
 export interface Room {
   id: number;
+  eventId: number;
   name: string;
   /** @nullable */
+  description?: string | null;
+  /** @nullable */
   capacity?: number | null;
+  isActive: boolean;
+  sortOrder: number;
+  participantCount?: number;
   createdAt: string;
 }
 
 export interface RoomInput {
   name: string;
+  description?: string;
   capacity?: number;
+  isActive?: boolean;
+  sortOrder?: number;
 }
 
 export interface RegistrationUpdateInput {
@@ -568,6 +609,7 @@ export interface UpdateEventInput {
   requireCheckout?: boolean;
   printLabels?: boolean;
   labelType?: string;
+  roomAssignmentMode?: string;
 }
 
 export type ListChildrenParams = {
@@ -578,6 +620,11 @@ eventId?: number;
 export type ListCheckinsParams = {
 date?: string;
 formId?: number;
+};
+
+export type CreateCheckin409 = {
+  error: string;
+  checkinId: number;
 };
 
 export type GetDashboardStatsParams = {

@@ -18,4 +18,5 @@ export interface UpdateEventInput {
   requireCheckout?: boolean;
   printLabels?: boolean;
   labelType?: string;
+  roomAssignmentMode?: string;
 }

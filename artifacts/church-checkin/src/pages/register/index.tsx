@@ -3,7 +3,9 @@ import { useParams } from "wouter";
 import {
   useGetOrganization,
   useSubmitRegistration,
+  useListRooms,
   getGetFormBySlugQueryKey,
+  getListRoomsQueryKey,
   getFormBySlug,
   type FormField,
 } from "@workspace/api-client-react";
@@ -143,8 +145,17 @@ export default function PublicRegistrationForm() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState<string>("");
 
   const submitRegistration = useSubmitRegistration();
+
+  const eventId = form?.eventId ?? 0;
+  const { data: rooms } = useListRooms(eventId, {
+    query: {
+      enabled: !!eventId && form?.roomAssignmentMode === "registrant_chooses",
+      queryKey: getListRoomsQueryKey(eventId),
+    },
+  });
 
   if (formLoading) {
     return (
@@ -168,6 +179,7 @@ export default function PublicRegistrationForm() {
   // ── Prefer formFields (new system); fall back to empty if none configured ──
   const formFields: FormField[] = form.formFields ?? [];
   const isChildCheckin = !form.registrationType || form.registrationType === "child_checkin";
+  const isRegistrantChoosesRoom = form.roomAssignmentMode === "registrant_chooses";
 
   const guardianFields = formFields.filter(isGuardianField);
   const childFields = formFields.filter((f) => !isGuardianField(f));
@@ -207,7 +219,7 @@ export default function PublicRegistrationForm() {
           fields.push({ fieldId: cf.id, value: childAnswerMap[cf.id] ?? "" });
         }
 
-        await submitRegistration.mutateAsync({ formId: form.id, data: { fields } });
+        await submitRegistration.mutateAsync({ formId: form.id, data: { fields, ...(isRegistrantChoosesRoom && selectedRoom ? { room: selectedRoom } : {}) } });
       }
       setIsSubmitted(true);
     } catch {
@@ -368,6 +380,35 @@ export default function PublicRegistrationForm() {
               <Plus className="w-4 h-4 mr-2" />
               {isChildCheckin ? "Add Another Child" : "Add Another Person"}
             </Button>
+
+            {/* Room selection (when registrant_chooses mode) */}
+            {isRegistrantChoosesRoom && rooms && rooms.filter((r) => r.isActive).length > 0 && (
+              <Card className="shadow-sm overflow-hidden">
+                <div className="bg-muted px-6 py-4 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold">Select a Room</h3>
+                </div>
+                <CardContent className="p-6">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium flex items-center gap-1">
+                      Room / Group <span className="text-destructive">*</span>
+                    </Label>
+                    <Select value={selectedRoom} onValueChange={setSelectedRoom} required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a room…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {rooms.filter((r) => r.isActive).map((r) => (
+                          <SelectItem key={r.id} value={r.name}>
+                            <span className="font-medium">{r.name}</span>
+                            {r.description && <span className="text-muted-foreground ml-1">— {r.description}</span>}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {submitError && (
               <p className="text-center text-destructive text-sm">{submitError}</p>

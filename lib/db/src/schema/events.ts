@@ -18,6 +18,7 @@ export const eventsTable = pgTable("events", {
   requireCheckout: boolean("require_checkout"),
   printLabels: boolean("print_labels"),
   labelType: text("label_type"), // 'simple_name' | 'child_security'
+  roomAssignmentMode: text("room_assignment_mode"), // 'manual' | 'registrant_chooses' | 'auto_assign'
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

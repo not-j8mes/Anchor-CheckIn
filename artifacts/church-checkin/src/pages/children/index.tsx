@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   useListChildren,
   useUpdateRegistration,
-  useListRooms,
   getListChildrenQueryKey,
   type Child,
 } from "@workspace/api-client-react";
@@ -13,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, Phone, User, Calendar, Pencil, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { format } from "date-fns";
@@ -30,7 +28,6 @@ interface EditChildDialogProps {
 function EditChildDialog({ child, open, onOpenChange }: EditChildDialogProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { data: rooms } = useListRooms();
 
   const guardianParts = (child.guardianName ?? "").trim().split(/\s+/);
   const [form, setForm] = useState({
@@ -116,24 +113,7 @@ function EditChildDialog({ child, open, onOpenChange }: EditChildDialogProps) {
             </div>
             <div className="space-y-1.5">
               <Label>Room</Label>
-              {rooms && rooms.length > 0 ? (
-                <Select
-                  value={form.room || "__none__"}
-                  onValueChange={(v) => setForm((p) => ({ ...p, room: v === "__none__" ? "" : v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Unassigned</SelectItem>
-                    {rooms.map((r) => (
-                      <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input value={form.room} onChange={set("room")} placeholder="Room name" />
-              )}
+              <Input value={form.room} onChange={set("room")} placeholder="Room name" />
             </div>
           </div>
 
