@@ -52,6 +52,7 @@ import {
   Search,
   Church,
   FileText,
+  Settings,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -539,11 +540,18 @@ export default function EventSelectionScreen() {
             <Church className="w-5 h-5 text-primary" />
             <span className="font-serif font-bold text-base">Church Check-In</span>
           </div>
-          <Button asChild size="sm" data-testid="button-create-event">
-            <Link href="/events/new">
-              <Plus className="w-4 h-4 mr-1.5" /> New Event
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/settings">
+                <Settings className="w-4 h-4 mr-1.5" /> Settings
+              </Link>
+            </Button>
+            <Button asChild size="sm" data-testid="button-create-event">
+              <Link href="/events/new">
+                <Plus className="w-4 h-4 mr-1.5" /> New Event
+              </Link>
+            </Button>
+          </div>
         </div>
       </header>
 
