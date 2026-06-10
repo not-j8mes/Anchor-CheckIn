@@ -6,12 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface RoomInput {
+export interface CreateEventCategoryInput {
   name: string;
-  description?: string;
-  capacity?: number;
-  isActive?: boolean;
-  sortOrder?: number;
-  ageMin?: number;
-  ageMax?: number;
 }

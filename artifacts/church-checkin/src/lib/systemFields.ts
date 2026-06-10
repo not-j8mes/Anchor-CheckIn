@@ -13,6 +13,7 @@ export const SYSTEM_FIELD_CATEGORIES = {
   guardian: "Parent / Guardian",
   emergency_safety: "Emergency / Safety",
   individual: "Individual / Adult",
+  rooms: "Room / Group",
 } as const;
 
 export type SystemFieldCategory = keyof typeof SYSTEM_FIELD_CATEGORIES;
@@ -294,6 +295,20 @@ const INDIVIDUAL_FIELDS: SystemFieldDef[] = [
   },
 ];
 
+// ─── Room / Group Assignment field ────────────────────────────────────────────
+
+const ROOM_FIELDS: SystemFieldDef[] = [
+  {
+    key: "room_assignment",
+    label: "Room / Group",
+    fieldType: "select",
+    category: "rooms",
+    dbColumn: "registrations.room",
+    placeholder: "Select a room or group",
+    defaultOptions: "",
+  },
+];
+
 // ─── Aggregated catalog ────────────────────────────────────────────────────────
 
 /** Full ordered list of all system field definitions. */
@@ -302,6 +317,7 @@ export const SYSTEM_FIELDS: SystemFieldDef[] = [
   ...GUARDIAN_FIELDS,
   ...EMERGENCY_SAFETY_FIELDS,
   ...INDIVIDUAL_FIELDS,
+  ...ROOM_FIELDS,
 ];
 
 /** Lookup map: system_key → SystemFieldDef */
@@ -327,11 +343,11 @@ export function getSystemFieldsByCategory(category: SystemFieldCategory): System
 /**
  * Default Kids Program Registration template.
  * Keys added to every new event form, in display order.
- * Must match the DEFAULT_FORM_FIELDS array in artifacts/api-server/src/routes/events.ts.
+ * Must match the TEMPLATE_CHILD_CHECKIN array in artifacts/api-server/src/routes/events.ts.
  *
- * Required (first 8): child names, DOB, guardian names + phone, emergency contact.
- * Optional (remaining): guardian email, allergies, medical notes, special needs,
- *                       authorized pickup, photo permission, medical permission.
+ * Required (first 6): child names, DOB, guardian names + phone.
+ * Optional (child/guardian section): guardian email, allergies, medical notes, special needs.
+ * Additional questions section: emergency contact name/phone, photo permission.
  */
 export const DEFAULT_SYSTEM_FIELD_KEYS: string[] = [
   // Required
@@ -341,14 +357,12 @@ export const DEFAULT_SYSTEM_FIELD_KEYS: string[] = [
   "guardian_first_name",
   "guardian_last_name",
   "guardian_phone",
-  "emergency_contact_name",
-  "emergency_contact_phone",
   // Optional
   "guardian_email",
   "allergies",
   "medical_notes",
   "special_needs",
-  "authorized_pickup_names",
-  "photo_permission",
-  "medical_permission",
+  // Additional questions
+  "emergency_contact_name",
+  "emergency_contact_phone",
 ];

@@ -32,6 +32,7 @@ export const formFieldsTable = pgTable("form_fields", {
   required: boolean("required").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   options: text("options"),
+  sectionKey: text("section_key"),
 });
 
 export const insertFormFieldSchema = createInsertSchema(formFieldsTable).omit({ id: true });

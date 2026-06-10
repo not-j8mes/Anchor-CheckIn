@@ -15,6 +15,7 @@ import {
   participantGuardiansTable,
   emergencyContactsTable,
   answersTable,
+  checkinsTable,
 } from "@workspace/db";
 import type { FormField } from "@workspace/db";
 import {
@@ -559,6 +560,27 @@ router.put("/registrations/:registrationId", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to update registration");
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/registrations/:registrationId", async (req, res) => {
+  const registrationId = parseInt(req.params.registrationId, 10);
+  if (isNaN(registrationId)) { res.status(400).json({ error: "Invalid registrationId" }); return; }
+  try {
+    // Delete child rows explicitly — avoids relying on DB-level CASCADE being in place
+    await db.delete(answersTable).where(eq(answersTable.registrationId, registrationId));
+    await db.delete(registrationCustomAnswersTable).where(eq(registrationCustomAnswersTable.registrationId, registrationId));
+    await db.delete(checkinsTable).where(eq(checkinsTable.registrationId, registrationId));
+    const [deleted] = await db
+      .delete(registrationsTable)
+      .where(eq(registrationsTable.id, registrationId))
+      .returning();
+    if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
+    res.status(204).end();
+  } catch (err) {
+    req.log.error({ err }, "Failed to delete registration");
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
   }
 });
 

@@ -8,6 +8,7 @@ import {
   getListRoomsQueryKey,
   getFormBySlug,
   type FormField,
+  type Room,
 } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,19 +24,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckCircle2, Plus, Trash2, User, Users } from "lucide-react";
+import { CheckCircle2, MessageSquare, Plus, Trash2, User, Users } from "lucide-react";
 import { SYSTEM_FIELDS_BY_KEY } from "@/lib/systemFields";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Returns true when this form field should go in the "Parent / Guardian" section
- * rather than the per-child section.
- */
-function isGuardianField(field: FormField): boolean {
-  if (field.fieldKind !== "system" || !field.systemKey) return false;
-  const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
-  return def?.category === "guardian" || def?.category === "emergency_safety";
+type FieldSection = "guardian_info" | "child_info" | "additional_questions";
+
+function getFieldSection(field: FormField): FieldSection {
+  if (field.fieldKind === "system" && field.systemKey) {
+    const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
+    if (def?.category === "guardian" || def?.category === "emergency_safety") return "guardian_info";
+    if (def?.category === "participant" || def?.category === "rooms") return "child_info";
+    return "additional_questions";
+  }
+  return (field.sectionKey as FieldSection) ?? "additional_questions";
 }
 
 // ─── Field renderer ───────────────────────────────────────────────────────────
@@ -44,12 +47,31 @@ function FieldInput({
   field,
   value,
   onChange,
+  rooms = [],
 }: {
   field: FormField;
   value: string;
   onChange: (v: string) => void;
+  rooms?: Room[];
 }) {
   const { fieldType, placeholder, options, required, label } = field;
+
+  if (field.systemKey === "room_assignment") {
+    return (
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select a room or group" />
+        </SelectTrigger>
+        <SelectContent>
+          {rooms.map((room) => (
+            <SelectItem key={room.id} value={room.name}>
+              {room.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    );
+  }
 
   if (fieldType === "textarea") {
     return (
@@ -136,23 +158,25 @@ export default function PublicRegistrationForm() {
     retry: false,
   });
 
-  // Guardian/family answers — keyed by formField.id (same values shared across all children)
+  // Guardian/family answers — shared across all children
   const [guardianAnswers, setGuardianAnswers] = useState<Record<number, string>>({});
 
   // Per-child answers — one Record<fieldId, string> per child
   const [childrenAnswers, setChildrenAnswers] = useState<Record<number, string>[]>([{}]);
 
+  // Additional questions — answered once, shared (not per-child)
+  const [additionalAnswers, setAdditionalAnswers] = useState<Record<number, string>>({});
+
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedRoom, setSelectedRoom] = useState<string>("");
 
   const submitRegistration = useSubmitRegistration();
 
   const eventId = form?.eventId ?? 0;
-  const { data: rooms } = useListRooms(eventId, {
+  const { data: rooms = [] } = useListRooms(eventId, {
     query: {
-      enabled: !!eventId && form?.roomAssignmentMode === "registrant_chooses",
+      enabled: !!eventId,
       queryKey: getListRoomsQueryKey(eventId),
     },
   });
@@ -179,14 +203,19 @@ export default function PublicRegistrationForm() {
   // ── Prefer formFields (new system); fall back to empty if none configured ──
   const formFields: FormField[] = form.formFields ?? [];
   const isChildCheckin = !form.registrationType || form.registrationType === "child_checkin";
-  const isRegistrantChoosesRoom = form.roomAssignmentMode === "registrant_chooses";
 
-  const guardianFields = formFields.filter(isGuardianField);
-  const childFields = formFields.filter((f) => !isGuardianField(f));
+  const guardianFields = formFields.filter((f) => getFieldSection(f) === "guardian_info");
+  const childFields = formFields.filter((f) => getFieldSection(f) === "child_info");
+  const additionalFields = formFields.filter((f) => getFieldSection(f) === "additional_questions");
+  const roomAssignmentFieldId = formFields.find((f) => f.systemKey === "room_assignment")?.id;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleGuardianChange = (fieldId: number, value: string) => {
     setGuardianAnswers((prev) => ({ ...prev, [fieldId]: value }));
+  };
+
+  const handleAdditionalChange = (fieldId: number, value: string) => {
+    setAdditionalAnswers((prev) => ({ ...prev, [fieldId]: value }));
   };
 
   const handleChildChange = (childIndex: number, fieldId: number, value: string) => {
@@ -209,7 +238,7 @@ export default function PublicRegistrationForm() {
 
     try {
       for (const childAnswerMap of childrenAnswers) {
-        // Build fields array: guardian answers (shared) + child answers (per-child)
+        // Build fields: guardian (shared) + child (per-child) + additional (shared, answered once)
         const fields: { fieldId: number; value: string }[] = [];
 
         for (const gf of guardianFields) {
@@ -218,8 +247,18 @@ export default function PublicRegistrationForm() {
         for (const cf of childFields) {
           fields.push({ fieldId: cf.id, value: childAnswerMap[cf.id] ?? "" });
         }
+        for (const af of additionalFields) {
+          fields.push({ fieldId: af.id, value: additionalAnswers[af.id] ?? "" });
+        }
 
-        await submitRegistration.mutateAsync({ formId: form.id, data: { fields, ...(isRegistrantChoosesRoom && selectedRoom ? { room: selectedRoom } : {}) } });
+        const selectedRoom = roomAssignmentFieldId
+          ? (childAnswerMap[roomAssignmentFieldId] ?? "")
+          : "";
+
+        await submitRegistration.mutateAsync({
+          formId: form.id,
+          data: { fields, ...(selectedRoom ? { room: selectedRoom } : {}) },
+        });
       }
       setIsSubmitted(true);
     } catch {
@@ -233,6 +272,7 @@ export default function PublicRegistrationForm() {
     setIsSubmitted(false);
     setGuardianAnswers({});
     setChildrenAnswers([{}]);
+    setAdditionalAnswers({});
     setSubmitError(null);
   };
 
@@ -309,6 +349,7 @@ export default function PublicRegistrationForm() {
                         field={field}
                         value={guardianAnswers[field.id] ?? ""}
                         onChange={(v) => handleGuardianChange(field.id, v)}
+                        rooms={rooms}
                       />
                     </div>
                   ))}
@@ -357,6 +398,7 @@ export default function PublicRegistrationForm() {
                           field={field}
                           value={childAnswerMap[field.id] ?? ""}
                           onChange={(v) => handleChildChange(idx, field.id, v)}
+                          rooms={rooms}
                         />
                       </div>
                     ))
@@ -381,31 +423,28 @@ export default function PublicRegistrationForm() {
               {isChildCheckin ? "Add Another Child" : "Add Another Person"}
             </Button>
 
-            {/* Room selection (when registrant_chooses mode) */}
-            {isRegistrantChoosesRoom && rooms && rooms.filter((r) => r.isActive).length > 0 && (
+            {/* Additional Questions — shown once, not per child */}
+            {isChildCheckin && additionalFields.length > 0 && (
               <Card className="shadow-sm overflow-hidden">
-                <div className="bg-muted px-6 py-4 flex items-center gap-2">
-                  <h3 className="text-lg font-semibold">Select a Room</h3>
+                <div className="bg-muted/60 border-b border-border px-6 py-4 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold text-foreground">Additional Questions</h3>
                 </div>
-                <CardContent className="p-6">
-                  <div className="space-y-1.5">
-                    <Label className="text-sm font-medium flex items-center gap-1">
-                      Room / Group <span className="text-destructive">*</span>
-                    </Label>
-                    <Select value={selectedRoom} onValueChange={setSelectedRoom} required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a room…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {rooms.filter((r) => r.isActive).map((r) => (
-                          <SelectItem key={r.id} value={r.name}>
-                            <span className="font-medium">{r.name}</span>
-                            {r.description && <span className="text-muted-foreground ml-1">— {r.description}</span>}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <CardContent className="p-6 space-y-5">
+                  {additionalFields.map((field) => (
+                    <div key={field.id} className="space-y-1.5">
+                      <Label className="text-sm font-medium flex items-center gap-1">
+                        {field.label}
+                        {field.required && <span className="text-destructive">*</span>}
+                      </Label>
+                      <FieldInput
+                        field={field}
+                        value={additionalAnswers[field.id] ?? ""}
+                        onChange={(v) => handleAdditionalChange(field.id, v)}
+                        rooms={rooms}
+                      />
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             )}

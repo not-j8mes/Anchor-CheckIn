@@ -6,20 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Room {
+export interface EventSession {
   id: number;
   eventId: number;
-  name: string;
+  sessionDate: string;
   /** @nullable */
-  description?: string | null;
+  startTime?: string | null;
   /** @nullable */
-  capacity?: number | null;
-  isActive: boolean;
-  sortOrder: number;
+  endTime?: string | null;
+  status: string;
   /** @nullable */
-  ageMin?: number | null;
-  /** @nullable */
-  ageMax?: number | null;
-  participantCount?: number;
+  notes?: string | null;
   createdAt: string;
+  updatedAt: string;
 }

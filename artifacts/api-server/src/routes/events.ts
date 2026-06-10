@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { eq, sql, desc, inArray, asc } from "drizzle-orm";
-import { db, eventsTable, formsTable, questionsTable, formFieldsTable, registrationsTable, checkinsTable, registrationCustomAnswersTable } from "@workspace/db";
+import { db, eventsTable, formsTable, questionsTable, formFieldsTable, registrationsTable, checkinsTable, registrationCustomAnswersTable, eventSessionsTable } from "@workspace/db";
 import { randomBytes } from "crypto";
+import { createEventSessions } from "./event-sessions";
 
 const router = Router();
 
@@ -21,23 +22,18 @@ const DEFAULT_QUESTIONS = [
  * For kids programs — child profiles, guardian info, emergency contacts, safety.
  */
 const TEMPLATE_CHILD_CHECKIN = [
-  // ── Required ───────────────────────────────────────────────────────────────
-  { fieldKind: "system", systemKey: "child_first_name",          label: "Child First Name",                     fieldType: "text",     required: true,  sortOrder: 0,  placeholder: "Enter first name",                              options: null },
-  { fieldKind: "system", systemKey: "child_last_name",           label: "Child Last Name",                      fieldType: "text",     required: true,  sortOrder: 1,  placeholder: "Enter last name",                               options: null },
-  { fieldKind: "system", systemKey: "date_of_birth",             label: "Date of Birth",                        fieldType: "date",     required: true,  sortOrder: 2,  placeholder: null,                                            options: null },
-  { fieldKind: "system", systemKey: "guardian_first_name",       label: "Parent / Guardian First Name",         fieldType: "text",     required: true,  sortOrder: 3,  placeholder: "First name",                                    options: null },
-  { fieldKind: "system", systemKey: "guardian_last_name",        label: "Parent / Guardian Last Name",          fieldType: "text",     required: true,  sortOrder: 4,  placeholder: "Last name",                                     options: null },
-  { fieldKind: "system", systemKey: "guardian_phone",            label: "Parent / Guardian Phone",              fieldType: "phone",    required: true,  sortOrder: 5,  placeholder: "(555) 000-0000",                                options: null },
-  { fieldKind: "system", systemKey: "emergency_contact_name",    label: "Emergency Contact Name",               fieldType: "text",     required: true,  sortOrder: 6,  placeholder: "Full name",                                     options: null },
-  { fieldKind: "system", systemKey: "emergency_contact_phone",   label: "Emergency Contact Phone",              fieldType: "phone",    required: true,  sortOrder: 7,  placeholder: "(555) 000-0000",                                options: null },
-  // ── Optional ───────────────────────────────────────────────────────────────
-  { fieldKind: "system", systemKey: "guardian_email",            label: "Parent / Guardian Email",              fieldType: "email",    required: false, sortOrder: 8,  placeholder: "email@example.com",                             options: null },
-  { fieldKind: "system", systemKey: "allergies",                 label: "Allergies",                            fieldType: "textarea", required: false, sortOrder: 9,  placeholder: "List any food, medication, or environmental allergies…", options: null },
-  { fieldKind: "system", systemKey: "medical_notes",             label: "Medical Notes",                        fieldType: "textarea", required: false, sortOrder: 10, placeholder: "Any diagnoses, medications, or medical considerations…",  options: null },
-  { fieldKind: "system", systemKey: "special_needs",             label: "Special Needs / Accommodations",       fieldType: "textarea", required: false, sortOrder: 11, placeholder: "Describe any special needs or accommodations required…",  options: null },
-  { fieldKind: "system", systemKey: "authorized_pickup_names",   label: "Authorized Pickup Names",              fieldType: "textarea", required: false, sortOrder: 12, placeholder: "List everyone authorized to pick up this child…",        options: null },
-  { fieldKind: "system", systemKey: "photo_permission",          label: "Photo Permission",                     fieldType: "select",   required: false, sortOrder: 13, placeholder: null,                                            options: "Yes,No" },
-  { fieldKind: "system", systemKey: "medical_permission",        label: "Medical Permission",                   fieldType: "select",   required: false, sortOrder: 14, placeholder: null,                                            options: "Yes,No" },
+  { fieldKind: "system", systemKey: "child_first_name",          label: "Child First Name",                     fieldType: "text",     required: true,  sortOrder: 0,  placeholder: "Enter first name",                              options: null,     sectionKey: null },
+  { fieldKind: "system", systemKey: "child_last_name",           label: "Child Last Name",                      fieldType: "text",     required: true,  sortOrder: 1,  placeholder: "Enter last name",                               options: null,     sectionKey: null },
+  { fieldKind: "system", systemKey: "date_of_birth",             label: "Date of Birth",                        fieldType: "date",     required: true,  sortOrder: 2,  placeholder: null,                                            options: null,     sectionKey: null },
+  { fieldKind: "system", systemKey: "guardian_first_name",       label: "Parent / Guardian First Name",         fieldType: "text",     required: true,  sortOrder: 3,  placeholder: "First name",                                    options: null,     sectionKey: null },
+  { fieldKind: "system", systemKey: "guardian_last_name",        label: "Parent / Guardian Last Name",          fieldType: "text",     required: true,  sortOrder: 4,  placeholder: "Last name",                                     options: null,     sectionKey: null },
+  { fieldKind: "system", systemKey: "guardian_phone",            label: "Parent / Guardian Phone",              fieldType: "phone",    required: true,  sortOrder: 5,  placeholder: "(555) 000-0000",                                options: null,     sectionKey: null },
+  { fieldKind: "system", systemKey: "guardian_email",            label: "Parent / Guardian Email",              fieldType: "email",    required: true,  sortOrder: 6,  placeholder: "email@example.com",                             options: null,     sectionKey: null },
+  { fieldKind: "system", systemKey: "allergies",                 label: "Allergies",                            fieldType: "textarea", required: false, sortOrder: 7,  placeholder: "List any food, medication, or environmental allergies…", options: null, sectionKey: null },
+  { fieldKind: "system", systemKey: "medical_notes",             label: "Medical Notes",                        fieldType: "textarea", required: false, sortOrder: 8,  placeholder: "Any diagnoses, medications, or medical considerations…",  options: null, sectionKey: null },
+  { fieldKind: "system", systemKey: "special_needs",             label: "Special Needs / Accommodations",       fieldType: "textarea", required: true,  sortOrder: 9,  placeholder: "Describe any special needs or accommodations required…",  options: null, sectionKey: null },
+  { fieldKind: "system", systemKey: "emergency_contact_name",    label: "Emergency Contact Name",               fieldType: "text",     required: true,  sortOrder: 10, placeholder: "Full name",                                     options: null,     sectionKey: "additional_questions" },
+  { fieldKind: "system", systemKey: "emergency_contact_phone",   label: "Emergency Contact Phone",              fieldType: "phone",    required: true,  sortOrder: 11, placeholder: "(555) 000-0000",                                options: null,     sectionKey: "additional_questions" },
 ] as const;
 
 /**
@@ -90,6 +86,8 @@ async function buildEventRow(event: typeof eventsTable.$inferSelect) {
   let formTitle: string | null = null;
   let formEmbedSlug: string | null = null;
   let registrationCount = 0;
+  let sessionCount: number | null = null;
+  let nextSessionDate: string | null = null;
 
   if (event.formId) {
     const form = await db.select().from(formsTable).where(eq(formsTable.id, event.formId)).limit(1);
@@ -104,6 +102,19 @@ async function buildEventRow(event: typeof eventsTable.$inferSelect) {
     registrationCount = count;
   }
 
+  if (event.scheduleType === "repeating") {
+    const sessions = await db
+      .select({ id: eventSessionsTable.id, sessionDate: eventSessionsTable.sessionDate, status: eventSessionsTable.status })
+      .from(eventSessionsTable)
+      .where(eq(eventSessionsTable.eventId, event.id))
+      .orderBy(asc(eventSessionsTable.sessionDate));
+
+    sessionCount = sessions.length;
+    const today = new Date().toISOString().slice(0, 10);
+    const upcoming = sessions.filter((s) => s.sessionDate >= today && s.status !== "cancelled");
+    nextSessionDate = upcoming[0]?.sessionDate ?? null;
+  }
+
   return {
     ...event,
     status: computeStatus(event.startDate, event.endDate),
@@ -111,6 +122,8 @@ async function buildEventRow(event: typeof eventsTable.$inferSelect) {
     formTitle,
     formEmbedSlug,
     registrationCount,
+    sessionCount,
+    nextSessionDate,
   };
 }
 
@@ -126,12 +139,14 @@ router.get("/events", async (req, res) => {
 });
 
 router.post("/events", async (req, res) => {
-  const { name, description, eventType, registrationType, startDate, endDate, formTitle, formDescription, addDefaultQuestions, trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode } = req.body;
+  const { name, description, eventType, registrationType, scheduleType, startDate, endDate, startTime, endTime, repeatFrequency, repeatDayOfWeek, formTitle, formDescription, addDefaultQuestions, trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode } = req.body;
 
   if (!name || !eventType || !formTitle) {
     res.status(400).json({ error: "name, eventType, and formTitle are required" });
     return;
   }
+
+  const resolvedScheduleType = scheduleType || "one_time";
 
   // Smart defaults based on registration type when caller doesn't specify
   const isChildCheckin = !registrationType || registrationType === "child_checkin";
@@ -175,8 +190,13 @@ router.post("/events", async (req, res) => {
         description: description || null,
         eventType,
         registrationType: registrationType || null,
+        scheduleType: resolvedScheduleType,
         startDate: startDate || null,
         endDate: endDate || null,
+        startTime: startTime || null,
+        endTime: endTime || null,
+        repeatFrequency: repeatFrequency || null,
+        repeatDayOfWeek: repeatDayOfWeek !== undefined ? repeatDayOfWeek : null,
         status: computeStatus(startDate || null, endDate || null),
         formId: form.id,
         trackAttendance: resolvedTrackAttendance,
@@ -187,17 +207,20 @@ router.post("/events", async (req, res) => {
       })
       .returning();
 
+    // Generate sessions for repeating events
+    if (resolvedScheduleType === "repeating" && startDate && endDate && repeatDayOfWeek !== undefined && repeatDayOfWeek !== null) {
+      await createEventSessions(event.id, startDate, endDate, repeatDayOfWeek, startTime || null, endTime || null);
+    }
+
     const [questions, formFields] = await Promise.all([
       db.select().from(questionsTable).where(eq(questionsTable.formId, form.id)).orderBy(asc(questionsTable.order)),
       db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, form.id)).orderBy(asc(formFieldsTable.sortOrder)),
     ]);
 
+    const row = await buildEventRow(event);
+
     res.status(201).json({
-      ...event,
-      createdAt: event.createdAt.toISOString(),
-      formTitle: form.title,
-      formEmbedSlug: form.embedSlug,
-      registrationCount: 0,
+      ...row,
       form: { ...form, submissionCount: 0, questions, formFields },
     });
   } catch (err) {
@@ -369,7 +392,7 @@ router.put("/events/:eventId", async (req, res) => {
     res.status(400).json({ error: "Invalid eventId" });
     return;
   }
-  const { name, description, eventType, registrationType, startDate, endDate, trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode } = req.body;
+  const { name, description, eventType, registrationType, scheduleType, startDate, endDate, startTime, endTime, repeatFrequency, repeatDayOfWeek, trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode } = req.body;
   try {
     const [updated] = await db
       .update(eventsTable)
@@ -378,8 +401,13 @@ router.put("/events/:eventId", async (req, res) => {
         ...(description !== undefined && { description }),
         ...(eventType !== undefined && { eventType }),
         ...(registrationType !== undefined && { registrationType }),
+        ...(scheduleType !== undefined && { scheduleType }),
         ...(startDate !== undefined && { startDate }),
         ...(endDate !== undefined && { endDate }),
+        ...(startTime !== undefined && { startTime }),
+        ...(endTime !== undefined && { endTime }),
+        ...(repeatFrequency !== undefined && { repeatFrequency }),
+        ...(repeatDayOfWeek !== undefined && { repeatDayOfWeek }),
         ...(trackAttendance !== undefined && { trackAttendance }),
         ...(requireCheckout !== undefined && { requireCheckout }),
         ...(printLabels !== undefined && { printLabels }),

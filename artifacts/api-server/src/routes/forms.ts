@@ -77,12 +77,15 @@ router.get("/forms/:formId", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const [questions, formFields, [{ count }]] = await Promise.all([
+    const [questions, formFields, [{ count }], linkedEvent] = await Promise.all([
       db.select().from(questionsTable).where(eq(questionsTable.formId, formId)).orderBy(asc(questionsTable.order)),
       db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, formId)).orderBy(asc(formFieldsTable.sortOrder)),
       db.select({ count: sql<number>`count(*)::int` }).from(registrationsTable).where(eq(registrationsTable.formId, formId)),
+      db.select({ eventId: eventsTable.id, registrationType: eventsTable.registrationType }).from(eventsTable).where(eq(eventsTable.formId, formId)).limit(1),
     ]);
-    res.json({ ...form[0], submissionCount: count, questions, formFields });
+    const eventId = linkedEvent[0]?.eventId ?? null;
+    const registrationType = linkedEvent[0]?.registrationType ?? null;
+    res.json({ ...form[0], submissionCount: count, questions, formFields, eventId, registrationType });
   } catch (err) {
     req.log.error({ err }, "Failed to get form");
     res.status(500).json({ error: "Internal server error" });

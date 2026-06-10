@@ -14,9 +14,9 @@ import {
   Users,
   CheckSquare,
   Settings,
-  Church,
   CalendarDays,
 } from "lucide-react";
+import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -33,7 +33,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen w-full bg-background">
       <Sidebar>
         <SidebarHeader className="p-4 flex flex-row items-center gap-2 text-sidebar-primary">
-          <Church className="w-8 h-8" />
+          <img src={appLogo} alt="logo" className="w-8 h-8 object-contain" />
           <span className="font-serif font-bold text-lg text-sidebar-foreground">
             {org?.name || "Church Check-In"}
           </span>

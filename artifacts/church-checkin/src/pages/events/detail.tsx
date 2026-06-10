@@ -7,6 +7,7 @@ import {
   useSubmitRegistration,
   useListRegistrations,
   useListEventCheckins,
+  useListEventSessions,
   useListFormFields,
   useCheckoutChild,
   useDeleteCheckin,
@@ -15,23 +16,31 @@ import {
   useGetRegistration,
   useListChildren,
   useUpdateRegistration,
+  useDeleteRegistration,
   useListRooms,
   useCreateRoom,
   useUpdateRoom,
   useDeleteRoom,
   useUpdateRegistrationRoom,
   useUpdateCheckin,
+  useDeleteEvent,
+  useListEventCategories,
+  useCreateEventCategory,
   getGetEventQueryKey,
+  getListEventsQueryKey,
   getGetFormQueryKey,
   getListFormFieldsQueryKey,
   getListRegistrationsQueryKey,
   getListEventCheckinsQueryKey,
+  getListEventSessionsQueryKey,
   getListChildrenQueryKey,
   getListRoomsQueryKey,
+  getListEventCategoriesQueryKey,
   type Child,
   type Room,
   type LabelData,
   type EventCheckin,
+  type EventSession,
   type Registration,
   type EventWithForm,
   type FormField,
@@ -45,7 +54,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
@@ -80,6 +89,7 @@ import {
   Tag,
   ChevronRight,
   User,
+  Repeat,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -88,15 +98,6 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { FormBuilderPanel } from "@/components/forms/FormBuilderPanel";
 
-const EVENT_TYPES: Record<string, string> = {
-  vbs: "Vacation Bible School (VBS)",
-  awana: "AWANA",
-  sunday_school: "Sunday School",
-  youth_group: "Youth Group",
-  camp: "Camp",
-  special_event: "Special Event",
-  general: "General / Other",
-};
 
 function statusBadge(status: string) {
   if (status === "active") return <Badge className="bg-green-100 text-green-800 border-green-200">Active</Badge>;
@@ -561,9 +562,24 @@ function RegistrationDetailSheet({
   const { toast } = useToast();
   const [editOpen, setEditOpen] = useState(false);
   const [assigningRoom, setAssigningRoom] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
 
   const { data: rooms } = useListRooms(eventId, {
     query: { enabled: open && !!eventId, queryKey: getListRoomsQueryKey(eventId) },
+  });
+
+  const deleteRegistration = useDeleteRegistration({
+    mutation: {
+      onSuccess: () => {
+        if (formId) queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(formId) });
+        queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey({ eventId }) });
+        toast({ title: "Registration deleted" });
+        setDeleteOpen(false);
+        onOpenChange(false);
+      },
+      onError: (err) => toast({ title: "Failed to delete registration", description: err instanceof Error ? err.message : String(err), variant: "destructive" }),
+    },
   });
 
   const updateRoom = useUpdateRegistrationRoom({
@@ -755,9 +771,16 @@ function RegistrationDetailSheet({
           </div>
 
           {/* Footer */}
-          <div className="border-t p-4 shrink-0">
-            <Button variant="outline" className="w-full gap-2" onClick={() => setEditOpen(true)}>
-              <Pencil className="w-4 h-4" /> Edit Registration
+          <div className="border-t p-4 shrink-0 flex gap-2">
+            <Button variant="outline" className="flex-1 gap-2" onClick={() => setEditOpen(true)}>
+              <Pencil className="w-4 h-4" /> Edit
+            </Button>
+            <Button
+              variant="outline"
+              className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+              onClick={() => { setDeleteConfirm(""); setDeleteOpen(true); }}
+            >
+              <Trash2 className="w-4 h-4" /> Delete
             </Button>
           </div>
         </SheetContent>
@@ -770,6 +793,46 @@ function RegistrationDetailSheet({
           onOpenChange={handleEditClose}
         />
       )}
+
+      <Dialog open={deleteOpen} onOpenChange={(v) => { if (!deleteRegistration.isPending) setDeleteOpen(v); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="w-5 h-5" /> Delete Registration
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <p className="text-sm text-muted-foreground">
+              This will permanently delete the registration for{" "}
+              <span className="font-semibold text-foreground">{reg.childFirstName} {reg.childLastName}</span>.
+              This action cannot be undone.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Type <span className="font-mono font-bold">DELETE</span> to confirm</Label>
+              <Input
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder="DELETE"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleteRegistration.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirm !== "DELETE" || deleteRegistration.isPending}
+              onClick={() => deleteRegistration.mutate({ registrationId: reg.id })}
+              className="gap-2"
+            >
+              {deleteRegistration.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Delete Registration
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -950,16 +1013,18 @@ function ChildrenTabContent({
                   {reg.childFirstName[0]}{reg.childLastName[0]}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{reg.childFirstName} {reg.childLastName}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-sm">{reg.childFirstName} {reg.childLastName}</p>
+                    {reg.room && (
+                      <Badge variant="outline" className="text-[10px] hidden sm:flex shrink-0">{reg.room}</Badge>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground truncate">
                     {reg.guardianName}
                     {reg.guardianPhone ? ` · ${reg.guardianPhone}` : ""}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {reg.room && (
-                    <Badge variant="outline" className="text-[10px] hidden sm:flex">{reg.room}</Badge>
-                  )}
                   {(reg.allergies || reg.specialNeeds) && (
                     <Badge className="text-[10px] bg-red-100 text-red-800 border-none hover:bg-red-100 gap-1">
                       <AlertTriangle className="w-2.5 h-2.5" /> Alert
@@ -1841,6 +1906,9 @@ function CheckInDeskContent({
   attendanceSessions,
   onExportCsv,
   isExporting,
+  sessions,
+  selectedSessionId,
+  onSessionChange,
 }: {
   eventId: number;
   formId?: number | null;
@@ -1854,6 +1922,9 @@ function CheckInDeskContent({
   attendanceSessions: Array<{ date: string; items: EventCheckin[] }>;
   onExportCsv: () => void;
   isExporting: boolean;
+  sessions?: EventSession[];
+  selectedSessionId?: number | null;
+  onSessionChange?: (id: number | null) => void;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1917,7 +1988,7 @@ function CheckInDeskContent({
 
   const doCheckin = (reg: Registration) => {
     setLoadingId(reg.id);
-    createCheckin.mutate({ data: { registrationId: reg.id } });
+    createCheckin.mutate({ data: { registrationId: reg.id, sessionId: selectedSessionId ?? undefined } });
   };
 
   const handleCheckinClick = (reg: Registration) => {
@@ -1928,15 +1999,19 @@ function CheckInDeskContent({
     }
   };
 
-  // Latest checkin per registration (most recent first if multiple sessions)
+  // When a session is selected, only look at check-ins for that session.
+  // Otherwise, use the most recent check-in per registration.
   const latestCheckinByRegId = useMemo(() => {
     const map = new Map<number, EventCheckin>();
     if (!checkins) return map;
-    for (const c of [...checkins].sort((a, b) => new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime())) {
+    const pool = selectedSessionId != null
+      ? checkins.filter((c) => c.sessionId === selectedSessionId)
+      : [...checkins].sort((a, b) => new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime());
+    for (const c of pool) {
       if (!map.has(c.registrationId)) map.set(c.registrationId, c);
     }
     return map;
-  }, [checkins]);
+  }, [checkins, selectedSessionId]);
 
   const participants = useMemo(() => {
     if (!registrations) return [] as Array<{ reg: Registration; checkin: EventCheckin | undefined; status: Exclude<DeskFilter, "all"> }>;
@@ -1974,8 +2049,50 @@ function CheckInDeskContent({
 
   const isLoading = regsLoading || checkinsLoading;
 
+  const today = new Date().toISOString().split("T")[0];
+
   return (
     <div className="space-y-5">
+      {/* Session picker for repeating events */}
+      {sessions && sessions.length > 0 && onSessionChange && (
+        <div className="flex items-center gap-3 p-3.5 rounded-xl border border-border bg-muted/30">
+          <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <Select
+              value={selectedSessionId != null ? String(selectedSessionId) : "__none__"}
+              onValueChange={(v) => onSessionChange(v === "__none__" ? null : parseInt(v, 10))}
+            >
+              <SelectTrigger className="h-9 text-sm border-0 bg-transparent shadow-none px-0 focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">All sessions (combined view)</SelectItem>
+                {sessions.map((s) => {
+                  const label = format(new Date(s.sessionDate + "T00:00:00"), "EEEE, MMMM d, yyyy");
+                  const isToday = s.sessionDate === today;
+                  return (
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {label}{isToday ? " — Today" : ""}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedSessionId == null && (
+            <span className="text-xs text-muted-foreground shrink-0">
+              Showing all {sessions.length} sessions
+            </span>
+          )}
+        </div>
+      )}
+      {sessions && sessions.length > 0 && !sessions.find((s) => s.sessionDate === today) && selectedSessionId == null && (
+        <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm">
+          <Info className="w-4 h-4 flex-shrink-0" />
+          No session scheduled for today. Select a session above to check in for a specific date.
+        </div>
+      )}
+
       {/* Search + Export */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
@@ -2311,6 +2428,69 @@ function CheckInDeskContent({
   );
 }
 
+// ─── Event Date Card ──────────────────────────────────────────────────────────
+
+function EventDateCard({ event }: { event: EventWithForm }) {
+  const { scheduleType, startDate, endDate, repeatDayOfWeek, nextSessionDate } = event;
+  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  if (scheduleType === "repeating") {
+    const dayLabel = repeatDayOfWeek != null ? DAY_NAMES[repeatDayOfWeek] : null;
+    if (nextSessionDate) {
+      return (
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground">Event Date</p>
+            <p className="text-xl font-bold font-serif mt-1">
+              {format(new Date(nextSessionDate + "T00:00:00"), "MMM d")}
+            </p>
+            {dayLabel && <p className="text-xs text-muted-foreground mt-0.5">Every {dayLabel}</p>}
+          </CardContent>
+        </Card>
+      );
+    }
+    const startLabel = startDate ? format(new Date(startDate + "T00:00:00"), "MMM d") : null;
+    const endLabel = endDate ? format(new Date(endDate + "T00:00:00"), "MMM d, yyyy") : null;
+    return (
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">Event Date</p>
+          <p className="text-base font-bold font-serif mt-1 leading-tight">
+            {startLabel && endLabel ? `${startLabel} – ${endLabel}` : startLabel ?? "—"}
+          </p>
+          {dayLabel && <p className="text-xs text-muted-foreground mt-0.5">Every {dayLabel}</p>}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (scheduleType === "multi_day") {
+    const startLabel = startDate ? format(new Date(startDate + "T00:00:00"), "MMM d") : null;
+    const endLabel = endDate ? format(new Date(endDate + "T00:00:00"), "MMM d, yyyy") : null;
+    return (
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">Event Dates</p>
+          <p className="text-base font-bold font-serif mt-1 leading-tight">
+            {startLabel && endLabel ? `${startLabel} – ${endLabel}` : startLabel ?? "—"}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <p className="text-sm text-muted-foreground">Event Date</p>
+        <p className="text-xl font-bold font-serif mt-1">
+          {startDate ? format(new Date(startDate + "T00:00:00"), "MMM d, yyyy") : "—"}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Section: Event Dashboard ──────────────────────────────────────────────────
 
 function EventDashboardSection({
@@ -2358,133 +2538,345 @@ function EventDashboardSection({
     .sort((a, b) => new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime())
     .slice(0, 5);
 
-  return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-8">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+  // ── Dynamic stat cards ──────────────────────────────────────────────────────
+  const regType = event.registrationType ?? "child_checkin";
+  const isFamilyGroup = regType === "family_group";
+  const isIndividual = regType === "individual";
+  const totalRegs = registrations?.length ?? 0;
+
+  const groupCount = isFamilyGroup
+    ? new Set((registrations ?? []).map((r) => r.guardianName ?? "").filter(Boolean)).size
+    : 0;
+  const attendanceRate = totalRegs > 0 ? Math.round((checkedIn.length / totalRegs) * 100) : 0;
+
+  let card2: React.ReactNode = null;
+  let card3: React.ReactNode = null;
+
+  if (isChildCheckin && trackAttendance) {
+    card2 = (
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">Checked In</p>
+          <p className="text-3xl font-bold font-serif mt-1 text-green-800">{checkedIn.length}</p>
+        </CardContent>
+      </Card>
+    );
+    card3 = (
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">Checked Out</p>
+          <p className="text-3xl font-bold font-serif mt-1 text-amber-800">{checkedOut.length}</p>
+        </CardContent>
+      </Card>
+    );
+  } else if (isFamilyGroup) {
+    card2 = (
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">Groups Registered</p>
+          <p className="text-3xl font-bold font-serif mt-1">{groupCount}</p>
+        </CardContent>
+      </Card>
+    );
+    if (trackAttendance) {
+      card3 = (
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Registered</p>
-            <p className="text-3xl font-bold font-serif mt-1">{registrations?.length ?? 0}</p>
+            <p className="text-sm text-muted-foreground">Checked In</p>
+            <p className="text-3xl font-bold font-serif mt-1 text-green-800">{checkedIn.length}</p>
           </CardContent>
         </Card>
-        {trackAttendance && (
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Checked In</p>
-              <p className="text-3xl font-bold font-serif mt-1 text-green-700">{checkedIn.length}</p>
-            </CardContent>
-          </Card>
-        )}
-        {requireCheckout && (
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Checked Out</p>
-              <p className="text-3xl font-bold font-serif mt-1 text-amber-700">{checkedOut.length}</p>
-            </CardContent>
-          </Card>
-        )}
-        {event.startDate && (
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Date</p>
-              <p className="text-xl font-bold font-serif mt-1">{format(new Date(event.startDate + "T00:00:00"), "MMM d")}</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      <div className="space-y-4">
-          <h2 className="text-lg font-serif font-bold">Quick Actions</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {registrationUrl && (
+      );
+    } else {
+      card3 = (
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground">Public Form</p>
+            <p className="text-sm font-medium mt-1">{event.formEmbedSlug ? "Active" : "Not configured"}</p>
+            {event.formEmbedSlug && (
               <a
-                href={registrationUrl}
+                href={`${window.location.origin}/register/${event.formEmbedSlug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center"
+                className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
               >
-                <ExternalLink className="w-5 h-5 text-primary" />
-                Open Public Form
+                <ExternalLink className="w-3 h-3" /> Open form
               </a>
             )}
-            {registrationUrl && (
-              <button
-                type="button"
-                onClick={copyEmbedCode}
-                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center"
+          </CardContent>
+        </Card>
+      );
+    }
+  } else if (isIndividual) {
+    if (trackAttendance) {
+      card2 = (
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground">Checked In</p>
+            <p className="text-3xl font-bold font-serif mt-1 text-green-800">{checkedIn.length}</p>
+          </CardContent>
+        </Card>
+      );
+      card3 = (
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground">Attendance Rate</p>
+            <p className="text-3xl font-bold font-serif mt-1">{attendanceRate}%</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{checkedIn.length} of {totalRegs}</p>
+          </CardContent>
+        </Card>
+      );
+    } else {
+      card2 = (
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground">Form Status</p>
+            <p className="text-xl font-bold font-serif mt-1">{event.formEmbedSlug ? "Active" : "Not Set"}</p>
+          </CardContent>
+        </Card>
+      );
+      card3 = (
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground">Public Link</p>
+            {event.formEmbedSlug ? (
+              <a
+                href={`${window.location.origin}/register/${event.formEmbedSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-primary hover:underline flex items-center gap-1.5 mt-1.5"
               >
-                <Copy className="w-5 h-5 text-primary" />
-                Copy Embed Code
-              </button>
+                <ExternalLink className="w-3.5 h-3.5" /> Open Form
+              </a>
+            ) : (
+              <p className="text-sm text-muted-foreground mt-1">Not configured</p>
             )}
-            {trackAttendance && (
-              <Link href={`/events/${eventId}/checkin`}>
-                <div className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center cursor-pointer">
-                  <CheckSquare className="w-5 h-5 text-primary" />
-                  Start Check-In
-                </div>
-              </Link>
-            )}
-            <button
-              type="button"
-              onClick={onExportCsv}
-              disabled={isExporting}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center disabled:opacity-50"
-            >
-              {isExporting ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <Download className="w-5 h-5 text-primary" />}
-              Export CSV
-            </button>
-            <Link href={`/events/${eventId}/form`}>
-              <div className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center cursor-pointer">
-                <FileEdit className="w-5 h-5 text-primary" />
-                Edit Form
-              </div>
-            </Link>
-            <Link href={`/events/${eventId}/settings`}>
-              <div className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center cursor-pointer">
-                <Settings className="w-5 h-5 text-primary" />
-                Event Settings
-              </div>
-            </Link>
+          </CardContent>
+        </Card>
+      );
+    }
+  }
+
+  const totalRegisteredCard = (
+    <Card>
+      <CardContent className="p-5">
+        <p className="text-sm text-muted-foreground">Total Registered</p>
+        <p className="text-3xl font-bold font-serif mt-1">{totalRegs}</p>
+      </CardContent>
+    </Card>
+  );
+
+  const statsSection = !card2 && !card3 ? (
+    <div className="grid grid-cols-2 gap-4">
+      {totalRegisteredCard}
+      <EventDateCard event={event} />
+    </div>
+  ) : (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {totalRegisteredCard}
+      {card2}
+      {card3}
+      <EventDateCard event={event} />
+    </div>
+  );
+
+  // ── Event header date/schedule summary ──────────────────────────────────────
+  const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const { scheduleType, startDate, endDate, repeatDayOfWeek, nextSessionDate } = event;
+  let scheduleSummary: React.ReactNode = null;
+  if (scheduleType === "repeating") {
+    const dayLabel = repeatDayOfWeek != null ? DAY_NAMES_FULL[repeatDayOfWeek] : null;
+    scheduleSummary = (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-sm text-muted-foreground">
+          Repeating weekly{dayLabel ? ` · ${dayLabel}s` : ""}
+        </span>
+        {nextSessionDate && (
+          <span className="text-xs text-muted-foreground">
+            Next session: {format(new Date(nextSessionDate + "T00:00:00"), "MMM d")}
+          </span>
+        )}
+      </div>
+    );
+  } else if (scheduleType === "multi_day") {
+    const s = startDate ? format(new Date(startDate + "T00:00:00"), "MMM d") : null;
+    const e = endDate ? format(new Date(endDate + "T00:00:00"), "MMM d") : null;
+    scheduleSummary = (
+      <span className="text-sm text-muted-foreground">
+        {s && e ? `${s} – ${e}` : s ?? ""}
+      </span>
+    );
+  } else if (startDate) {
+    scheduleSummary = (
+      <span className="text-sm text-muted-foreground">
+        {format(new Date(startDate + "T00:00:00"), "MMM d")}
+      </span>
+    );
+  }
+
+  const REG_TYPE_LABELS: Record<string, string> = {
+    child_checkin: "Child Check-In",
+    family_group: "Family / Group",
+    individual: "Individual",
+  };
+  const regTypeLabel = REG_TYPE_LABELS[regType] ?? regType;
+
+  // ── Hero card ───────────────────────────────────────────────────────────────
+  let heroTitle: string;
+  let heroDescription: string;
+  let heroButtonLabel: string;
+  let heroHref: string;
+  let heroIcon: React.ReactNode;
+  let heroColors: { border: string; bg: string; titleColor: string; descColor: string; btnClass: string; iconBg: string; iconColor: string };
+
+  if (trackAttendance) {
+    if (isChildCheckin) {
+      heroTitle = "Start Check-In Desk";
+      heroDescription = "Begin checking children in and out for this event.";
+      heroButtonLabel = "Open Check-In Desk";
+    } else {
+      heroTitle = "Start Check-In";
+      heroDescription = "Begin checking people in for this event.";
+      heroButtonLabel = "Open Check-In";
+    }
+    heroHref = `/events/${eventId}/checkin`;
+    heroIcon = <ClipboardList className="w-7 h-7 text-amber-600" />;
+    heroColors = {
+      border: "border-amber-200",
+      bg: "bg-amber-50",
+      titleColor: "text-amber-900",
+      descColor: "text-amber-700",
+      btnClass: "bg-amber-500 hover:bg-amber-600 text-black border-0 shadow-sm",
+      iconBg: "bg-amber-100 border border-amber-200",
+      iconColor: "text-amber-600",
+    };
+  } else {
+    heroTitle = "Share Registration Form";
+    heroDescription = "Open or share your public form to start collecting registrations.";
+    heroButtonLabel = "Open Public Form";
+    heroHref = registrationUrl ?? "#";
+    heroIcon = <ExternalLink className="w-7 h-7 text-primary" />;
+    heroColors = {
+      border: "border-primary/20",
+      bg: "bg-primary/5",
+      titleColor: "text-foreground",
+      descColor: "text-muted-foreground",
+      btnClass: "bg-primary hover:bg-primary/90 text-primary-foreground border-0 shadow-sm",
+      iconBg: "bg-primary/10 border border-primary/20",
+      iconColor: "text-primary",
+    };
+  }
+
+  return (
+    <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-6">
+
+      {/* 1 — Event Header */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1.5 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-serif font-bold leading-tight">{event.name}</h1>
+            <Badge variant="secondary" className="text-xs shrink-0">{regTypeLabel}</Badge>
+            {statusBadge(event.status)}
           </div>
+          {scheduleSummary}
+        </div>
+        <Link href={`/events/${eventId}/settings`} className="shrink-0">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+            <Settings className="w-4 h-4" />
+            <span className="hidden sm:inline">Settings</span>
+          </Button>
+        </Link>
+      </div>
 
-          {/* Recent registrations */}
-          {recentRegistrations.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-semibold">Recent Registrations</h2>
-                <Link href={`/events/${eventId}/registrations`} className="text-sm text-primary hover:underline">View all</Link>
-              </div>
-              <Card>
-                <CardContent className="p-0 divide-y divide-border">
-                  {recentRegistrations.map((reg) => (
-                    <div key={reg.id} className="px-4 py-3 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-xs shrink-0">
-                        {reg.childFirstName[0]}{reg.childLastName[0]}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{reg.childFirstName} {reg.childLastName}</p>
-                        <p className="text-xs text-muted-foreground">{reg.guardianName}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground shrink-0">
-                        {format(new Date(reg.createdAt), "MMM d")}
-                      </p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
+      {/* 2 — Stat Cards */}
+      {statsSection}
+
+      {/* 3 — Primary Hero Action */}
+      <div className={`relative overflow-hidden rounded-2xl border ${heroColors.border} ${heroColors.bg} p-6 flex items-center gap-5`}>
+        <div className={`w-14 h-14 rounded-xl ${heroColors.iconBg} flex items-center justify-center shrink-0`}>
+          {heroIcon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className={`text-xl font-serif font-bold ${heroColors.titleColor}`}>{heroTitle}</h2>
+          <p className={`text-sm ${heroColors.descColor} mt-0.5`}>{heroDescription}</p>
+          {trackAttendance ? (
+            <Link href={heroHref}>
+              <Button size="lg" className={`mt-3 gap-2 ${heroColors.btnClass}`}>
+                <LogIn className="w-4 h-4" />
+                {heroButtonLabel}
+              </Button>
+            </Link>
+          ) : registrationUrl ? (
+            <a href={registrationUrl} target="_blank" rel="noopener noreferrer">
+              <Button className={`mt-3 gap-2 ${heroColors.btnClass}`}>
+                <ExternalLink className="w-4 h-4" />
+                {heroButtonLabel}
+              </Button>
+            </a>
+          ) : (
+            <Link href={`/events/${eventId}/form`}>
+              <Button className={`mt-3 gap-2 ${heroColors.btnClass}`}>
+                <FileEdit className="w-4 h-4" />
+                Set Up Form
+              </Button>
+            </Link>
           )}
+        </div>
 
-          {/* Recently checked in */}
-          {trackAttendance && recentCheckins.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-semibold">Recently Checked In</h2>
-                <Link href={`/events/${eventId}/checkin`} className="text-sm text-primary hover:underline">View all</Link>
-              </div>
-              <Card>
+      </div>
+
+      {/* 4 — Recent Activity */}
+      <div className="space-y-4">
+        {/* Recent Registrations */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold">Recent Registrations</h2>
+            <Link href={`/events/${eventId}/registrations`} className="text-sm text-primary hover:underline">View all</Link>
+          </div>
+          <Card>
+            {recentRegistrations.length > 0 ? (
+              <CardContent className="p-0 divide-y divide-border">
+                {recentRegistrations.map((reg) => (
+                  <div key={reg.id} className="px-4 py-3 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-xs shrink-0">
+                      {reg.childFirstName[0]}{reg.childLastName[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm">{reg.childFirstName} {reg.childLastName}</p>
+                      {reg.guardianName && <p className="text-xs text-muted-foreground truncate">{reg.guardianName}</p>}
+                    </div>
+                    <p className="text-xs text-muted-foreground shrink-0">
+                      {format(new Date(reg.createdAt), "MMM d")}
+                    </p>
+                  </div>
+                ))}
+              </CardContent>
+            ) : (
+              <CardContent className="py-8 text-center space-y-2">
+                <Users className="w-7 h-7 mx-auto text-muted-foreground/40" />
+                <p className="text-sm font-medium text-muted-foreground">No registrations yet.</p>
+                <p className="text-xs text-muted-foreground">Share the public form to start collecting registrations.</p>
+                {registrationUrl && (
+                  <a href={registrationUrl} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm" className="mt-2 gap-1.5">
+                      <ExternalLink className="w-3.5 h-3.5" /> Open Public Form
+                    </Button>
+                  </a>
+                )}
+              </CardContent>
+            )}
+          </Card>
+        </div>
+
+        {/* Recently Checked In — only when check-in is enabled */}
+        {trackAttendance && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold">Recently Checked In</h2>
+              <Link href={`/events/${eventId}/checkin`} className="text-sm text-primary hover:underline">View all</Link>
+            </div>
+            <Card>
+              {recentCheckins.length > 0 ? (
                 <CardContent className="p-0 divide-y divide-border">
                   {recentCheckins.map((c) => (
                     <div key={c.id} className="px-4 py-3 flex items-center gap-3">
@@ -2501,10 +2893,67 @@ function EventDashboardSection({
                     </div>
                   ))}
                 </CardContent>
-              </Card>
-            </div>
-          )}
+              ) : (
+                <CardContent className="py-8 text-center space-y-2">
+                  <LogIn className="w-7 h-7 mx-auto text-muted-foreground/40" />
+                  <p className="text-sm font-medium text-muted-foreground">No check-ins yet.</p>
+                  <p className="text-xs text-muted-foreground">Check-ins will appear here once people are checked in.</p>
+                </CardContent>
+              )}
+            </Card>
+          </div>
+        )}
       </div>
+
+      {/* 5 — Quick Actions */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-serif font-bold">Quick Actions</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {registrationUrl && (
+            <a
+              href={registrationUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center"
+            >
+              <ExternalLink className="w-5 h-5 text-primary" />
+              Open Public Form
+            </a>
+          )}
+          {registrationUrl && (
+            <button
+              type="button"
+              onClick={copyEmbedCode}
+              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center"
+            >
+              <Copy className="w-5 h-5 text-primary" />
+              Copy Embed Code
+            </button>
+          )}
+          <Link href={`/events/${eventId}/form`}>
+            <div className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center cursor-pointer">
+              <FileEdit className="w-5 h-5 text-primary" />
+              Edit Form
+            </div>
+          </Link>
+          <button
+            type="button"
+            onClick={onExportCsv}
+            disabled={isExporting}
+            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center disabled:opacity-50"
+          >
+            {isExporting ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <Download className="w-5 h-5 text-primary" />}
+            Export CSV
+          </button>
+          <Link href={`/events/${eventId}/settings`}>
+            <div className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center cursor-pointer">
+              <Settings className="w-5 h-5 text-primary" />
+              Event Settings
+            </div>
+          </Link>
+        </div>
+      </div>
+
     </div>
   );
 }
@@ -2769,7 +3218,7 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
 
         <TabsContent value="build" className="mt-5">
           {event.formId ? (
-            <FormBuilderPanel formId={event.formId} hideAdditionalPeople={isChildCheckin} />
+            <FormBuilderPanel formId={event.formId} eventId={eventId} hideAdditionalPeople={isChildCheckin} />
           ) : (
             <Card>
               <CardContent className="p-10 text-center text-muted-foreground">
@@ -3009,21 +3458,30 @@ function EventSettingsSection({
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const EVENT_TYPES_LIST = [
-    { value: "vbs", label: "Vacation Bible School (VBS)" },
-    { value: "awana", label: "AWANA" },
-    { value: "sunday_school", label: "Sunday School" },
-    { value: "youth_group", label: "Youth Group" },
-    { value: "camp", label: "Camp" },
-    { value: "special_event", label: "Special Event" },
-    { value: "general", label: "General / Other" },
-  ];
+  const [, navigate] = useLocation();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const { data: categories = [] } = useListEventCategories();
+  const [createCatOpen, setCreateCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const createCategory = useCreateEventCategory({
+    mutation: {
+      onSuccess: (cat) => {
+        queryClient.invalidateQueries({ queryKey: getListEventCategoriesQueryKey() });
+        set("eventType")(cat.slug);
+        setCreateCatOpen(false);
+        setNewCatName("");
+        toast({ title: `Category "${cat.name}" created` });
+      },
+      onError: () => toast({ title: "Failed to create category", variant: "destructive" }),
+    },
+  });
 
   const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
-  const [isMultiDay, setIsMultiDay] = useState(
-    !!(event.startDate && event.endDate && event.startDate !== event.endDate)
-  );
+  const scheduleType =
+    (event.scheduleType === "repeating" || event.repeatDayOfWeek != null) ? "repeating"
+    : (event.scheduleType === "multi_day" || (event.endDate && event.startDate && event.endDate !== event.startDate)) ? "multi_day"
+    : "one_time";
 
   const [form, setForm] = useState({
     name: event.name,
@@ -3075,6 +3533,17 @@ function EventSettingsSection({
   const set = <K extends keyof typeof form>(key: K) => (value: (typeof form)[K]) =>
     setForm((p) => ({ ...p, [key]: value }));
 
+  const deleteEvent = useDeleteEvent({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+        toast({ title: "Event deleted" });
+        navigate("/events");
+      },
+      onError: () => toast({ title: "Failed to delete event", variant: "destructive" }),
+    },
+  });
+
   return (
     <div className="p-6 md:p-8 max-w-2xl mx-auto w-full space-y-6">
       <div>
@@ -3093,31 +3562,92 @@ function EventSettingsSection({
             <Input value={form.name} onChange={(e) => set("name")(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Event Type</Label>
+            <Label>Event Category</Label>
             <Select value={form.eventType} onValueChange={set("eventType")}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {EVENT_TYPES_LIST.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
                 ))}
+                <div className="border-t border-border mt-1 pt-1">
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-1.5 text-sm px-2 py-1.5 text-primary hover:bg-accent rounded-sm"
+                    onMouseDown={(e) => { e.preventDefault(); setCreateCatOpen(true); }}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Create new category
+                  </button>
+                </div>
               </SelectContent>
             </Select>
           </div>
+
+          <Dialog open={createCatOpen} onOpenChange={setCreateCatOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>New Event Category</DialogTitle>
+                <DialogDescription>
+                  Give your category a name. It will be available for all events.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1.5 py-2">
+                <Label>Category Name</Label>
+                <Input
+                  autoFocus
+                  placeholder="e.g. Vacation Bible School"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newCatName.trim()) {
+                      createCategory.mutate({ data: { name: newCatName.trim() } });
+                    }
+                  }}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateCatOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => createCategory.mutate({ data: { name: newCatName.trim() } })}
+                  disabled={!newCatName.trim() || createCategory.isPending}
+                >
+                  {createCategory.isPending ? "Creating…" : "Create"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <div className="space-y-1.5">
             <Label>Description</Label>
             <Textarea rows={2} value={form.description} onChange={(e) => set("description")(e.target.value)} />
           </div>
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <p className="text-sm font-medium">Multi-day event</p>
-              <p className="text-xs text-muted-foreground">Spans more than one day</p>
+          {/* Schedule display — varies by type */}
+          {scheduleType === "repeating" ? (
+            <div className="rounded-lg border border-border bg-muted/30 p-3.5 space-y-2">
+              <div className="flex items-center gap-2">
+                <Repeat className="w-4 h-4 text-primary" />
+                <p className="text-sm font-semibold">Repeating Schedule</p>
+              </div>
+              <div className="text-sm space-y-1 pl-6">
+                {event.repeatDayOfWeek != null && (
+                  <p className="text-foreground">
+                    Every <span className="font-medium">{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][event.repeatDayOfWeek]}</span>
+                    {event.repeatFrequency ? ` (${event.repeatFrequency})` : ""}
+                  </p>
+                )}
+                {event.startDate && event.endDate && (
+                  <p className="text-muted-foreground">
+                    {format(new Date(event.startDate + "T00:00:00"), "MMM d, yyyy")} – {format(new Date(event.endDate + "T00:00:00"), "MMM d, yyyy")}
+                  </p>
+                )}
+                {event.sessionCount != null && (
+                  <p className="text-muted-foreground">{event.sessionCount} sessions scheduled</p>
+                )}
+                {event.nextSessionDate && (
+                  <p className="text-muted-foreground">Next: {format(new Date(event.nextSessionDate + "T00:00:00"), "EEEE, MMM d, yyyy")}</p>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground pl-6">To change the schedule, create a new event.</p>
             </div>
-            <Switch
-              checked={isMultiDay}
-              onCheckedChange={(v) => { setIsMultiDay(v); if (!v) set("endDate")(""); }}
-            />
-          </div>
-          {isMultiDay ? (
+          ) : scheduleType === "multi_day" ? (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Start Date</Label>
@@ -3292,6 +3822,79 @@ function EventSettingsSection({
           </CardFooter>
         </Card>
       )}
+
+      {/* Danger Zone */}
+      <Card className="border-destructive/40">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2 text-destructive">
+            <AlertTriangle className="w-4 h-4" /> Danger Zone
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+            <div>
+              <p className="font-medium text-sm">Delete this event</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Permanently removes this event. The linked registration form and its registrations will not be deleted.
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="flex-shrink-0 gap-1.5"
+              onClick={() => { setDeleteConfirmText(""); setDeleteDialogOpen(true); }}
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Event
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) setDeleteConfirmText(""); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+              </div>
+              <DialogTitle className="text-destructive">Delete "{event.name}"?</DialogTitle>
+            </div>
+            <DialogDescription className="pt-1">
+              This will permanently delete this event. The linked registration form and its registrations will not be deleted. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="delete-event-confirm" className="text-sm">
+              Type <span className="font-mono font-bold text-destructive">DELETE</span> to confirm
+            </Label>
+            <Input
+              id="delete-event-confirm"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              className="font-mono"
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => { setDeleteDialogOpen(false); setDeleteConfirmText(""); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteConfirmText !== "DELETE" || deleteEvent.isPending}
+              onClick={() => deleteEvent.mutate({ eventId })}
+              className="gap-1.5"
+            >
+              {deleteEvent.isPending ? "Deleting…" : <><Trash2 className="w-4 h-4" /> Delete Event</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -3315,6 +3918,19 @@ export default function EventWorkspace() {
   const { data: checkins, isLoading: checkinsLoading } = useListEventCheckins(eventId, {
     query: { enabled: !!eventId, queryKey: getListEventCheckinsQueryKey(eventId) },
   });
+  const isRepeating = event?.scheduleType === "repeating";
+  const { data: eventSessions } = useListEventSessions(eventId, {
+    query: { enabled: !!eventId && isRepeating, queryKey: getListEventSessionsQueryKey(eventId) },
+  });
+
+  // Default selected session: today's session (if any), else null
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todaySession = eventSessions?.find((s) => s.sessionDate === todayStr);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | null | undefined>(undefined);
+  // Once sessions load, default to today's session if available
+  const resolvedSessionId = selectedSessionId === undefined
+    ? (todaySession?.id ?? null)
+    : selectedSessionId;
 
   const attendanceSessions = useMemo(() => {
     if (!checkins?.length) return [];
@@ -3447,6 +4063,9 @@ export default function EventWorkspace() {
           attendanceSessions={attendanceSessions}
           onExportCsv={handleExportCsv}
           isExporting={isExporting}
+          sessions={isRepeating ? eventSessions : undefined}
+          selectedSessionId={isRepeating ? resolvedSessionId : undefined}
+          onSessionChange={isRepeating ? setSelectedSessionId : undefined}
         />
       </div>
     );

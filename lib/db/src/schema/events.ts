@@ -9,8 +9,13 @@ export const eventsTable = pgTable("events", {
   description: text("description"),
   eventType: text("event_type").notNull().default("general"),
   registrationType: text("registration_type"),
+  scheduleType: text("schedule_type").notNull().default("one_time"), // 'one_time' | 'multi_day' | 'repeating'
   startDate: text("start_date"),
   endDate: text("end_date"),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  repeatFrequency: text("repeat_frequency"), // 'weekly'
+  repeatDayOfWeek: integer("repeat_day_of_week"), // 0=Sun, 1=Mon, ..., 6=Sat
   status: text("status").notNull().default("upcoming"),
   formId: integer("form_id").references(() => formsTable.id, { onDelete: "set null" }),
   // Check-in / attendance settings — null means derive from registrationType on the client

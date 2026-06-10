@@ -11,8 +11,13 @@ export interface UpdateEventInput {
   description?: string;
   eventType?: string;
   registrationType?: string;
+  scheduleType?: string;
   startDate?: string;
   endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  repeatFrequency?: string;
+  repeatDayOfWeek?: number;
   status?: string;
   trackAttendance?: boolean;
   requireCheckout?: boolean;

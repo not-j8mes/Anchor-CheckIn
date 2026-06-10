@@ -6,12 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface RoomInput {
+export interface EventCategory {
+  id: number;
+  slug: string;
   name: string;
-  description?: string;
-  capacity?: number;
-  isActive?: boolean;
-  sortOrder?: number;
-  ageMin?: number;
-  ageMax?: number;
+  isDefault: boolean;
+  createdAt: string;
 }

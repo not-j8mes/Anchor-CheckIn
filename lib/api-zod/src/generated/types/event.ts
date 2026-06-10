@@ -15,9 +15,19 @@ export interface Event {
   /** @nullable */
   registrationType?: string | null;
   /** @nullable */
+  scheduleType?: string | null;
+  /** @nullable */
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  endTime?: string | null;
+  /** @nullable */
+  repeatFrequency?: string | null;
+  /** @nullable */
+  repeatDayOfWeek?: number | null;
   status: string;
   /** @nullable */
   formId?: number | null;
@@ -34,5 +44,9 @@ export interface Event {
   printLabels?: boolean | null;
   /** @nullable */
   labelType?: string | null;
+  /** @nullable */
+  sessionCount?: number | null;
+  /** @nullable */
+  nextSessionDate?: string | null;
   createdAt: string;
 }

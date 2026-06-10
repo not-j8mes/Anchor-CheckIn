@@ -17,6 +17,8 @@ router.get("/events/:eventId/rooms", async (req, res) => {
         capacity: roomsTable.capacity,
         isActive: roomsTable.isActive,
         sortOrder: roomsTable.sortOrder,
+        ageMin: roomsTable.ageMin,
+        ageMax: roomsTable.ageMax,
         createdAt: roomsTable.createdAt,
         participantCount: sql<number>`(
           SELECT COUNT(*)::int FROM ${registrationsTable} r
@@ -38,12 +40,14 @@ router.get("/events/:eventId/rooms", async (req, res) => {
 router.post("/events/:eventId/rooms", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   if (isNaN(eventId)) { res.status(400).json({ error: "Invalid eventId" }); return; }
-  const { name, description, capacity, isActive, sortOrder } = req.body as {
+  const { name, description, capacity, isActive, sortOrder, ageMin, ageMax } = req.body as {
     name?: string;
     description?: string;
     capacity?: number;
     isActive?: boolean;
     sortOrder?: number;
+    ageMin?: number;
+    ageMax?: number;
   };
   if (!name?.trim()) {
     res.status(400).json({ error: "name is required" });
@@ -59,6 +63,8 @@ router.post("/events/:eventId/rooms", async (req, res) => {
         capacity: capacity ?? null,
         isActive: isActive ?? true,
         sortOrder: sortOrder ?? 0,
+        ageMin: ageMin ?? null,
+        ageMax: ageMax ?? null,
       })
       .returning();
     res.status(201).json({ ...room, participantCount: 0 });
@@ -72,12 +78,14 @@ router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   const roomId = parseInt(req.params.roomId, 10);
   if (isNaN(eventId) || isNaN(roomId)) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, description, capacity, isActive, sortOrder } = req.body as {
+  const { name, description, capacity, isActive, sortOrder, ageMin, ageMax } = req.body as {
     name?: string;
     description?: string;
     capacity?: number | null;
     isActive?: boolean;
     sortOrder?: number;
+    ageMin?: number | null;
+    ageMax?: number | null;
   };
   try {
     const [updated] = await db
@@ -88,6 +96,8 @@ router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
         ...(capacity !== undefined && { capacity }),
         ...(isActive !== undefined && { isActive }),
         ...(sortOrder !== undefined && { sortOrder }),
+        ...(ageMin !== undefined && { ageMin }),
+        ...(ageMax !== undefined && { ageMax }),
       })
       .where(and(eq(roomsTable.id, roomId), eq(roomsTable.eventId, eventId)))
       .returning();
@@ -101,6 +111,8 @@ router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
         capacity: roomsTable.capacity,
         isActive: roomsTable.isActive,
         sortOrder: roomsTable.sortOrder,
+        ageMin: roomsTable.ageMin,
+        ageMax: roomsTable.ageMax,
         createdAt: roomsTable.createdAt,
         participantCount: sql<number>`(
           SELECT COUNT(*)::int FROM ${registrationsTable} r

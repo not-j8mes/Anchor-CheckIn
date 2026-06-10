@@ -28,11 +28,14 @@ import type {
   CheckoutInput,
   Child,
   CreateCheckin409,
+  CreateEventCategoryInput,
   CreateEventInput,
   DashboardStats,
   DayCount,
   Event,
+  EventCategory,
   EventCheckin,
+  EventSession,
   EventWithForm,
   Form,
   FormField,
@@ -57,6 +60,7 @@ import type {
   Room,
   RoomInput,
   UpdateCheckinInput,
+  UpdateEventCategoryInput,
   UpdateEventInput,
   UpdateRoomInput
 } from './api.schemas';
@@ -659,6 +663,83 @@ export function useListEventCheckins<TData = Awaited<ReturnType<typeof listEvent
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListEventCheckinsQueryOptions(eventId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListEventSessionsUrl = (eventId: number,) => {
+
+
+
+
+  return `/api/events/${eventId}/sessions`
+}
+
+/**
+ * @summary List sessions for a repeating event
+ */
+export const listEventSessions = async (eventId: number, options?: RequestInit): Promise<EventSession[]> => {
+
+  return customFetch<EventSession[]>(getListEventSessionsUrl(eventId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEventSessionsQueryKey = (eventId: number,) => {
+    return [
+    `/api/events/${eventId}/sessions`
+    ] as const;
+    }
+
+
+export const getListEventSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listEventSessions>>, TError = ErrorType<unknown>>(eventId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEventSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEventSessionsQueryKey(eventId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEventSessions>>> = ({ signal }) => listEventSessions(eventId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(eventId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEventSessions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEventSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listEventSessions>>>
+export type ListEventSessionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List sessions for a repeating event
+ */
+
+export function useListEventSessions<TData = Awaited<ReturnType<typeof listEventSessions>>, TError = ErrorType<unknown>>(
+ eventId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEventSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEventSessionsQueryOptions(eventId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2218,6 +2299,76 @@ export const useUpdateRegistration = <TError = ErrorType<unknown>,
       return useMutation(getUpdateRegistrationMutationOptions(options));
     }
 
+export const getDeleteRegistrationUrl = (registrationId: number,) => {
+
+
+
+
+  return `/api/registrations/${registrationId}`
+}
+
+/**
+ * @summary Delete a registration
+ */
+export const deleteRegistration = async (registrationId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteRegistrationUrl(registrationId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteRegistrationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRegistration>>, TError,{registrationId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteRegistration>>, TError,{registrationId: number}, TContext> => {
+
+const mutationKey = ['deleteRegistration'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteRegistration>>, {registrationId: number}> = (props) => {
+          const {registrationId} = props ?? {};
+
+          return  deleteRegistration(registrationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteRegistrationMutationResult = NonNullable<Awaited<ReturnType<typeof deleteRegistration>>>
+
+    export type DeleteRegistrationMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a registration
+ */
+export const useDeleteRegistration = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRegistration>>, TError,{registrationId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteRegistration>>,
+        TError,
+        {registrationId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteRegistrationMutationOptions(options));
+    }
+
 export const getUpdateRegistrationRoomUrl = (registrationId: number,) => {
 
 
@@ -3254,6 +3405,296 @@ export const useUndoCheckout = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUndoCheckoutMutationOptions(options));
+    }
+
+export const getListEventCategoriesUrl = () => {
+
+
+
+
+  return `/api/event-categories`
+}
+
+/**
+ * @summary List all event categories
+ */
+export const listEventCategories = async ( options?: RequestInit): Promise<EventCategory[]> => {
+
+  return customFetch<EventCategory[]>(getListEventCategoriesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListEventCategoriesQueryKey = () => {
+    return [
+    `/api/event-categories`
+    ] as const;
+    }
+
+
+export const getListEventCategoriesQueryOptions = <TData = Awaited<ReturnType<typeof listEventCategories>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEventCategories>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListEventCategoriesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listEventCategories>>> = ({ signal }) => listEventCategories({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listEventCategories>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListEventCategoriesQueryResult = NonNullable<Awaited<ReturnType<typeof listEventCategories>>>
+export type ListEventCategoriesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all event categories
+ */
+
+export function useListEventCategories<TData = Awaited<ReturnType<typeof listEventCategories>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listEventCategories>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListEventCategoriesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateEventCategoryUrl = () => {
+
+
+
+
+  return `/api/event-categories`
+}
+
+/**
+ * @summary Create a new event category
+ */
+export const createEventCategory = async (createEventCategoryInput: CreateEventCategoryInput, options?: RequestInit): Promise<EventCategory> => {
+
+  return customFetch<EventCategory>(getCreateEventCategoryUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createEventCategoryInput,)
+  }
+);}
+
+
+
+
+export const getCreateEventCategoryMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEventCategory>>, TError,{data: BodyType<CreateEventCategoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createEventCategory>>, TError,{data: BodyType<CreateEventCategoryInput>}, TContext> => {
+
+const mutationKey = ['createEventCategory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createEventCategory>>, {data: BodyType<CreateEventCategoryInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createEventCategory(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateEventCategoryMutationResult = NonNullable<Awaited<ReturnType<typeof createEventCategory>>>
+    export type CreateEventCategoryMutationBody = BodyType<CreateEventCategoryInput>
+    export type CreateEventCategoryMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new event category
+ */
+export const useCreateEventCategory = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createEventCategory>>, TError,{data: BodyType<CreateEventCategoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createEventCategory>>,
+        TError,
+        {data: BodyType<CreateEventCategoryInput>},
+        TContext
+      > => {
+      return useMutation(getCreateEventCategoryMutationOptions(options));
+    }
+
+export const getUpdateEventCategoryUrl = (categoryId: number,) => {
+
+
+
+
+  return `/api/event-categories/${categoryId}`
+}
+
+/**
+ * @summary Rename an event category
+ */
+export const updateEventCategory = async (categoryId: number,
+    updateEventCategoryInput: UpdateEventCategoryInput, options?: RequestInit): Promise<EventCategory> => {
+
+  return customFetch<EventCategory>(getUpdateEventCategoryUrl(categoryId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateEventCategoryInput,)
+  }
+);}
+
+
+
+
+export const getUpdateEventCategoryMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEventCategory>>, TError,{categoryId: number;data: BodyType<UpdateEventCategoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateEventCategory>>, TError,{categoryId: number;data: BodyType<UpdateEventCategoryInput>}, TContext> => {
+
+const mutationKey = ['updateEventCategory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateEventCategory>>, {categoryId: number;data: BodyType<UpdateEventCategoryInput>}> = (props) => {
+          const {categoryId,data} = props ?? {};
+
+          return  updateEventCategory(categoryId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateEventCategoryMutationResult = NonNullable<Awaited<ReturnType<typeof updateEventCategory>>>
+    export type UpdateEventCategoryMutationBody = BodyType<UpdateEventCategoryInput>
+    export type UpdateEventCategoryMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Rename an event category
+ */
+export const useUpdateEventCategory = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateEventCategory>>, TError,{categoryId: number;data: BodyType<UpdateEventCategoryInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateEventCategory>>,
+        TError,
+        {categoryId: number;data: BodyType<UpdateEventCategoryInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateEventCategoryMutationOptions(options));
+    }
+
+export const getDeleteEventCategoryUrl = (categoryId: number,) => {
+
+
+
+
+  return `/api/event-categories/${categoryId}`
+}
+
+/**
+ * @summary Delete an event category (reassigns its events to General / Other)
+ */
+export const deleteEventCategory = async (categoryId: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteEventCategoryUrl(categoryId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteEventCategoryMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEventCategory>>, TError,{categoryId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteEventCategory>>, TError,{categoryId: number}, TContext> => {
+
+const mutationKey = ['deleteEventCategory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteEventCategory>>, {categoryId: number}> = (props) => {
+          const {categoryId} = props ?? {};
+
+          return  deleteEventCategory(categoryId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteEventCategoryMutationResult = NonNullable<Awaited<ReturnType<typeof deleteEventCategory>>>
+
+    export type DeleteEventCategoryMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete an event category (reassigns its events to General / Other)
+ */
+export const useDeleteEventCategory = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEventCategory>>, TError,{categoryId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteEventCategory>>,
+        TError,
+        {categoryId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteEventCategoryMutationOptions(options));
     }
 
 export const getResetAllDataUrl = () => {

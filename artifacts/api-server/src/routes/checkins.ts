@@ -233,7 +233,7 @@ router.post("/checkins", async (req, res) => {
     return;
   }
   try {
-    const { registrationId, room } = parsed.data;
+    const { registrationId, room, sessionId } = parsed.data;
 
     // Prevent duplicate active check-ins for the same registration
     const [activeCheckin] = await db
@@ -261,6 +261,7 @@ router.post("/checkins", async (req, res) => {
       .insert(checkinsTable)
       .values({
         registrationId,
+        sessionId: sessionId ?? null,
         childFirstName: r.childFirstName,
         childLastName: r.childLastName,
         guardianName: r.guardianName,

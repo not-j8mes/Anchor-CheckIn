@@ -17,4 +17,5 @@ export interface FormFieldInput {
   required?: boolean;
   sortOrder?: number;
   options?: string;
+  sectionKey?: string;
 }

@@ -22,4 +22,6 @@ export interface FormField {
   sortOrder: number;
   /** @nullable */
   options?: string | null;
+  /** @nullable */
+  sectionKey?: string | null;
 }

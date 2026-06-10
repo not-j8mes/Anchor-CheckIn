@@ -7,10 +7,13 @@ import {
   useUpdateFormField,
   useDeleteFormField,
   useReorderFormFields,
+  useListRooms,
   getGetFormQueryKey,
   getListFormFieldsQueryKey,
+  getListRoomsQueryKey,
   type FormField,
   type FormFieldInput,
+  type Room,
   FormFieldFieldKind,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -50,17 +53,88 @@ import {
   CheckCircle2,
   Eye,
   Users,
+  User,
+  Baby,
   ChevronDown,
   Info,
+  DoorOpen,
+  RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   SYSTEM_FIELDS,
   SYSTEM_FIELD_CATEGORIES,
   getSystemField,
+  SYSTEM_FIELDS_BY_KEY,
   type SystemFieldCategory,
   type SystemFieldDef,
 } from "@/lib/systemFields";
+
+// ─── Section definitions ───────────────────────────────────────────────────────
+
+type SectionKey = "guardian_info" | "child_info" | "additional_questions";
+
+interface SectionDef {
+  key: SectionKey;
+  title: string;
+  description?: string;
+  repeats?: boolean;
+  headerClass: string;
+  iconClass: string;
+  Icon: React.ElementType;
+  addSystemLabel: string;
+  addCustomLabel: string;
+}
+
+const SECTIONS: SectionDef[] = [
+  {
+    key: "guardian_info",
+    title: "Parent / Guardian Information",
+    headerClass: "bg-primary text-primary-foreground",
+    iconClass: "text-primary-foreground",
+    Icon: User,
+    addSystemLabel: "Add Guardian Field",
+    addCustomLabel: "Add Custom Question",
+  },
+  {
+    key: "child_info",
+    title: "Child Information",
+    description: "This section repeats when a parent registers another child.",
+    repeats: true,
+    headerClass: "bg-secondary text-secondary-foreground",
+    iconClass: "text-secondary-foreground",
+    Icon: Baby,
+    addSystemLabel: "Add Child Field",
+    addCustomLabel: "Add Custom Question",
+  },
+  {
+    key: "additional_questions",
+    title: "Additional Questions",
+    headerClass: "bg-muted/70 text-foreground border-b border-border",
+    iconClass: "text-muted-foreground",
+    Icon: MessageSquare,
+    addSystemLabel: "Add System Field",
+    addCustomLabel: "Add Custom Question",
+  },
+];
+
+const SECTION_CATEGORY_MAP: Record<SystemFieldCategory, SectionKey> = {
+  guardian: "guardian_info",
+  emergency_safety: "guardian_info",
+  participant: "child_info",
+  rooms: "child_info",
+  individual: "additional_questions",
+};
+
+function getFieldSection(field: FormField): SectionKey {
+  // Explicit sectionKey always wins — lets template fields override category defaults
+  if (field.sectionKey) return field.sectionKey as SectionKey;
+  if (field.fieldKind === "system" && field.systemKey) {
+    const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
+    if (def) return SECTION_CATEGORY_MAP[def.category] ?? "additional_questions";
+  }
+  return "additional_questions";
+}
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -76,17 +150,21 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   number: "Number",
 };
 
-const CATEGORY_ORDER: SystemFieldCategory[] = ["participant", "guardian", "emergency_safety", "individual"];
+const CATEGORY_ORDER: SystemFieldCategory[] = ["participant", "guardian", "emergency_safety", "individual", "rooms"];
 
-/**
- * Friendly display labels shown in the field card subtitle and picker group headers.
- * These are UI-only — the underlying system_key and category values are unchanged.
- */
 const CATEGORY_DISPLAY_LABELS: Record<SystemFieldCategory, string> = {
   participant: "Child Profile",
   guardian: "Guardian Info",
   emergency_safety: "Safety Info",
   individual: "Individual / Adult",
+  rooms: "Room / Group",
+};
+
+// Categories that are auto-placed — shown in the picker per section
+const SECTION_CATEGORY_FILTER: Record<SectionKey, SystemFieldCategory[]> = {
+  guardian_info: ["guardian", "emergency_safety"],
+  child_info: ["participant", "rooms"],
+  additional_questions: ["individual", "guardian", "emergency_safety", "participant", "rooms"],
 };
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
@@ -95,10 +173,11 @@ type ModalMode = "none" | "system-picker" | "field-editor" | "preview";
 
 interface FormBuilderPanelProps {
   formId: number;
+  eventId?: number;
   hideAdditionalPeople?: boolean;
 }
 
-// ─── Sub-component: FieldCard ───────────────────────────────────────────────────
+// ─── FieldCard ──────────────────────────────────────────────────────────────────
 
 interface FieldCardProps {
   field: FormField;
@@ -126,83 +205,51 @@ function FieldCard({ field, index, total, onEdit, onDelete, onMove }: FieldCardP
       ].join(" · ");
 
   return (
-    <Card className="hover-elevate transition-all border-card-border overflow-hidden">
-      <div className="flex items-stretch">
-        {/* Reorder column */}
-        <div className="p-3 flex flex-col gap-1 text-muted-foreground border-r border-border bg-muted/10 justify-center">
+    <div className="flex items-stretch rounded-lg border border-border bg-background hover:shadow-sm transition-shadow overflow-hidden">
+      {/* Reorder column */}
+      <div className="p-2 flex flex-col gap-1 text-muted-foreground border-r border-border bg-muted/10 justify-center">
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onMove("up")} disabled={index === 0}>
+          <ArrowUp className="w-3 h-3" />
+        </Button>
+        <GripVertical className="w-4 h-4 mx-auto opacity-30" />
+        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onMove("down")} disabled={index === total - 1}>
+          <ArrowDown className="w-3 h-3" />
+        </Button>
+      </div>
+
+      {/* Content */}
+      <div className="p-3 flex-1 flex justify-between items-center gap-3">
+        <div className="flex items-start gap-2.5 min-w-0">
+          <div className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center ${isSystem ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+            {isSystem ? <Sparkles className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-medium text-sm text-foreground truncate">{field.label}</span>
+              {field.required && <span className="text-xs text-destructive font-bold">*</span>}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onEdit}>Edit</Button>
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
-            className="h-6 w-6"
-            onClick={() => onMove("up")}
-            disabled={index === 0}
+            className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={onDelete}
           >
-            <ArrowUp className="w-3 h-3" />
-          </Button>
-          <GripVertical className="w-4 h-4 mx-auto opacity-40" />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => onMove("down")}
-            disabled={index === total - 1}
-          >
-            <ArrowDown className="w-3 h-3" />
+            <Trash2 className="w-3 h-3" />
           </Button>
         </div>
-
-        {/* Content */}
-        <CardContent className="p-4 flex-1 flex justify-between items-center gap-4">
-          <div className="flex items-start gap-3 min-w-0">
-            {/* Icon badge */}
-            <div
-              className={`mt-0.5 flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center ${
-                isSystem
-                  ? "bg-primary/10 text-primary"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {isSystem ? (
-                <Sparkles className="w-3.5 h-3.5" />
-              ) : (
-                <MessageSquare className="w-3.5 h-3.5" />
-              )}
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-foreground truncate">{field.label}</span>
-                {field.required && (
-                  <span className="text-xs text-destructive font-semibold">*</span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={onEdit}>
-              Edit
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={onDelete}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        </CardContent>
       </div>
-    </Card>
+    </div>
   );
 }
 
 // ─── Main component ─────────────────────────────────────────────────────────────
 
-export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormBuilderPanelProps) {
+export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalPeople = false }: FormBuilderPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -213,6 +260,12 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
   const { data: fields, isLoading: fieldsLoading } = useListFormFields(formId, {
     query: { queryKey: getListFormFieldsQueryKey(formId) },
   });
+  const eventId = eventIdProp ?? form?.eventId ?? 0;
+  const { data: eventRooms = [] } = useListRooms(eventId, {
+    query: { enabled: !!eventId, queryKey: getListRoomsQueryKey(eventId) },
+  });
+
+  const isChildCheckin = !form?.registrationType || form?.registrationType === "child_checkin";
 
   // ── Form settings state ───────────────────────────────────────────────────────
   const [formSettings, setFormSettings] = useState({
@@ -239,6 +292,7 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
   const [modalMode, setModalMode] = useState<ModalMode>("none");
   const [editingField, setEditingField] = useState<Partial<FormField> | null>(null);
   const [systemSearch, setSystemSearch] = useState("");
+  const [pickerTargetSection, setPickerTargetSection] = useState<SectionKey | null>(null);
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
   const invalidateFields = () =>
@@ -255,35 +309,21 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
 
   const createFormField = useCreateFormField({
     mutation: {
-      onSuccess: () => {
-        setModalMode("none");
-        invalidateFields();
-      },
-      onError: () => {
-        toast({ title: "Failed to add field", variant: "destructive" });
-      },
+      onSuccess: () => { setModalMode("none"); invalidateFields(); },
+      onError: () => { toast({ title: "Failed to add field", variant: "destructive" }); },
     },
   });
 
   const updateFormField = useUpdateFormField({
     mutation: {
-      onSuccess: () => {
-        toast({ title: "Field updated" });
-        setModalMode("none");
-        invalidateFields();
-      },
-      onError: () => {
-        toast({ title: "Failed to update field", variant: "destructive" });
-      },
+      onSuccess: () => { toast({ title: "Field updated" }); setModalMode("none"); invalidateFields(); },
+      onError: () => { toast({ title: "Failed to update field", variant: "destructive" }); },
     },
   });
 
   const deleteFormField = useDeleteFormField({
     mutation: {
-      onSuccess: () => {
-        toast({ title: "Field removed" });
-        invalidateFields();
-      },
+      onSuccess: () => { toast({ title: "Field removed" }); invalidateFields(); },
     },
   });
 
@@ -292,24 +332,33 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
   });
 
   // ── Derived data ──────────────────────────────────────────────────────────────
-
-  /** System keys already present in this form */
   const addedSystemKeys = new Set<string>(
     fields
       ?.filter((f) => f.fieldKind === FormFieldFieldKind.system && f.systemKey)
       .map((f) => f.systemKey!) ?? []
   );
 
-  /** System field definitions filtered by search query */
   const filteredSystemFields = SYSTEM_FIELDS.filter((def) => {
     const q = systemSearch.toLowerCase();
-    return (
-      !q ||
-      def.label.toLowerCase().includes(q) ||
-      def.key.toLowerCase().includes(q) ||
-      SYSTEM_FIELD_CATEGORIES[def.category].toLowerCase().includes(q)
-    );
+    const matchesSearch = !q || def.label.toLowerCase().includes(q) || def.key.toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+    if (pickerTargetSection) {
+      return SECTION_CATEGORY_FILTER[pickerTargetSection].includes(def.category);
+    }
+    return true;
   });
+
+  // Group fields by section, sorted by global sortOrder
+  const fieldsBySection = (() => {
+    const sorted = [...(fields ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    const result: Record<SectionKey, FormField[]> = {
+      guardian_info: [],
+      child_info: [],
+      additional_questions: [],
+    };
+    sorted.forEach((f) => result[getFieldSection(f)].push(f));
+    return result;
+  })();
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
 
@@ -325,6 +374,7 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
         sortOrder: fields?.length ?? 0,
         placeholder: def.placeholder ?? "",
         options: def.defaultOptions ?? "",
+        sectionKey: SECTION_CATEGORY_MAP[def.category],
       },
     });
   };
@@ -343,6 +393,7 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
       options: editingField.options ?? "",
       fieldKind: editingField.fieldKind as FormFieldInput["fieldKind"],
       systemKey: editingField.systemKey ?? undefined,
+      sectionKey: editingField.sectionKey ?? "additional_questions",
     };
     if (editingField.id) {
       updateFormField.mutate({ formId, fieldId: editingField.id, data });
@@ -352,26 +403,39 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
   };
 
   const handleDeleteField = (field: FormField) => {
-    if (!confirm(`Remove "${field.label}" from this form?`)) return;
+    const isSystem = field.fieldKind === FormFieldFieldKind.system;
+    const msg = isSystem && field.required
+      ? `"${field.label}" is a required system field. Removing it may break registrations. Remove anyway?`
+      : `Remove "${field.label}" from this form?`;
+    if (!confirm(msg)) return;
     deleteFormField.mutate({ formId, fieldId: field.id });
   };
 
-  const handleMoveField = (index: number, direction: "up" | "down") => {
+  const handleMoveSectionField = (fieldId: number, section: SectionKey, dir: "up" | "down") => {
     if (!fields) return;
-    const reordered = [...fields];
-    if (direction === "up" && index > 0) {
-      [reordered[index], reordered[index - 1]] = [reordered[index - 1], reordered[index]];
-    } else if (direction === "down" && index < reordered.length - 1) {
-      [reordered[index], reordered[index + 1]] = [reordered[index + 1], reordered[index]];
-    } else {
-      return;
-    }
-    reorderFormFields.mutate({ formId, data: { fieldIds: reordered.map((f) => f.id) } });
+    const sectionArr = [...fieldsBySection[section]];
+    const idx = sectionArr.findIndex((f) => f.id === fieldId);
+    if (idx === -1) return;
+    if (dir === "up" && idx === 0) return;
+    if (dir === "down" && idx === sectionArr.length - 1) return;
+    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
+    [sectionArr[idx], sectionArr[swapIdx]] = [sectionArr[swapIdx], sectionArr[idx]];
+    // Rebuild full global order: guardian → child → additional
+    const orderedIds = (["guardian_info", "child_info", "additional_questions"] as SectionKey[]).flatMap(
+      (s) => (s === section ? sectionArr : fieldsBySection[s]).map((f) => f.id)
+    );
+    reorderFormFields.mutate({ formId, data: { fieldIds: orderedIds } });
   };
 
-  const openCustomEditor = () => {
-    setEditingField({ fieldKind: "custom", fieldType: "text", required: false });
+  const openCustomEditor = (targetSection: SectionKey = "additional_questions") => {
+    setEditingField({ fieldKind: "custom", fieldType: "text", required: false, sectionKey: targetSection });
     setModalMode("field-editor");
+  };
+
+  const openSystemPicker = (targetSection: SectionKey | null = null) => {
+    setPickerTargetSection(targetSection);
+    setSystemSearch("");
+    setModalMode("system-picker");
   };
 
   const openFieldEditor = (field: FormField) => {
@@ -380,7 +444,6 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
   };
 
   // ── Loading / empty states ────────────────────────────────────────────────────
-
   if (formLoading || fieldsLoading) {
     return (
       <div className="animate-pulse space-y-4">
@@ -393,16 +456,13 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
   if (!form) return <div className="p-4 text-muted-foreground">Form not found.</div>;
 
   const isEditingSystemField = editingField?.fieldKind === FormFieldFieldKind.system;
-
-  // ── Render ────────────────────────────────────────────────────────────────────
-
   const hasRegistrations = (form.submissionCount ?? 0) > 0;
 
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* ── Left: field list ──────────────────────────────────────────────────── */}
+      {/* ── Left: field builder ───────────────────────────────────────────────── */}
       <div className="md:col-span-2 space-y-4">
-        {/* Version / registration warning banner */}
         {hasRegistrations && (
           <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-4 py-3 text-sm">
             <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
@@ -410,83 +470,148 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
               <span className="font-semibold">
                 This form has {form.submissionCount} registration{form.submissionCount === 1 ? "" : "s"}.
               </span>{" "}
-              Changes will apply only to future submissions — existing registrations will keep the
-              form structure that was active when they were submitted.
+              Changes apply only to future submissions.
             </div>
           </div>
         )}
 
-        {/* Header */}
         <div className="flex justify-between items-center gap-2 flex-wrap">
           <h2 className="text-lg font-serif font-bold">Form Fields</h2>
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setModalMode("preview")}
-            >
-              <Eye className="w-4 h-4 mr-1.5" />
-              Preview
+            <Button size="sm" variant="ghost" onClick={() => setModalMode("preview")}>
+              <Eye className="w-4 h-4 mr-1.5" /> Preview
             </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                setSystemSearch("");
-                setModalMode("system-picker");
-              }}
-            >
-              <Sparkles className="w-4 h-4 mr-1.5" />
-              Add System Field
-            </Button>
-            <Button size="sm" variant="outline" onClick={openCustomEditor}>
-              <Plus className="w-4 h-4 mr-1.5" />
-              Add Custom Question
-            </Button>
+            {!isChildCheckin && (
+              <>
+                <Button size="sm" onClick={() => openSystemPicker()}>
+                  <Sparkles className="w-4 h-4 mr-1.5" /> Add System Field
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => openCustomEditor()}>
+                  <Plus className="w-4 h-4 mr-1.5" /> Add Custom Question
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Field list */}
-        <div className="space-y-3">
-          {!fields || fields.length === 0 ? (
-            <Card className="border-dashed bg-transparent">
-              <CardContent className="p-8 text-center space-y-3">
-                <p className="text-muted-foreground text-sm">
-                  No fields yet. Add system fields for common child &amp; guardian info, or
-                  create custom questions.
-                </p>
-                <div className="flex justify-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setSystemSearch("");
-                      setModalMode("system-picker");
-                    }}
-                  >
-                    <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-                    Add System Field
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={openCustomEditor}>
-                    <Plus className="w-3.5 h-3.5 mr-1.5" />
-                    Add Custom Question
-                  </Button>
+        {/* ── Sectioned layout (child check-in) ──────────────────────────────── */}
+        {isChildCheckin ? (
+          <div className="space-y-4">
+            {SECTIONS.map((section) => {
+              const sectionFields = fieldsBySection[section.key];
+              return (
+                <div key={section.key} className="rounded-xl border border-border overflow-hidden shadow-sm">
+                  {/* Section header */}
+                  <div className={`px-5 py-3.5 flex items-center justify-between ${section.headerClass}`}>
+                    <div className="flex items-center gap-2.5">
+                      <section.Icon className={`w-4 h-4 ${section.iconClass}`} />
+                      <span className="font-semibold text-sm">{section.title}</span>
+                      {section.repeats && (
+                        <span className="flex items-center gap-1 text-xs opacity-80 ml-1">
+                          <RefreshCw className="w-3 h-3" />
+                          Repeats per child
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {section.key !== "additional_questions" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs opacity-80 hover:opacity-100 hover:bg-white/20"
+                          onClick={() => openSystemPicker(section.key)}
+                        >
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          {section.addSystemLabel}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs opacity-80 hover:opacity-100 hover:bg-white/20"
+                        onClick={() => openCustomEditor(section.key)}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        {section.addCustomLabel}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Section description */}
+                  {section.description && (
+                    <div className="px-5 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                      <Info className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                      <p className="text-xs text-muted-foreground">{section.description}</p>
+                    </div>
+                  )}
+
+                  {/* Fields */}
+                  <div className="p-3 space-y-2 bg-background">
+                    {sectionFields.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-4 italic">
+                        No fields in this section yet.
+                      </p>
+                    ) : (
+                      sectionFields.map((field, idx) => (
+                        <FieldCard
+                          key={field.id}
+                          field={field}
+                          index={idx}
+                          total={sectionFields.length}
+                          onEdit={() => openFieldEditor(field)}
+                          onDelete={() => handleDeleteField(field)}
+                          onMove={(dir) => handleMoveSectionField(field.id, section.key, dir)}
+                        />
+                      ))
+                    )}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            fields.map((field, index) => (
-              <FieldCard
-                key={field.id}
-                field={field}
-                index={index}
-                total={fields.length}
-                onEdit={() => openFieldEditor(field)}
-                onDelete={() => handleDeleteField(field)}
-                onMove={(dir) => handleMoveField(index, dir)}
-              />
-            ))
-          )}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* ── Flat layout (non child check-in) ──────────────────────────────── */
+          <div className="space-y-3">
+            <div className="flex gap-2 flex-wrap">
+              <Button size="sm" onClick={() => openSystemPicker()}>
+                <Sparkles className="w-4 h-4 mr-1.5" /> Add System Field
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => openCustomEditor()}>
+                <Plus className="w-4 h-4 mr-1.5" /> Add Custom Question
+              </Button>
+            </div>
+            {!fields || fields.length === 0 ? (
+              <Card className="border-dashed bg-transparent">
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground text-sm">
+                    No fields yet. Add system fields or custom questions.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              [...fields].sort((a, b) => a.sortOrder - b.sortOrder).map((field, index) => (
+                <FieldCard
+                  key={field.id}
+                  field={field}
+                  index={index}
+                  total={fields.length}
+                  onEdit={() => openFieldEditor(field)}
+                  onDelete={() => handleDeleteField(field)}
+                  onMove={(dir) => {
+                    const sorted = [...fields].sort((a, b) => a.sortOrder - b.sortOrder);
+                    const reordered = [...sorted];
+                    if (dir === "up" && index > 0) {
+                      [reordered[index], reordered[index - 1]] = [reordered[index - 1], reordered[index]];
+                    } else if (dir === "down" && index < reordered.length - 1) {
+                      [reordered[index], reordered[index + 1]] = [reordered[index + 1], reordered[index]];
+                    } else return;
+                    reorderFormFields.mutate({ formId, data: { fieldIds: reordered.map((f) => f.id) } });
+                  }}
+                />
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Right: form settings sidebar ──────────────────────────────────────── */}
@@ -566,24 +691,23 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
         </Card>
       </div>
 
-      {/* ── System Field Picker dialog ────────────────────────────────────────── */}
-      <Dialog
-        open={modalMode === "system-picker"}
-        onOpenChange={(open) => !open && setModalMode("none")}
-      >
+      {/* ── System Field Picker ───────────────────────────────────────────────── */}
+      <Dialog open={modalMode === "system-picker"} onOpenChange={(open) => !open && setModalMode("none")}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary" />
-              Add System Field
+              {pickerTargetSection
+                ? `Add Field — ${SECTIONS.find((s) => s.key === pickerTargetSection)?.title}`
+                : "Add System Field"}
             </DialogTitle>
             <DialogDescription>
-              System fields map to structured columns in the database. The key is
-              permanent — you can freely rename the label.
+              {pickerTargetSection
+                ? "Showing fields for this section. Fields auto-place into the correct section."
+                : "System fields map to structured database columns. The key is permanent — you can freely rename the label."}
             </DialogDescription>
           </DialogHeader>
 
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
@@ -595,52 +719,61 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
             />
           </div>
 
-          {/* Grouped field list */}
           <div className="max-h-[380px] overflow-y-auto -mx-6 px-6 space-y-5 pb-1">
             {CATEGORY_ORDER.map((category) => {
-              const defsInCategory = filteredSystemFields.filter(
-                (d) => d.category === category
-              );
+              const defsInCategory = filteredSystemFields.filter((d) => d.category === category);
               if (defsInCategory.length === 0) return null;
+              const sectionForCategory = SECTION_CATEGORY_MAP[category];
+              const sectionLabel = SECTIONS.find((s) => s.key === sectionForCategory)?.title ?? sectionForCategory;
               return (
                 <div key={category}>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                    {CATEGORY_DISPLAY_LABELS[category]}
-                  </p>
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      {CATEGORY_DISPLAY_LABELS[category]}
+                    </p>
+                    <span className="text-xs text-muted-foreground/60">→ {sectionLabel}</span>
+                  </div>
                   <div className="space-y-1">
                     {defsInCategory.map((def) => {
                       const alreadyAdded = addedSystemKeys.has(def.key);
+                      const isRoomField = def.key === "room_assignment";
+                      const noRooms = isRoomField && eventRooms.length === 0;
+                      const isDisabled = alreadyAdded || noRooms || createFormField.isPending;
                       return (
                         <button
                           key={def.key}
                           type="button"
-                          disabled={alreadyAdded || createFormField.isPending}
-                          onClick={() => !alreadyAdded && handleAddSystemField(def)}
-                          className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left transition-colors text-sm group
-                            ${
-                              alreadyAdded
-                                ? "opacity-50 cursor-not-allowed bg-transparent"
-                                : "hover:bg-muted/70 cursor-pointer"
-                            }`}
+                          disabled={isDisabled}
+                          onClick={() => !isDisabled && handleAddSystemField(def)}
+                          className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left transition-colors text-sm group ${isDisabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/70 cursor-pointer"}`}
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <Sparkles className="w-3.5 h-3.5 flex-shrink-0 text-primary/70" />
+                            {isRoomField ? (
+                              <DoorOpen className="w-3.5 h-3.5 flex-shrink-0 text-primary/70" />
+                            ) : (
+                              <Sparkles className="w-3.5 h-3.5 flex-shrink-0 text-primary/70" />
+                            )}
                             <div className="min-w-0">
                               <span className="font-medium text-foreground">{def.label}</span>
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                {FIELD_TYPE_LABELS[def.fieldType] ?? def.fieldType}
-                              </span>
+                              {isRoomField ? (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  {eventRooms.length > 0 ? `${eventRooms.length} rooms` : "No rooms configured"}
+                                </span>
+                              ) : (
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  {FIELD_TYPE_LABELS[def.fieldType] ?? def.fieldType}
+                                </span>
+                              )}
                             </div>
                           </div>
                           {alreadyAdded ? (
                             <span className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                              Already added
+                              <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Added
                             </span>
+                          ) : noRooms ? (
+                            <span className="text-xs text-muted-foreground flex-shrink-0">Add rooms first</span>
                           ) : (
-                            <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 flex-shrink-0">
-                              + Add
-                            </span>
+                            <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 flex-shrink-0">+ Add</span>
                           )}
                         </button>
                       );
@@ -649,91 +782,68 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
                 </div>
               );
             })}
-
             {filteredSystemFields.length === 0 && (
               <p className="text-center text-sm text-muted-foreground py-8">
-                No fields match "{systemSearch}"
+                No fields match{systemSearch ? ` "${systemSearch}"` : " the current filter"}.
               </p>
             )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalMode("none")}>
-              Done
-            </Button>
+            <Button variant="outline" onClick={() => setModalMode("none")}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Field editor dialog (custom + edit) ───────────────────────────────── */}
-      <Dialog
-        open={modalMode === "field-editor"}
-        onOpenChange={(open) => !open && setModalMode("none")}
-      >
+      {/* ── Field editor ─────────────────────────────────────────────────────── */}
+      <Dialog open={modalMode === "field-editor"} onOpenChange={(open) => !open && setModalMode("none")}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {editingField?.id
-                ? isEditingSystemField
-                  ? "Edit System Field"
-                  : "Edit Custom Question"
+                ? isEditingSystemField ? "Edit System Field" : "Edit Custom Question"
                 : "Add Custom Question"}
             </DialogTitle>
             <DialogDescription>
               {isEditingSystemField
-                ? "You can rename the label and change required/placeholder. Field type is fixed by the system."
-                : "Configure the custom question for this form."}
+                ? "You can rename the label and change required/placeholder. Field type is fixed."
+                : "Configure this custom question."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* System field type badge (read-only indicator) */}
             {isEditingSystemField && editingField?.systemKey && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/5 border border-primary/20">
                 <Sparkles className="w-3.5 h-3.5 text-primary flex-shrink-0" />
                 <div className="text-xs">
                   <span className="font-medium text-primary">System field</span>
-                  <span className="text-muted-foreground ml-1.5">
-                    key: <code className="font-mono">{editingField.systemKey}</code>
-                  </span>
+                  <span className="text-muted-foreground ml-1.5">key: <code className="font-mono">{editingField.systemKey}</code></span>
                 </div>
               </div>
             )}
 
-            {/* Label */}
             <div className="space-y-1.5">
               <Label>Field Label</Label>
               <Input
                 value={editingField?.label ?? ""}
-                onChange={(e) =>
-                  setEditingField((p) => ({ ...p, label: e.target.value }))
-                }
+                onChange={(e) => setEditingField((p) => ({ ...p, label: e.target.value }))}
                 placeholder="e.g. T-Shirt Size"
               />
             </div>
 
-            {/* Field type + Required */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Field Type</Label>
                 {isEditingSystemField ? (
                   <div className="h-9 px-3 py-2 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground flex items-center">
-                    {FIELD_TYPE_LABELS[editingField?.fieldType ?? "text"] ??
-                      editingField?.fieldType}
+                    {FIELD_TYPE_LABELS[editingField?.fieldType ?? "text"] ?? editingField?.fieldType}
                   </div>
                 ) : (
                   <Select
                     value={editingField?.fieldType ?? "text"}
-                    onValueChange={(v) =>
-                      setEditingField((p) => ({
-                        ...p,
-                        fieldType: v as FormField["fieldType"],
-                      }))
-                    }
+                    onValueChange={(v) => setEditingField((p) => ({ ...p, fieldType: v as FormField["fieldType"] }))}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="text">Short Text</SelectItem>
                       <SelectItem value="textarea">Long Text</SelectItem>
@@ -753,147 +863,176 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
                 <Switch
                   id="fe-required"
                   checked={editingField?.required ?? false}
-                  onCheckedChange={(c) =>
-                    setEditingField((p) => ({ ...p, required: c }))
-                  }
+                  onCheckedChange={(c) => setEditingField((p) => ({ ...p, required: c }))}
                 />
                 <Label htmlFor="fe-required">Required</Label>
               </div>
             </div>
 
-            {/* Options — shown for select/multiselect, locked for system fields */}
-            {(editingField?.fieldType === "select" ||
-              editingField?.fieldType === "multiselect") && (
+            {/* Section selector — custom questions only */}
+            {!isEditingSystemField && isChildCheckin && (
+              <div className="space-y-1.5">
+                <Label>Section</Label>
+                <Select
+                  value={editingField?.sectionKey ?? "additional_questions"}
+                  onValueChange={(v) => setEditingField((p) => ({ ...p, sectionKey: v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SECTIONS.map((s) => (
+                      <SelectItem key={s.key} value={s.key}>{s.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Choose which section this question appears in.</p>
+              </div>
+            )}
+
+            {(editingField?.fieldType === "select" || editingField?.fieldType === "multiselect") && (
               <div className="space-y-1.5 animate-in fade-in zoom-in duration-200">
                 <Label>Options (comma-separated)</Label>
                 <Input
                   value={editingField?.options ?? ""}
-                  onChange={(e) =>
-                    setEditingField((p) => ({ ...p, options: e.target.value }))
-                  }
+                  onChange={(e) => setEditingField((p) => ({ ...p, options: e.target.value }))}
                   placeholder="Option A, Option B, Option C"
                   disabled={isEditingSystemField}
                 />
                 {isEditingSystemField && (
-                  <p className="text-xs text-muted-foreground">
-                    Options are fixed for system fields.
-                  </p>
+                  <p className="text-xs text-muted-foreground">Options are fixed for system fields.</p>
                 )}
               </div>
             )}
 
-            {/* Placeholder — hide for checkbox, select, multiselect */}
-            {!["checkbox", "select", "multiselect"].includes(
-              editingField?.fieldType ?? "text"
-            ) && (
+            {!["checkbox", "select", "multiselect"].includes(editingField?.fieldType ?? "text") && (
               <div className="space-y-1.5">
                 <Label>Placeholder (optional)</Label>
                 <Input
                   value={editingField?.placeholder ?? ""}
-                  onChange={(e) =>
-                    setEditingField((p) => ({ ...p, placeholder: e.target.value }))
-                  }
+                  onChange={(e) => setEditingField((p) => ({ ...p, placeholder: e.target.value }))}
                 />
               </div>
             )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalMode("none")}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveField}
-              disabled={createFormField.isPending || updateFormField.isPending}
-            >
+            <Button variant="outline" onClick={() => setModalMode("none")}>Cancel</Button>
+            <Button onClick={handleSaveField} disabled={createFormField.isPending || updateFormField.isPending}>
               {editingField?.id ? "Save Changes" : "Add Question"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Preview Form dialog ───────────────────────────────────────────────── */}
-      <Dialog
-        open={modalMode === "preview"}
-        onOpenChange={(open) => !open && setModalMode("none")}
-      >
+      {/* ── Preview dialog ────────────────────────────────────────────────────── */}
+      <Dialog open={modalMode === "preview"} onOpenChange={(open) => !open && setModalMode("none")}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Eye className="w-4 h-4 text-primary" />
-              Form Preview
+              <Eye className="w-4 h-4 text-primary" /> Form Preview
             </DialogTitle>
             <DialogDescription>
-              This is how your form looks to registrants. Preview only — no data will be saved.
+              How the form looks to registrants. No data will be saved.
             </DialogDescription>
           </DialogHeader>
 
-          {/* Form preview body */}
           <div className="rounded-xl border border-border bg-background overflow-hidden">
-            {/* Form header */}
             <div className="bg-primary/5 border-b border-border px-6 py-5">
-              <h2 className="text-xl font-serif font-bold text-foreground">
-                {formSettings.title || "Untitled Form"}
-              </h2>
+              <h2 className="text-xl font-serif font-bold">{formSettings.title || "Untitled Form"}</h2>
               {formSettings.description && (
                 <p className="mt-1.5 text-sm text-muted-foreground">{formSettings.description}</p>
               )}
             </div>
 
-            {/* Fields */}
-            <div className="px-6 py-5 space-y-5">
-              {!fields || fields.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic text-center py-6">
-                  No fields added yet.
-                </p>
-              ) : (
-                fields.map((field) => (
-                  <PreviewField key={field.id} field={field} />
-                ))
-              )}
+            <div className="space-y-0">
+              {isChildCheckin ? (
+                <>
+                  {/* Guardian section */}
+                  {fieldsBySection.guardian_info.length > 0 && (
+                    <div>
+                      <div className="bg-primary px-6 py-3.5 flex items-center gap-2">
+                        <User className="w-4 h-4 text-primary-foreground" />
+                        <span className="text-base font-semibold text-primary-foreground">Parent / Guardian Information</span>
+                      </div>
+                      <div className="px-6 py-5 space-y-5">
+                        {fieldsBySection.guardian_info.map((field) => (
+                          <PreviewField key={field.id} field={field} rooms={eventRooms} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              {/* Additional people section */}
-              {formSettings.allowAdditionalPeople && (
-                <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Additional People</span>
-                    <span className="text-xs text-muted-foreground">(optional)</span>
+                  {/* Child section */}
+                  {fieldsBySection.child_info.length > 0 && (
+                    <div className="border-t border-border">
+                      <div className="bg-secondary px-6 py-3.5 flex items-center gap-2">
+                        <Baby className="w-4 h-4 text-secondary-foreground" />
+                        <span className="text-base font-semibold text-secondary-foreground">Child Information</span>
+                      </div>
+                      <div className="px-6 py-5 space-y-5">
+                        {fieldsBySection.child_info.map((field) => (
+                          <PreviewField key={field.id} field={field} rooms={eventRooms} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Add another child button */}
+                  <div className="border-t border-border px-6 py-4">
+                    <button type="button" disabled className="text-sm text-primary flex items-center gap-1.5 opacity-60">
+                      <Plus className="w-3.5 h-3.5" /> Add Another Child
+                    </button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Registrants can add more people to this registration.
-                  </p>
-                  <button
-                    type="button"
-                    disabled
-                    className="text-sm text-primary flex items-center gap-1.5 opacity-60"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add another person
-                  </button>
+
+                  {/* Additional Questions — separate section, shown once, never repeats */}
+                  {fieldsBySection.additional_questions.length > 0 && (
+                    <div className="border-t border-border">
+                      <div className="bg-muted/70 border-b border-border px-6 py-3.5 flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-base font-semibold text-foreground">Additional Questions</span>
+                      </div>
+                      <div className="px-6 py-5 space-y-5">
+                        {fieldsBySection.additional_questions.map((field) => (
+                          <PreviewField key={field.id} field={field} rooms={eventRooms} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="px-6 py-5 space-y-5">
+                  {!fields || fields.length === 0 ? (
+                    <p className="text-sm text-muted-foreground italic text-center py-6">No fields added yet.</p>
+                  ) : (
+                    [...fields].sort((a, b) => a.sortOrder - b.sortOrder).map((field) => (
+                      <PreviewField key={field.id} field={field} rooms={eventRooms} />
+                    ))
+                  )}
+                  {formSettings.allowAdditionalPeople && (
+                    <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Additional People</span>
+                      </div>
+                      <button type="button" disabled className="text-sm text-primary flex items-center gap-1.5 opacity-60">
+                        <Plus className="w-3.5 h-3.5" /> Add another person
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Submit button */}
-              <div className="pt-2">
-                <button
-                  type="button"
-                  disabled
-                  className="w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium opacity-60 cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  Submit Registration
+              <div className="border-t border-border px-6 py-5">
+                <button type="button" disabled className="w-full h-10 rounded-md bg-primary text-primary-foreground text-sm font-medium opacity-60 cursor-not-allowed">
+                  Complete Registration
                 </button>
-                <p className="text-xs text-center text-muted-foreground mt-2">
-                  Submit button is disabled in preview mode
-                </p>
+                <p className="text-xs text-center text-muted-foreground mt-2">Submit button disabled in preview</p>
               </div>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setModalMode("none")}>
-              Close Preview
-            </Button>
+            <Button variant="outline" onClick={() => setModalMode("none")}>Close Preview</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -903,7 +1042,7 @@ export function FormBuilderPanel({ formId, hideAdditionalPeople = false }: FormB
 
 // ─── Preview field renderer ──────────────────────────────────────────────────
 
-function PreviewField({ field }: { field: FormField }) {
+function PreviewField({ field, rooms = [] }: { field: FormField; rooms?: Room[] }) {
   const label = (
     <div className="flex items-center gap-1.5 mb-1.5">
       <span className="text-sm font-medium text-foreground">{field.label}</span>
@@ -911,20 +1050,27 @@ function PreviewField({ field }: { field: FormField }) {
     </div>
   );
 
-  const inputClass =
-    "w-full h-9 rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground cursor-not-allowed";
-  const textareaClass =
-    "w-full rounded-md border border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed resize-none";
-
+  const inputClass = "w-full h-9 rounded-md border border-input bg-muted/30 px-3 text-sm text-muted-foreground cursor-not-allowed";
+  const textareaClass = "w-full rounded-md border border-input bg-muted/30 px-3 py-2 text-sm text-muted-foreground cursor-not-allowed resize-none";
   const placeholder = field.placeholder || "";
 
-  if (field.fieldType === "textarea") {
+  if (field.systemKey === "room_assignment") {
     return (
       <div>
         {label}
-        <textarea disabled rows={3} placeholder={placeholder} className={textareaClass} />
+        <div className={`${inputClass} flex items-center justify-between`}>
+          <span className="text-muted-foreground/60">{rooms.length > 0 ? rooms[0].name : "No rooms available"}</span>
+          <ChevronDown className="w-4 h-4 opacity-50" />
+        </div>
+        {rooms.length > 0 && (
+          <p className="text-xs text-muted-foreground mt-1">Options: {rooms.map((r) => r.name).join(", ")}</p>
+        )}
       </div>
     );
+  }
+
+  if (field.fieldType === "textarea") {
+    return <div>{label}<textarea disabled rows={3} placeholder={placeholder} className={textareaClass} /></div>;
   }
 
   if (field.fieldType === "select") {
@@ -948,8 +1094,7 @@ function PreviewField({ field }: { field: FormField }) {
         <div className="flex flex-wrap gap-2">
           {opts.slice(0, 4).map((opt) => (
             <label key={opt} className="flex items-center gap-1.5 text-sm text-muted-foreground cursor-not-allowed">
-              <input type="checkbox" disabled className="rounded" />
-              {opt}
+              <input type="checkbox" disabled className="rounded" /> {opt}
             </label>
           ))}
         </div>
@@ -974,10 +1119,5 @@ function PreviewField({ field }: { field: FormField }) {
     : field.fieldType === "number" ? "number"
     : "text";
 
-  return (
-    <div>
-      {label}
-      <input disabled type={inputType} placeholder={placeholder} className={inputClass} />
-    </div>
-  );
+  return <div>{label}<input disabled type={inputType} placeholder={placeholder} className={inputClass} /></div>;
 }

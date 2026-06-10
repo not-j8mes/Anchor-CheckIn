@@ -9,6 +9,8 @@
 export interface EventCheckin {
   id: number;
   registrationId: number;
+  /** @nullable */
+  sessionId?: number | null;
   childFirstName: string;
   childLastName: string;
   guardianName: string;

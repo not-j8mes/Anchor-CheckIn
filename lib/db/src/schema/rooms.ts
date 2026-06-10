@@ -9,6 +9,9 @@ export const roomsTable = pgTable("rooms", {
   capacity: integer("capacity"),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
+  // Auto-assign rule: age range in years (inclusive)
+  ageMin: integer("age_min"),
+  ageMax: integer("age_max"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

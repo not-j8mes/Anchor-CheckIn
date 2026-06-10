@@ -16,9 +16,19 @@ export interface EventWithForm {
   /** @nullable */
   registrationType?: string | null;
   /** @nullable */
+  scheduleType?: string | null;
+  /** @nullable */
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  endTime?: string | null;
+  /** @nullable */
+  repeatFrequency?: string | null;
+  /** @nullable */
+  repeatDayOfWeek?: number | null;
   status: string;
   /** @nullable */
   formId?: number | null;
@@ -37,6 +47,10 @@ export interface EventWithForm {
   labelType?: string | null;
   /** @nullable */
   roomAssignmentMode?: string | null;
+  /** @nullable */
+  sessionCount?: number | null;
+  /** @nullable */
+  nextSessionDate?: string | null;
   createdAt: string;
   form?: FormWithQuestions | null;
 }

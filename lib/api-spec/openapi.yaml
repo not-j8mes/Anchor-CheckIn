@@ -158,6 +158,27 @@ paths:
                 items:
                   $ref: "#/components/schemas/EventCheckin"
 
+  /events/{eventId}/sessions:
+    get:
+      operationId: listEventSessions
+      tags: [events]
+      summary: List sessions for a repeating event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of event sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventSession"
+
   /events/{eventId}:
     get:
       operationId: getEvent
@@ -618,6 +639,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Registration"
+    delete:
+      operationId: deleteRegistration
+      tags: [registrations]
+      summary: Delete a registration
+      parameters:
+        - name: registrationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
 
   /registrations/{registrationId}/room:
     patch:
@@ -933,6 +967,76 @@ paths:
               schema:
                 $ref: "#/components/schemas/CheckIn"
 
+  /event-categories:
+    get:
+      operationId: listEventCategories
+      tags: [eventCategories]
+      summary: List all event categories
+      responses:
+        "200":
+          description: List of event categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventCategory"
+    post:
+      operationId: createEventCategory
+      tags: [eventCategories]
+      summary: Create a new event category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventCategoryInput"
+      responses:
+        "201":
+          description: Created category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventCategory"
+
+  /event-categories/{categoryId}:
+    patch:
+      operationId: updateEventCategory
+      tags: [eventCategories]
+      summary: Rename an event category
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEventCategoryInput"
+      responses:
+        "200":
+          description: Updated category
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventCategory"
+    delete:
+      operationId: deleteEventCategory
+      tags: [eventCategories]
+      summary: Delete an event category (reassigns its events to General / Other)
+      parameters:
+        - name: categoryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Category deleted
+
   /admin/reset:
     delete:
       operationId: resetAllData
@@ -1185,6 +1289,8 @@ components:
           type: integer
         options:
           type: ["string", "null"]
+        sectionKey:
+          type: ["string", "null"]
 
     FormFieldInput:
       type: object
@@ -1207,6 +1313,8 @@ components:
         sortOrder:
           type: integer
         options:
+          type: string
+        sectionKey:
           type: string
 
     ReorderFieldsInput:
@@ -1487,6 +1595,8 @@ components:
           type: integer
         room:
           type: string
+        sessionId:
+          type: integer
 
     CheckoutInput:
       type: object
@@ -1587,6 +1697,8 @@ components:
           type: integer
         registrationId:
           type: integer
+        sessionId:
+          type: ["integer", "null"]
         childFirstName:
           type: string
         childLastName:
@@ -1615,6 +1727,29 @@ components:
         count:
           type: integer
 
+    EventSession:
+      type: object
+      required: [id, eventId, sessionDate, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        sessionDate:
+          type: string
+        startTime:
+          type: ["string", "null"]
+        endTime:
+          type: ["string", "null"]
+        status:
+          type: string
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
     Event:
       type: object
       required: [id, name, eventType, status, createdAt, registrationCount]
@@ -1629,10 +1764,20 @@ components:
           type: string
         registrationType:
           type: ["string", "null"]
+        scheduleType:
+          type: ["string", "null"]
         startDate:
           type: ["string", "null"]
         endDate:
           type: ["string", "null"]
+        startTime:
+          type: ["string", "null"]
+        endTime:
+          type: ["string", "null"]
+        repeatFrequency:
+          type: ["string", "null"]
+        repeatDayOfWeek:
+          type: ["integer", "null"]
         status:
           type: string
         formId:
@@ -1651,6 +1796,10 @@ components:
           type: ["boolean", "null"]
         labelType:
           type: ["string", "null"]
+        sessionCount:
+          type: ["integer", "null"]
+        nextSessionDate:
+          type: ["string", "null"]
         createdAt:
           type: string
 
@@ -1668,10 +1817,20 @@ components:
           type: string
         registrationType:
           type: ["string", "null"]
+        scheduleType:
+          type: ["string", "null"]
         startDate:
           type: ["string", "null"]
         endDate:
           type: ["string", "null"]
+        startTime:
+          type: ["string", "null"]
+        endTime:
+          type: ["string", "null"]
+        repeatFrequency:
+          type: ["string", "null"]
+        repeatDayOfWeek:
+          type: ["integer", "null"]
         status:
           type: string
         formId:
@@ -1692,6 +1851,10 @@ components:
           type: ["string", "null"]
         roomAssignmentMode:
           type: ["string", "null"]
+        sessionCount:
+          type: ["integer", "null"]
+        nextSessionDate:
+          type: ["string", "null"]
         createdAt:
           type: string
         form:
@@ -1711,10 +1874,20 @@ components:
           type: string
         registrationType:
           type: string
+        scheduleType:
+          type: string
         startDate:
           type: string
         endDate:
           type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        repeatFrequency:
+          type: string
+        repeatDayOfWeek:
+          type: integer
         status:
           type: string
         formTitle:
@@ -1752,6 +1925,10 @@ components:
           type: boolean
         sortOrder:
           type: integer
+        ageMin:
+          type: ["integer", "null"]
+        ageMax:
+          type: ["integer", "null"]
         participantCount:
           type: integer
         createdAt:
@@ -1770,6 +1947,10 @@ components:
         isActive:
           type: boolean
         sortOrder:
+          type: integer
+        ageMin:
+          type: integer
+        ageMax:
           type: integer
 
     RegistrationUpdateInput:
@@ -1807,10 +1988,20 @@ components:
           type: string
         registrationType:
           type: string
+        scheduleType:
+          type: string
         startDate:
           type: string
         endDate:
           type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        repeatFrequency:
+          type: string
+        repeatDayOfWeek:
+          type: integer
         status:
           type: string
         trackAttendance:
@@ -1822,4 +2013,33 @@ components:
         labelType:
           type: string
         roomAssignmentMode:
+          type: string
+
+    EventCategory:
+      type: object
+      required: [id, slug, name, isDefault, createdAt]
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        isDefault:
+          type: boolean
+        createdAt:
+          type: string
+
+    CreateEventCategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    UpdateEventCategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name:
           type: string

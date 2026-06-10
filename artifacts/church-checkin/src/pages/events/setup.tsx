@@ -3,7 +3,10 @@ import { Link, useLocation } from "wouter";
 import {
   useCreateEvent,
   useCreateRoom,
+  useListEventCategories,
+  useCreateEventCategory,
   getListEventsQueryKey,
+  getListEventCategoriesQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -19,6 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Baby,
   Users,
   User,
@@ -32,18 +43,12 @@ import {
   ChevronRight,
   Church,
   Pencil,
+  Calendar,
+  CalendarRange,
+  Repeat,
+  Clock,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-const EVENT_TYPES = [
-  { value: "vbs", label: "Vacation Bible School (VBS)" },
-  { value: "awana", label: "AWANA" },
-  { value: "sunday_school", label: "Sunday School" },
-  { value: "youth_group", label: "Youth Group" },
-  { value: "camp", label: "Camp" },
-  { value: "special_event", label: "Special Event" },
-  { value: "general", label: "General / Other" },
-];
 
 const REGISTRATION_TYPES = [
   {
@@ -71,21 +76,21 @@ const REGISTRATION_TYPES = [
 
 const TEMPLATE_FIELDS: Record<string, { label: string; required: boolean }[]> = {
   child_checkin: [
-    { label: "Child First Name", required: true },
-    { label: "Child Last Name", required: true },
-    { label: "Date of Birth", required: true },
+    // Guardian section
     { label: "Parent/Guardian First Name", required: true },
     { label: "Parent/Guardian Last Name", required: true },
     { label: "Parent/Guardian Phone", required: true },
-    { label: "Emergency Contact Name", required: true },
-    { label: "Emergency Contact Phone", required: true },
-    { label: "Parent/Guardian Email", required: false },
+    { label: "Parent/Guardian Email", required: true },
+    // Child section
+    { label: "Child First Name", required: true },
+    { label: "Child Last Name", required: true },
+    { label: "Date of Birth", required: true },
     { label: "Allergies", required: false },
     { label: "Medical Notes", required: false },
-    { label: "Special Needs / Accommodations", required: false },
-    { label: "Authorized Pickup Names", required: false },
-    { label: "Photo Permission", required: false },
-    { label: "Medical Permission", required: false },
+    { label: "Special Needs / Accommodations", required: true },
+    // Additional questions
+    { label: "Emergency Contact Name", required: true },
+    { label: "Emergency Contact Phone", required: true },
   ],
   family_group: [
     { label: "First Name", required: true },
@@ -115,17 +120,22 @@ interface RoomDraft {
   sortOrder: number;
 }
 
+type ScheduleType = "one_time" | "multi_day" | "repeating";
+
 interface WizardState {
   registrationType: string;
   name: string;
   description: string;
   eventType: string;
-  isMultiDay: boolean;
+  scheduleType: ScheduleType;
   startDate: string;
   endDate: string;
+  startTime: string;
+  endTime: string;
+  repeatFrequency: "weekly";
+  repeatDayOfWeek: number; // 0=Sun … 6=Sat, -1 = not set
   useRooms: boolean | null;
   rooms: RoomDraft[];
-  roomAssignmentMode: string;
   formTitle: string;
   formDescription: string;
   addDefaultQuestions: boolean;
@@ -140,12 +150,15 @@ const DEFAULTS: WizardState = {
   name: "",
   description: "",
   eventType: "general",
-  isMultiDay: false,
+  scheduleType: "one_time",
   startDate: "",
   endDate: "",
+  startTime: "",
+  endTime: "",
+  repeatFrequency: "weekly",
+  repeatDayOfWeek: -1,
   useRooms: null,
   rooms: [],
-  roomAssignmentMode: "manual",
   formTitle: "",
   formDescription: "",
   addDefaultQuestions: true,
@@ -154,6 +167,24 @@ const DEFAULTS: WizardState = {
   printLabels: false,
   labelType: "simple_name",
 };
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAY_ABBR = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+function computeSessionCount(startDate: string, endDate: string, dayOfWeek: number): number {
+  if (!startDate || !endDate || dayOfWeek < 0) return 0;
+  let count = 0;
+  const end = new Date(endDate + "T00:00:00");
+  const current = new Date(startDate + "T00:00:00");
+  while (current.getDay() !== dayOfWeek) current.setDate(current.getDate() + 1);
+  while (current <= end) { count++; current.setDate(current.getDate() + 7); }
+  return count;
+}
+
+function formatPreviewDate(dateStr: string): string {
+  if (!dateStr) return "";
+  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
 const STEP_TITLES = ["Event Details", "Rooms / Groups", "Registration Form", "Review & Finish"];
 
@@ -166,6 +197,26 @@ function Step1({
   state: WizardState;
   update: (k: keyof WizardState, v: unknown) => void;
 }) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { data: categories = [] } = useListEventCategories();
+  const [createCatOpen, setCreateCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const createCategory = useCreateEventCategory({
+    mutation: {
+      onSuccess: (cat) => {
+        queryClient.invalidateQueries({ queryKey: getListEventCategoriesQueryKey() });
+        update("eventType", cat.slug);
+        setCreateCatOpen(false);
+        setNewCatName("");
+        toast({ title: `Category "${cat.name}" created` });
+      },
+      onError: (err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Failed to create category";
+        toast({ title: msg, variant: "destructive" });
+      },
+    },
+  });
   const setRegType = (type: string) => {
     const isChild = type === "child_checkin";
     update("registrationType", type);
@@ -232,37 +283,66 @@ function Step1({
           />
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 sm:col-span-2">
           <Label>Event Category</Label>
-          <Select value={state.eventType} onValueChange={(v) => update("eventType", v)}>
+          <Select
+            value={state.eventType}
+            onValueChange={(v) => update("eventType", v)}
+          >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Select category…" />
             </SelectTrigger>
             <SelectContent>
-              {EVENT_TYPES.map((t) => (
-                <SelectItem key={t.value} value={t.value}>
-                  {t.label}
-                </SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
               ))}
+              <div className="border-t border-border mt-1 pt-1">
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-1.5 text-sm px-2 py-1.5 text-primary hover:bg-accent rounded-sm"
+                  onMouseDown={(e) => { e.preventDefault(); setCreateCatOpen(true); }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Create new category
+                </button>
+              </div>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="space-y-1.5 flex flex-col justify-end pb-0.5">
-          <div className="flex items-center gap-2 py-2">
-            <Switch
-              id="multiday"
-              checked={state.isMultiDay}
-              onCheckedChange={(v) => {
-                update("isMultiDay", v);
-                if (!v) update("endDate", "");
-              }}
-            />
-            <label htmlFor="multiday" className="text-sm cursor-pointer">
-              Multi-day event
-            </label>
-          </div>
-        </div>
+        {/* Create category modal */}
+        <Dialog open={createCatOpen} onOpenChange={setCreateCatOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>New Event Category</DialogTitle>
+              <DialogDescription>
+                Give your category a name. It will be available for all events.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-1.5 py-2">
+              <Label>Category Name</Label>
+              <Input
+                autoFocus
+                placeholder="e.g. Kids Program"
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newCatName.trim()) {
+                    createCategory.mutate({ data: { name: newCatName.trim() } });
+                  }
+                }}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateCatOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => createCategory.mutate({ data: { name: newCatName.trim() } })}
+                disabled={!newCatName.trim() || createCategory.isPending}
+              >
+                {createCategory.isPending ? "Creating…" : "Create"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Description</Label>
@@ -273,9 +353,75 @@ function Step1({
             onChange={(e) => update("description", e.target.value)}
           />
         </div>
+      </div>
 
-        {state.isMultiDay ? (
-          <>
+      {/* ── Event Schedule ─────────────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div>
+          <Label className="text-base font-semibold">Event Schedule</Label>
+          <p className="text-sm text-muted-foreground mt-0.5 mb-3">
+            How often does this event occur?
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {([
+              { value: "one_time" as ScheduleType, label: "One-time", Icon: Calendar, description: "A single event on one day." },
+              { value: "multi_day" as ScheduleType, label: "Multi-day", Icon: CalendarRange, description: "Spans consecutive days — VBS, retreat, conference." },
+              { value: "repeating" as ScheduleType, label: "Repeating", Icon: Repeat, description: "Regular schedule — AWANA, youth group, weekly classes." },
+            ] as const).map(({ value, label, Icon, description }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  update("scheduleType", value);
+                  if (value === "one_time") update("endDate", "");
+                }}
+                className={`group text-left rounded-xl border-2 p-4 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  state.scheduleType === value
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50 hover:bg-muted/40"
+                }`}
+              >
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center mb-2.5 transition-colors ${
+                  state.scheduleType === value ? "bg-primary/20" : "bg-primary/10 group-hover:bg-primary/15"
+                }`}>
+                  <Icon className="w-4 h-4 text-primary" />
+                </div>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <p className="font-semibold text-sm">{label}</p>
+                  {state.scheduleType === value && <Check className="w-3.5 h-3.5 text-primary ml-auto" />}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* One-time date fields */}
+        {state.scheduleType === "one_time" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Date <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Input
+                type="date"
+                value={state.startDate}
+                onChange={(e) => update("startDate", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5" />
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-muted-foreground" />Start Time <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Input type="time" value={state.startTime} onChange={(e) => update("startTime", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-muted-foreground" />End Time <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Input type="time" value={state.endTime} onChange={(e) => update("endTime", e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {/* Multi-day date fields */}
+        {state.scheduleType === "multi_day" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Start Date</Label>
               <Input
@@ -296,15 +442,95 @@ function Step1({
                 onChange={(e) => update("endDate", e.target.value)}
               />
             </div>
-          </>
-        ) : (
-          <div className="space-y-1.5">
-            <Label>Date</Label>
-            <Input
-              type="date"
-              value={state.startDate}
-              onChange={(e) => update("startDate", e.target.value)}
-            />
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-muted-foreground" />Start Time <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Input type="time" value={state.startTime} onChange={(e) => update("startTime", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-muted-foreground" />End Time <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Input type="time" value={state.endTime} onChange={(e) => update("endTime", e.target.value)} />
+            </div>
+          </div>
+        )}
+
+        {/* Repeating schedule fields */}
+        {state.scheduleType === "repeating" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Program Start Date</Label>
+                <Input
+                  type="date"
+                  value={state.startDate}
+                  onChange={(e) => {
+                    update("startDate", e.target.value);
+                    if (state.endDate && e.target.value > state.endDate) update("endDate", "");
+                  }}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Program End Date</Label>
+                <Input
+                  type="date"
+                  value={state.endDate}
+                  min={state.startDate || undefined}
+                  onChange={(e) => update("endDate", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Repeat Frequency</Label>
+                <Select value={state.repeatFrequency} onValueChange={(v) => update("repeatFrequency", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Repeat On</Label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {DAY_ABBR.map((abbr, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => update("repeatDayOfWeek", idx)}
+                      className={`w-9 h-9 rounded-lg text-xs font-semibold border-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                        state.repeatDayOfWeek === idx
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border hover:border-primary/50 hover:bg-muted/40"
+                      }`}
+                    >
+                      {abbr}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-muted-foreground" />Start Time <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                <Input type="time" value={state.startTime} onChange={(e) => update("startTime", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-muted-foreground" />End Time <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                <Input type="time" value={state.endTime} onChange={(e) => update("endTime", e.target.value)} />
+              </div>
+            </div>
+
+            {/* Session preview */}
+            {state.startDate && state.endDate && state.repeatDayOfWeek >= 0 && (() => {
+              const count = computeSessionCount(state.startDate, state.endDate, state.repeatDayOfWeek);
+              const dayName = DAY_NAMES[state.repeatDayOfWeek];
+              return (
+                <div className="flex items-start gap-2.5 p-3.5 rounded-lg border border-primary/20 bg-primary/5">
+                  <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-foreground">
+                    This will create{" "}
+                    <span className="font-semibold">{count} {dayName} session{count !== 1 ? "s" : ""}</span>{" "}
+                    from <span className="font-semibold">{formatPreviewDate(state.startDate)}</span> to{" "}
+                    <span className="font-semibold">{formatPreviewDate(state.endDate)}</span>.
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -462,29 +688,6 @@ function Step2({
 
       {state.useRooms === true && (
         <div className="space-y-4 pt-2">
-          <div className="space-y-1.5">
-            <Label>{entityNameCap} Assignment Mode</Label>
-            <Select
-              value={state.roomAssignmentMode}
-              onValueChange={(v) => update("roomAssignmentMode", v)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="manual">
-                  Manual assignment — staff assigns {entityNamePlural}
-                </SelectItem>
-                <SelectItem value="registrant_chooses">
-                  Registrant chooses during registration
-                </SelectItem>
-                <SelectItem value="auto_assign">
-                  Auto-assign based on rules
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           {state.rooms.length > 0 && (
             <div className="space-y-2">
               <Label>
@@ -737,8 +940,6 @@ function Step3({
 }) {
   const regType = (state.registrationType || "child_checkin") as keyof typeof TEMPLATE_FIELDS;
   const fields = TEMPLATE_FIELDS[regType] ?? TEMPLATE_FIELDS.child_checkin;
-  const requiredFields = fields.filter((f) => f.required);
-  const optionalFields = fields.filter((f) => !f.required);
   const regTypeLabel =
     regType === "child_checkin"
       ? "child check-in"
@@ -819,21 +1020,9 @@ function Step3({
           <div className="mt-2 p-3 rounded-lg border border-border bg-muted/30 space-y-2">
             <p className="text-xs font-medium text-foreground">Fields included:</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-0.5">
-              {requiredFields.map((f) => (
-                <div
-                  key={f.label}
-                  className="flex items-center gap-1.5 text-xs text-foreground"
-                >
-                  <Check className="w-3 h-3 text-primary flex-shrink-0" />
-                  {f.label}
-                </div>
-              ))}
-              {optionalFields.map((f) => (
-                <div
-                  key={f.label}
-                  className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                >
-                  <Check className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+              {fields.map((f) => (
+                <div key={f.label} className="flex items-center gap-1.5 text-xs text-foreground">
+                  <Check className="w-3 h-3 flex-shrink-0 text-primary" />
                   {f.label}
                 </div>
               ))}
@@ -953,6 +1142,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 }
 
 function Step4({ state }: { state: WizardState }) {
+  const { data: categories = [] } = useListEventCategories();
   const isChild = !state.registrationType || state.registrationType === "child_checkin";
   const regTypeLabel =
     ({
@@ -961,12 +1151,7 @@ function Step4({ state }: { state: WizardState }) {
       individual: "Individual",
     } as Record<string, string>)[state.registrationType] ?? state.registrationType;
 
-  const assignmentModeLabel =
-    ({
-      manual: "Manual (staff assigns)",
-      registrant_chooses: "Registrant chooses during registration",
-      auto_assign: "Auto-assign based on rules",
-    } as Record<string, string>)[state.roomAssignmentMode] ?? state.roomAssignmentMode;
+  const categoryLabel = categories.find((c) => c.slug === state.eventType)?.name ?? state.eventType;
 
   const regType = (state.registrationType || "child_checkin") as keyof typeof TEMPLATE_FIELDS;
   const templateFieldCount = (TEMPLATE_FIELDS[regType] ?? TEMPLATE_FIELDS.child_checkin).length;
@@ -988,18 +1173,46 @@ function Step4({ state }: { state: WizardState }) {
         <div className="p-4 space-y-2.5">
           <ReviewRow label="Name" value={state.name} />
           <ReviewRow label="Registration Type" value={regTypeLabel} />
+          <ReviewRow label="Category" value={categoryLabel} />
           <ReviewRow
-            label="Category"
-            value={EVENT_TYPES.find((t) => t.value === state.eventType)?.label ?? state.eventType}
+            label="Schedule"
+            value={
+              state.scheduleType === "one_time"
+                ? "One-time"
+                : state.scheduleType === "multi_day"
+                ? "Multi-day"
+                : "Repeating"
+            }
           />
-          {state.startDate && (
+          {state.scheduleType === "one_time" && state.startDate && (
+            <ReviewRow label="Date" value={formatPreviewDate(state.startDate)} />
+          )}
+          {state.scheduleType === "multi_day" && (
+            <>
+              {state.startDate && <ReviewRow label="Start Date" value={formatPreviewDate(state.startDate)} />}
+              {state.endDate && <ReviewRow label="End Date" value={formatPreviewDate(state.endDate)} />}
+            </>
+          )}
+          {state.scheduleType === "repeating" && (
+            <>
+              {state.startDate && <ReviewRow label="Program Start" value={formatPreviewDate(state.startDate)} />}
+              {state.endDate && <ReviewRow label="Program End" value={formatPreviewDate(state.endDate)} />}
+              {state.repeatDayOfWeek >= 0 && (
+                <ReviewRow
+                  label="Repeats"
+                  value={`Weekly on ${DAY_NAMES[state.repeatDayOfWeek]}${
+                    state.startDate && state.endDate && state.repeatDayOfWeek >= 0
+                      ? ` (${computeSessionCount(state.startDate, state.endDate, state.repeatDayOfWeek)} sessions)`
+                      : ""
+                  }`}
+                />
+              )}
+            </>
+          )}
+          {(state.startTime || state.endTime) && (
             <ReviewRow
-              label="Date"
-              value={
-                state.isMultiDay && state.endDate
-                  ? `${state.startDate} – ${state.endDate}`
-                  : state.startDate
-              }
+              label="Time"
+              value={[state.startTime, state.endTime].filter(Boolean).join(" – ")}
             />
           )}
           {state.description && (
@@ -1025,11 +1238,10 @@ function Step4({ state }: { state: WizardState }) {
               />
               {state.rooms.length > 0 && (
                 <ReviewRow
-                  label="Names"
+                  label={isChild ? "Rooms" : "Groups"}
                   value={state.rooms.map((r) => r.name).join(", ")}
                 />
               )}
-              <ReviewRow label="Assignment Mode" value={assignmentModeLabel} />
             </>
           ) : (
             <p className="text-sm text-muted-foreground">Not configured</p>
@@ -1121,8 +1333,13 @@ export default function EventSetupWizard() {
           description: state.description || undefined,
           eventType: state.eventType,
           registrationType: state.registrationType || undefined,
+          scheduleType: state.scheduleType,
           startDate: state.startDate || undefined,
-          endDate: state.endDate || undefined,
+          endDate: state.scheduleType !== "one_time" ? (state.endDate || undefined) : undefined,
+          startTime: state.startTime || undefined,
+          endTime: state.endTime || undefined,
+          repeatFrequency: state.scheduleType === "repeating" ? state.repeatFrequency : undefined,
+          repeatDayOfWeek: state.scheduleType === "repeating" && state.repeatDayOfWeek >= 0 ? state.repeatDayOfWeek : undefined,
           formTitle,
           formDescription: state.formDescription || undefined,
           addDefaultQuestions: state.addDefaultQuestions,
@@ -1130,7 +1347,6 @@ export default function EventSetupWizard() {
           requireCheckout: state.requireCheckout,
           printLabels: state.printLabels,
           labelType: state.labelType,
-          roomAssignmentMode: state.useRooms ? state.roomAssignmentMode : undefined,
         },
       });
 

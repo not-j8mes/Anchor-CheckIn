@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import {
   useListEvents,
-  useDeleteEvent,
   useUpdateEvent,
+  useListEventCategories,
+  useCreateEventCategory,
   getListEventsQueryKey,
   getGetEventQueryKey,
+  getListEventCategoriesQueryKey,
   type Event as ChurchEvent,
+  type EventCategory,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -31,29 +35,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Plus,
   Calendar,
+  CalendarRange,
   Users,
   ArrowRight,
-  Trash2,
   Pencil,
   ChevronRight,
   ChevronLeft,
   Search,
-  Church,
   FileText,
   Settings,
+  Check,
+  Repeat,
 } from "lucide-react";
+import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 import { useToast } from "@/hooks/use-toast";
 import {
   format,
@@ -68,15 +64,9 @@ import {
   subMonths,
 } from "date-fns";
 
-const EVENT_TYPES = [
-  { value: "vbs", label: "Vacation Bible School (VBS)" },
-  { value: "awana", label: "AWANA" },
-  { value: "sunday_school", label: "Sunday School" },
-  { value: "youth_group", label: "Youth Group" },
-  { value: "camp", label: "Camp" },
-  { value: "special_event", label: "Special Event" },
-  { value: "general", label: "General / Other" },
-];
+function categoryLabel(type: string, categories: EventCategory[]) {
+  return categories.find((c) => c.slug === type)?.name ?? type;
+}
 
 function statusBadge(status: string) {
   if (status === "active") return <Badge className="bg-green-100 text-green-800 border-green-200">Active</Badge>;
@@ -100,20 +90,38 @@ function registrationTypeStripe(type?: string | null) {
   return "bg-primary";
 }
 
-function eventTypeLabel(type: string) {
-  return EVENT_TYPES.find((t) => t.value === type)?.label ?? type;
-}
-
-function eventChipClass(type: string) {
-  if (type === "vbs") return "bg-yellow-100 text-yellow-800";
-  if (type === "awana") return "bg-blue-100 text-blue-800";
-  if (type === "sunday_school") return "bg-purple-100 text-purple-800";
-  if (type === "youth_group") return "bg-green-100 text-green-800";
-  if (type === "camp") return "bg-orange-100 text-orange-800";
-  return "bg-primary/10 text-primary";
-}
 
 // ─── Edit Event Dialog ──────────────────────────────────────────────────────
+
+type EditScheduleType = "one_time" | "multi_day" | "repeating";
+
+const EDIT_DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const EDIT_DAY_ABBR = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+function editComputeSessionCount(startDate: string, endDate: string, dayOfWeek: number): number {
+  if (!startDate || !endDate || dayOfWeek < 0) return 0;
+  let count = 0;
+  const end = new Date(endDate + "T00:00:00");
+  const cur = new Date(startDate + "T00:00:00");
+  while (cur.getDay() !== dayOfWeek) cur.setDate(cur.getDate() + 1);
+  while (cur <= end) { count++; cur.setDate(cur.getDate() + 7); }
+  return count;
+}
+
+function editFormatDate(d: string): string {
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function inferScheduleType(event: {
+  scheduleType?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  repeatDayOfWeek?: number | null;
+}): EditScheduleType {
+  if (event.scheduleType === "repeating" || event.repeatDayOfWeek != null) return "repeating";
+  if (event.scheduleType === "multi_day" || (event.endDate && event.startDate && event.endDate !== event.startDate)) return "multi_day";
+  return "one_time";
+}
 
 interface EditEventDialogProps {
   event: {
@@ -122,8 +130,13 @@ interface EditEventDialogProps {
     description?: string | null;
     eventType: string;
     registrationType?: string | null;
+    scheduleType?: string | null;
     startDate?: string | null;
     endDate?: string | null;
+    startTime?: string | null;
+    endTime?: string | null;
+    repeatFrequency?: string | null;
+    repeatDayOfWeek?: number | null;
     trackAttendance?: boolean | null;
     requireCheckout?: boolean | null;
     printLabels?: boolean | null;
@@ -136,22 +149,62 @@ interface EditEventDialogProps {
 function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: categories = [] } = useListEventCategories();
+  const [createCatOpen, setCreateCatOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const createCategory = useCreateEventCategory({
+    mutation: {
+      onSuccess: (cat) => {
+        queryClient.invalidateQueries({ queryKey: getListEventCategoriesQueryKey() });
+        setForm((p) => ({ ...p, eventType: cat.slug }));
+        setCreateCatOpen(false);
+        setNewCatName("");
+        toast({ title: `Category "${cat.name}" created` });
+      },
+      onError: () => toast({ title: "Failed to create category", variant: "destructive" }),
+    },
+  });
 
   const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
-  const [isMultiDay, setIsMultiDay] = useState(
-    !!(event.startDate && event.endDate && event.startDate !== event.endDate)
-  );
   const [form, setForm] = useState({
     name: event.name,
     description: event.description ?? "",
     eventType: event.eventType,
+    scheduleType: inferScheduleType(event),
     startDate: event.startDate ?? "",
     endDate: event.endDate ?? "",
+    startTime: event.startTime ?? "",
+    endTime: event.endTime ?? "",
+    repeatFrequency: (event.repeatFrequency ?? "weekly") as "weekly",
+    repeatDayOfWeek: event.repeatDayOfWeek ?? -1,
     trackAttendance: event.trackAttendance ?? isChildCheckin,
     requireCheckout: event.requireCheckout ?? isChildCheckin,
     printLabels: event.printLabels ?? isChildCheckin,
     labelType: event.labelType ?? (isChildCheckin ? "child_security" : "simple_name"),
   });
+  const upd = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((p) => ({ ...p, [k]: v }));
+
+  // Sync form when the event data updates (e.g. React Query refetch resolves after stale-cache initial render)
+  useEffect(() => {
+    setForm({
+      name: event.name,
+      description: event.description ?? "",
+      eventType: event.eventType,
+      scheduleType: inferScheduleType(event),
+      startDate: event.startDate ?? "",
+      endDate: event.endDate ?? "",
+      startTime: event.startTime ?? "",
+      endTime: event.endTime ?? "",
+      repeatFrequency: (event.repeatFrequency ?? "weekly") as "weekly",
+      repeatDayOfWeek: event.repeatDayOfWeek ?? -1,
+      trackAttendance: event.trackAttendance ?? isChildCheckin,
+      requireCheckout: event.requireCheckout ?? isChildCheckin,
+      printLabels: event.printLabels ?? isChildCheckin,
+      labelType: event.labelType ?? (isChildCheckin ? "child_security" : "simple_name"),
+    });
+  // Only re-sync if the event id or scheduleType changes — not on every keystroke
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event.id, event.scheduleType, event.repeatDayOfWeek]);
 
   const updateEvent = useUpdateEvent({
     mutation: {
@@ -177,40 +230,118 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
             <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
           </div>
           <div className="space-y-1.5">
-            <Label>Event Type</Label>
+            <Label>Event Category</Label>
             <Select value={form.eventType} onValueChange={(v) => setForm((p) => ({ ...p, eventType: v }))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {EVENT_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
                 ))}
+                <div className="border-t border-border mt-1 pt-1">
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-1.5 text-sm px-2 py-1.5 text-primary hover:bg-accent rounded-sm"
+                    onMouseDown={(e) => { e.preventDefault(); setCreateCatOpen(true); }}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Create new category
+                  </button>
+                </div>
               </SelectContent>
             </Select>
           </div>
+
+          <Dialog open={createCatOpen} onOpenChange={setCreateCatOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader>
+                <DialogTitle>New Event Category</DialogTitle>
+                <DialogDescription>
+                  Give your category a name. It will be available for all events.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1.5 py-2">
+                <Label>Category Name</Label>
+                <Input
+                  autoFocus
+                  placeholder="e.g. Vacation Bible School"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newCatName.trim()) {
+                      createCategory.mutate({ data: { name: newCatName.trim() } });
+                    }
+                  }}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateCatOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => createCategory.mutate({ data: { name: newCatName.trim() } })}
+                  disabled={!newCatName.trim() || createCategory.isPending}
+                >
+                  {createCategory.isPending ? "Creating…" : "Create"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <div className="space-y-1.5">
             <Label>Description</Label>
             <Textarea rows={2} value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} />
           </div>
-          <div className="flex items-center justify-between py-1.5">
-            <div>
-              <span className="text-sm font-medium">Multi-day event</span>
-              <p className="text-xs text-muted-foreground">Spans more than one day</p>
+
+          {/* Schedule type picker */}
+          <div className="space-y-2">
+            <Label>Event Schedule</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { value: "one_time" as EditScheduleType, label: "One-time", Icon: Calendar },
+                { value: "multi_day" as EditScheduleType, label: "Multi-day", Icon: CalendarRange },
+                { value: "repeating" as EditScheduleType, label: "Repeating", Icon: Repeat },
+              ] as const).map(({ value, label, Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    upd("scheduleType", value);
+                    if (value === "one_time") upd("endDate", "");
+                  }}
+                  className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 text-xs font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    form.scheduleType === value
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border hover:border-primary/50 hover:bg-muted/40 text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                  {form.scheduleType === value && <Check className="w-3 h-3 absolute" style={{ display: "none" }} />}
+                </button>
+              ))}
             </div>
-            <Switch
-              checked={isMultiDay}
-              onCheckedChange={(v) => {
-                setIsMultiDay(v);
-                if (!v) setForm((p) => ({ ...p, endDate: "" }));
-              }}
-            />
           </div>
-          {isMultiDay ? (
+
+          {/* One-time */}
+          {form.scheduleType === "one_time" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5 col-span-2">
+                <Label>Date</Label>
+                <Input type="date" value={form.startDate} onChange={(e) => upd("startDate", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Start Time <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input type="time" value={form.startTime} onChange={(e) => upd("startTime", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End Time <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input type="time" value={form.endTime} onChange={(e) => upd("endTime", e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {/* Multi-day */}
+          {form.scheduleType === "multi_day" && (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Start Date</Label>
-                <Input
-                  type="date"
-                  value={form.startDate}
+                <Input type="date" value={form.startDate}
                   onChange={(e) => {
                     const val = e.target.value;
                     setForm((p) => ({ ...p, startDate: val, endDate: p.endDate && val > p.endDate ? "" : p.endDate }));
@@ -219,18 +350,75 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
               </div>
               <div className="space-y-1.5">
                 <Label>End Date</Label>
-                <Input
-                  type="date"
-                  value={form.endDate}
-                  min={form.startDate || undefined}
-                  onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
-                />
+                <Input type="date" value={form.endDate} min={form.startDate || undefined}
+                  onChange={(e) => upd("endDate", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Start Time <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input type="time" value={form.startTime} onChange={(e) => upd("startTime", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>End Time <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input type="time" value={form.endTime} onChange={(e) => upd("endTime", e.target.value)} />
               </div>
             </div>
-          ) : (
-            <div className="space-y-1.5">
-              <Label>Date</Label>
-              <Input type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} />
+          )}
+
+          {/* Repeating */}
+          {form.scheduleType === "repeating" && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Program Start</Label>
+                  <Input type="date" value={form.startDate}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setForm((p) => ({ ...p, startDate: val, endDate: p.endDate && val > p.endDate ? "" : p.endDate }));
+                    }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Program End</Label>
+                  <Input type="date" value={form.endDate} min={form.startDate || undefined}
+                    onChange={(e) => upd("endDate", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Start Time <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                  <Input type="time" value={form.startTime} onChange={(e) => upd("startTime", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>End Time <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                  <Input type="time" value={form.endTime} onChange={(e) => upd("endTime", e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Repeat On</Label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {EDIT_DAY_ABBR.map((abbr, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => upd("repeatDayOfWeek", idx)}
+                      className={`w-9 h-9 rounded-lg text-xs font-semibold border-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                        form.repeatDayOfWeek === idx
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border hover:border-primary/50 hover:bg-muted/40"
+                      }`}
+                    >
+                      {abbr}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {form.startDate && form.endDate && form.repeatDayOfWeek >= 0 && (() => {
+                const count = editComputeSessionCount(form.startDate, form.endDate, form.repeatDayOfWeek);
+                const dayName = EDIT_DAY_NAMES[form.repeatDayOfWeek];
+                return (
+                  <p className="text-xs text-muted-foreground px-1">
+                    {count} {dayName} session{count !== 1 ? "s" : ""} from {editFormatDate(form.startDate)} to {editFormatDate(form.endDate)}
+                  </p>
+                );
+              })()}
             </div>
           )}
           <div className="space-y-2 pt-1 border-t border-border">
@@ -303,7 +491,17 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
-            onClick={() => updateEvent.mutate({ eventId: event.id, data: form })}
+            onClick={() => updateEvent.mutate({
+              eventId: event.id,
+              data: {
+                ...form,
+                endDate: form.scheduleType === "one_time" ? undefined : (form.endDate || undefined),
+                startTime: form.startTime || undefined,
+                endTime: form.endTime || undefined,
+                repeatFrequency: form.scheduleType === "repeating" ? form.repeatFrequency : undefined,
+                repeatDayOfWeek: form.scheduleType === "repeating" && form.repeatDayOfWeek >= 0 ? form.repeatDayOfWeek : undefined,
+              },
+            })}
             disabled={updateEvent.isPending}
           >
             {updateEvent.isPending ? "Saving..." : "Save Changes"}
@@ -316,10 +514,10 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
 
 // ─── Event card ──────────────────────────────────────────────────────────────
 
-function EventCard({ event, onEdit, onDelete }: {
+function EventCard({ event, onEdit, categories }: {
   event: ChurchEvent;
   onEdit: (e: ChurchEvent) => void;
-  onDelete: (id: number) => void;
+  categories: EventCategory[];
 }) {
   const trackAttendance = event.trackAttendance ?? (event.registrationType === "child_checkin" || !event.registrationType);
   const checkinBadge = trackAttendance
@@ -344,15 +542,23 @@ function EventCard({ event, onEdit, onDelete }: {
                   {registrationTypeBadge(event.registrationType)}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {eventTypeLabel(event.eventType)}
-                  {event.startDate && (
+                  {categoryLabel(event.eventType, categories)}
+                  {event.scheduleType === "repeating" && event.repeatDayOfWeek != null ? (
+                    <span className="ml-3 inline-flex items-center gap-1">
+                      <Repeat className="w-3 h-3 inline-block" />
+                      Every {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][event.repeatDayOfWeek]}
+                      {event.nextSessionDate && (
+                        <> · Next: {format(new Date(event.nextSessionDate + "T00:00:00"), "MMM d")}</>
+                      )}
+                    </span>
+                  ) : event.startDate ? (
                     <span className="ml-3">
                       {format(new Date(event.startDate + "T00:00:00"), "MMM d, yyyy")}
                       {event.endDate && event.startDate !== event.endDate && (
                         <> – {format(new Date(event.endDate + "T00:00:00"), "MMM d, yyyy")}</>
                       )}
                     </span>
-                  )}
+                  ) : null}
                 </p>
                 {event.description && (
                   <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{event.description}</p>
@@ -371,10 +577,6 @@ function EventCard({ event, onEdit, onDelete }: {
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8"
                   onClick={() => onEdit(event)} data-testid={`button-edit-event-${event.id}`}>
                   <Pencil className="w-3.5 h-3.5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-8 w-8"
-                  onClick={() => onDelete(event.id)} data-testid={`button-delete-event-${event.id}`}>
-                  <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </div>
             </div>
@@ -395,7 +597,7 @@ function EventCard({ event, onEdit, onDelete }: {
 
 // ─── Calendar view ────────────────────────────────────────────────────────────
 
-function CalendarView({ events }: { events: ChurchEvent[] }) {
+function CalendarView({ events, categories }: { events: ChurchEvent[]; categories: EventCategory[] }) {
   const [month, setMonth] = useState(() => new Date());
 
   const days = eachDayOfInterval({
@@ -408,8 +610,24 @@ function CalendarView({ events }: { events: ChurchEvent[] }) {
     if (!event.startDate) continue;
     const start = new Date(event.startDate + "T00:00:00");
     const end = event.endDate ? new Date(event.endDate + "T00:00:00") : start;
-    const span = eachDayOfInterval({ start, end });
-    for (const d of span) {
+
+    let dates: Date[];
+    if (event.scheduleType === "repeating" && event.repeatDayOfWeek != null) {
+      // Only show on days that match the repeat day of week
+      dates = [];
+      const cur = new Date(start);
+      while (cur.getDay() !== event.repeatDayOfWeek) cur.setDate(cur.getDate() + 1);
+      while (cur <= end) {
+        dates.push(new Date(cur));
+        cur.setDate(cur.getDate() + 7);
+      }
+    } else if (event.scheduleType === "one_time") {
+      dates = [start];
+    } else {
+      dates = eachDayOfInterval({ start, end });
+    }
+
+    for (const d of dates) {
       const key = format(d, "yyyy-MM-dd");
       const bucket = eventsByDate.get(key) ?? [];
       if (!bucket.find((e) => e.id === event.id)) bucket.push(event);
@@ -461,7 +679,7 @@ function CalendarView({ events }: { events: ChurchEvent[] }) {
               <div className="space-y-0.5">
                 {dayEvents.slice(0, 3).map((event) => (
                   <Link key={event.id} href={`/events/${event.id}`}>
-                    <div className={`text-xs px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-80 transition-opacity font-medium ${eventChipClass(event.eventType)}`}>
+                    <div className="text-xs px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-80 transition-opacity font-medium bg-primary/10 text-primary">
                       {event.name}
                     </div>
                   </Link>
@@ -493,25 +711,12 @@ function isPast(event: ChurchEvent): boolean {
 
 export default function EventSelectionScreen() {
   const { data: events, isLoading } = useListEvents();
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+  const { data: categories = [] } = useListEventCategories();
 
   const [editEvent, setEditEvent] = useState<ChurchEvent | null>(null);
-  const [deleteId, setDeleteId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [showPast, setShowPast] = useState(false);
   const [search, setSearch] = useState("");
-
-  const deleteEvent = useDeleteEvent({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
-        toast({ title: "Event deleted" });
-        setDeleteId(null);
-      },
-      onError: () => toast({ title: "Failed to delete event", variant: "destructive" }),
-    },
-  });
 
   const sorted = [...(events ?? [])].sort((a, b) => {
     const aT = a.startDate ? new Date(a.startDate + "T00:00:00").getTime() : -Infinity;
@@ -522,7 +727,7 @@ export default function EventSelectionScreen() {
   const filtered = search.trim()
     ? sorted.filter((e) =>
         e.name.toLowerCase().includes(search.toLowerCase()) ||
-        eventTypeLabel(e.eventType).toLowerCase().includes(search.toLowerCase())
+        categoryLabel(e.eventType, categories).toLowerCase().includes(search.toLowerCase())
       )
     : sorted;
 
@@ -535,31 +740,33 @@ export default function EventSelectionScreen() {
     <div className="min-h-screen bg-background">
       {/* Top bar */}
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-foreground">
-            <Church className="w-5 h-5 text-primary" />
-            <span className="font-serif font-bold text-base">Church Check-In</span>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-foreground min-w-0 shrink-0">
+            <img src={appLogo} alt="logo" className="w-6 h-6 object-contain shrink-0" />
+            <span className="font-serif font-bold text-base whitespace-nowrap">Church Check-In</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
               <Link href="/settings">
-                <Settings className="w-4 h-4 mr-1.5" /> Settings
+                <Settings className="w-4 h-4" />
+                <span className="sr-only sm:not-sr-only sm:ml-1.5">Settings</span>
               </Link>
             </Button>
-            <Button asChild size="sm" data-testid="button-create-event">
+            <Button asChild size="sm" className="px-2 sm:px-3" data-testid="button-create-event">
               <Link href="/events/new">
-                <Plus className="w-4 h-4 mr-1.5" /> New Event
+                <Plus className="w-4 h-4" />
+                <span className="ml-1 sm:ml-1.5"><span className="sm:hidden">New</span><span className="hidden sm:inline">New Event</span></span>
               </Link>
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8">
         {/* Hero header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-serif font-bold text-foreground">Select an Event</h1>
-          <p className="text-muted-foreground text-lg max-w-md mx-auto">
+        <div className="text-center space-y-1.5 sm:space-y-2">
+          <h1 className="text-2xl sm:text-4xl font-serif font-bold text-foreground">Select an Event</h1>
+          <p className="text-muted-foreground text-sm sm:text-lg max-w-md mx-auto">
             Choose an event to manage registrations, forms, check-in, and reports.
           </p>
         </div>
@@ -615,13 +822,13 @@ export default function EventSelectionScreen() {
           </div>
         ) : !events?.length ? (
           <Card className="border-dashed">
-            <CardContent className="py-24 flex flex-col items-center text-center gap-5">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-                <Calendar className="w-10 h-10 text-primary" />
+            <CardContent className="py-12 sm:py-24 flex flex-col items-center text-center gap-4 sm:gap-5">
+              <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-primary/10 flex items-center justify-center">
+                <Calendar className="w-7 h-7 sm:w-10 sm:h-10 text-primary" />
               </div>
               <div>
-                <h3 className="text-2xl font-serif font-bold">No events yet</h3>
-                <p className="text-muted-foreground mt-2 max-w-sm">
+                <h3 className="text-xl sm:text-2xl font-serif font-bold">No events yet</h3>
+                <p className="text-muted-foreground mt-1.5 sm:mt-2 text-sm sm:text-base max-w-sm">
                   Create your first event — a registration form will be set up automatically.
                 </p>
               </div>
@@ -633,7 +840,7 @@ export default function EventSelectionScreen() {
             </CardContent>
           </Card>
         ) : viewMode === "calendar" ? (
-          <CalendarView events={filtered} />
+          <CalendarView events={filtered} categories={categories} />
         ) : (
           <div className="space-y-4">
             {/* Past-events toggle */}
@@ -679,7 +886,7 @@ export default function EventSelectionScreen() {
                   key={event.id}
                   event={event}
                   onEdit={setEditEvent}
-                  onDelete={setDeleteId}
+                  categories={categories}
                 />
               ))
             )}
@@ -689,31 +896,13 @@ export default function EventSelectionScreen() {
 
       {editEvent && (
         <EditEventDialog
+          key={editEvent.id}
           event={editEvent}
           open={!!editEvent}
           onOpenChange={(o) => { if (!o) setEditEvent(null); }}
         />
       )}
 
-      <AlertDialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this event?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will delete the event. The linked registration form and its registrations will not be deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteId && deleteEvent.mutate({ eventId: deleteId })}
-            >
-              Delete Event
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

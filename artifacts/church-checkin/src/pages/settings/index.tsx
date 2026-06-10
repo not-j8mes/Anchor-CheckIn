@@ -1,6 +1,17 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { useGetOrganization, useUpdateOrganization, useResetAllData, getGetOrganizationQueryKey } from "@workspace/api-client-react";
+import {
+  useGetOrganization,
+  useUpdateOrganization,
+  useResetAllData,
+  useListEventCategories,
+  useCreateEventCategory,
+  useUpdateEventCategory,
+  useDeleteEventCategory,
+  getGetOrganizationQueryKey,
+  getListEventCategoriesQueryKey,
+  type EventCategory,
+} from "@workspace/api-client-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,10 +25,200 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Church, Moon, Sun, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X } from "lucide-react";
+import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 import { useDarkMode } from "@/hooks/use-dark-mode";
+
+// ─── Event Categories Card ────────────────────────────────────────────────────
+
+function EventCategoriesCard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: categories = [], isLoading } = useListEventCategories();
+
+  const [newName, setNewName] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editName, setEditName] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<EventCategory | null>(null);
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: getListEventCategoriesQueryKey() });
+
+  const createCategory = useCreateEventCategory({
+    mutation: {
+      onSuccess: () => { invalidate(); setNewName(""); toast({ title: "Category created" }); },
+      onError: (err: unknown) => {
+        const msg = err instanceof Error && err.message.includes("409") ? "That name is already taken" : "Failed to create category";
+        toast({ title: msg, variant: "destructive" });
+      },
+    },
+  });
+
+  const updateCategory = useUpdateEventCategory({
+    mutation: {
+      onSuccess: () => { invalidate(); setEditingId(null); toast({ title: "Category renamed" }); },
+      onError: (err: unknown) => {
+        const msg = err instanceof Error && err.message.includes("409") ? "That name is already taken" : "Failed to rename category";
+        toast({ title: msg, variant: "destructive" });
+      },
+    },
+  });
+
+  const deleteCategory = useDeleteEventCategory({
+    mutation: {
+      onSuccess: () => { invalidate(); setDeleteTarget(null); toast({ title: "Category deleted, events reassigned" }); },
+      onError: () => toast({ title: "Failed to delete category", variant: "destructive" }),
+    },
+  });
+
+  const startEdit = (cat: EventCategory) => {
+    setEditingId(cat.id);
+    setEditName(cat.name);
+  };
+
+  const cancelEdit = () => { setEditingId(null); setEditName(""); };
+
+  const saveEdit = (id: number) => {
+    if (!editName.trim()) return;
+    updateCategory.mutate({ categoryId: id, data: { name: editName.trim() } });
+  };
+
+  return (
+    <>
+      <Card className="border-card-border shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Tag className="w-4 h-4 text-primary" /> Event Categories
+          </CardTitle>
+          <CardDescription>
+            Manage the categories used to organise events. "General / Other" is the built-in default and cannot be deleted.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {isLoading ? (
+            <div className="animate-pulse space-y-2">
+              {[1, 2].map((i) => <div key={i} className="h-9 bg-muted rounded" />)}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {categories.map((cat) => (
+                <div key={cat.id} className="flex items-center gap-2">
+                  {editingId === cat.id ? (
+                    <>
+                      <Input
+                        autoFocus
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="flex-1 h-8 text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEdit(cat.id);
+                          if (e.key === "Escape") cancelEdit();
+                        }}
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-green-600 hover:text-green-700"
+                        onClick={() => saveEdit(cat.id)}
+                        disabled={!editName.trim() || updateCategory.isPending}
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" onClick={cancelEdit}>
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex-1 text-sm py-1.5 px-2 rounded border border-border bg-background">
+                        {cat.name}
+                        {cat.isDefault && (
+                          <span className="ml-2 text-xs text-muted-foreground">(default)</span>
+                        )}
+                      </span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                        onClick={() => startEdit(cat)}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-destructive/60 hover:text-destructive"
+                        disabled={cat.isDefault}
+                        onClick={() => setDeleteTarget(cat)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 pt-1 border-t border-border">
+            <Input
+              placeholder="e.g. Kids Program"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="flex-1 h-8 text-sm"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newName.trim()) {
+                  createCategory.mutate({ data: { name: newName.trim() } });
+                }
+              }}
+            />
+            <Button
+              size="sm"
+              onClick={() => createCategory.mutate({ data: { name: newName.trim() } })}
+              disabled={!newName.trim() || createCategory.isPending}
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              {createCategory.isPending ? "Adding…" : "Add"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Any events using this category will be reassigned to "General / Other". This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteCategory.mutate({ categoryId: deleteTarget.id })}
+              disabled={deleteCategory.isPending}
+            >
+              {deleteCategory.isPending ? "Deleting…" : "Delete & Reassign"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
 
 export default function Settings() {
   const { data: org, isLoading } = useGetOrganization();
@@ -85,7 +286,7 @@ export default function Settings() {
         <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
           <div className="max-w-3xl mx-auto px-6 h-14 flex items-center gap-4">
             <div className="flex items-center gap-2 text-foreground">
-              <Church className="w-5 h-5 text-primary" />
+              <img src={appLogo} alt="logo" className="w-6 h-6 object-contain" />
               <span className="font-serif font-bold text-base">Church Check-In</span>
             </div>
           </div>
@@ -106,7 +307,7 @@ export default function Settings() {
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-foreground">
-            <Church className="w-5 h-5 text-primary" />
+            <img src={appLogo} alt="logo" className="w-6 h-6 object-contain" />
             <span className="font-serif font-bold text-base">Church Check-In</span>
           </div>
           <Button asChild variant="ghost" size="sm">
@@ -217,6 +418,9 @@ export default function Settings() {
           </CardFooter>
         </Card>
       </form>
+
+      {/* Event Categories */}
+      <EventCategoriesCard />
 
       {/* Danger Zone */}
       <Card className="border-destructive/40 shadow-sm">

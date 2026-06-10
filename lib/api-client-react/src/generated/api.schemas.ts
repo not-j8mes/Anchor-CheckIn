@@ -123,6 +123,8 @@ export interface FormField {
   sortOrder: number;
   /** @nullable */
   options?: string | null;
+  /** @nullable */
+  sectionKey?: string | null;
 }
 
 export interface FormWithQuestions {
@@ -208,6 +210,7 @@ export interface FormFieldInput {
   required?: boolean;
   sortOrder?: number;
   options?: string;
+  sectionKey?: string;
 }
 
 export interface ReorderFieldsInput {
@@ -403,6 +406,7 @@ export interface CheckIn {
 export interface CheckInInput {
   registrationId: number;
   room?: string;
+  sessionId?: number;
 }
 
 export interface CheckoutInput {
@@ -459,6 +463,8 @@ export interface BatchCheckinResult {
 export interface EventCheckin {
   id: number;
   registrationId: number;
+  /** @nullable */
+  sessionId?: number | null;
   childFirstName: string;
   childLastName: string;
   guardianName: string;
@@ -479,6 +485,21 @@ export interface DayCount {
   count: number;
 }
 
+export interface EventSession {
+  id: number;
+  eventId: number;
+  sessionDate: string;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  endTime?: string | null;
+  status: string;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Event {
   id: number;
   name: string;
@@ -488,9 +509,19 @@ export interface Event {
   /** @nullable */
   registrationType?: string | null;
   /** @nullable */
+  scheduleType?: string | null;
+  /** @nullable */
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  endTime?: string | null;
+  /** @nullable */
+  repeatFrequency?: string | null;
+  /** @nullable */
+  repeatDayOfWeek?: number | null;
   status: string;
   /** @nullable */
   formId?: number | null;
@@ -507,6 +538,10 @@ export interface Event {
   printLabels?: boolean | null;
   /** @nullable */
   labelType?: string | null;
+  /** @nullable */
+  sessionCount?: number | null;
+  /** @nullable */
+  nextSessionDate?: string | null;
   createdAt: string;
 }
 
@@ -519,9 +554,19 @@ export interface EventWithForm {
   /** @nullable */
   registrationType?: string | null;
   /** @nullable */
+  scheduleType?: string | null;
+  /** @nullable */
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;
+  /** @nullable */
+  startTime?: string | null;
+  /** @nullable */
+  endTime?: string | null;
+  /** @nullable */
+  repeatFrequency?: string | null;
+  /** @nullable */
+  repeatDayOfWeek?: number | null;
   status: string;
   /** @nullable */
   formId?: number | null;
@@ -540,6 +585,10 @@ export interface EventWithForm {
   labelType?: string | null;
   /** @nullable */
   roomAssignmentMode?: string | null;
+  /** @nullable */
+  sessionCount?: number | null;
+  /** @nullable */
+  nextSessionDate?: string | null;
   createdAt: string;
   form?: FormWithQuestions | null;
 }
@@ -549,8 +598,13 @@ export interface CreateEventInput {
   description?: string;
   eventType: string;
   registrationType?: string;
+  scheduleType?: string;
   startDate?: string;
   endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  repeatFrequency?: string;
+  repeatDayOfWeek?: number;
   status?: string;
   formTitle: string;
   formDescription?: string;
@@ -572,6 +626,10 @@ export interface Room {
   capacity?: number | null;
   isActive: boolean;
   sortOrder: number;
+  /** @nullable */
+  ageMin?: number | null;
+  /** @nullable */
+  ageMax?: number | null;
   participantCount?: number;
   createdAt: string;
 }
@@ -582,6 +640,8 @@ export interface RoomInput {
   capacity?: number;
   isActive?: boolean;
   sortOrder?: number;
+  ageMin?: number;
+  ageMax?: number;
 }
 
 export interface RegistrationUpdateInput {
@@ -602,14 +662,35 @@ export interface UpdateEventInput {
   description?: string;
   eventType?: string;
   registrationType?: string;
+  scheduleType?: string;
   startDate?: string;
   endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  repeatFrequency?: string;
+  repeatDayOfWeek?: number;
   status?: string;
   trackAttendance?: boolean;
   requireCheckout?: boolean;
   printLabels?: boolean;
   labelType?: string;
   roomAssignmentMode?: string;
+}
+
+export interface EventCategory {
+  id: number;
+  slug: string;
+  name: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface CreateEventCategoryInput {
+  name: string;
+}
+
+export interface UpdateEventCategoryInput {
+  name: string;
 }
 
 export type ListChildrenParams = {

@@ -11,12 +11,15 @@ import statsRouter from "./stats";
 import eventsRouter from "./events";
 import adminRouter from "./admin";
 import roomsRouter from "./rooms";
+import eventCategoriesRouter from "./event-categories";
+import eventSessionsRouter from "./event-sessions";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(organizationsRouter);
 router.use(eventsRouter);
+router.use(eventSessionsRouter);
 router.use(formsRouter);
 router.use(questionsRouter);
 router.use(formFieldsRouter);
@@ -26,5 +29,6 @@ router.use(checkinsRouter);
 router.use(statsRouter);
 router.use(adminRouter);
 router.use(roomsRouter);
+router.use(eventCategoriesRouter);
 
 export default router;
