@@ -1,0 +1,58 @@
+Add QZ Tray silent printing integration to the app. QZ Tray is a local desktop app that runs on the kiosk machine and allows the browser to print directly to a label printer without a print dialog.
+1. Install the QZ Tray npm package
+In artifacts/church-checkin/package.json, add qz-tray as a dependency.
+2. Create a printing service
+Create artifacts/church-checkin/src/lib/printing.ts. This module should:
+
+Import qz-tray
+Export connectQZ(): Promise<boolean> — attempts to connect to the local QZ Tray WebSocket, returns true if successful, false if QZ Tray is not running. Should not throw.
+Export disconnectQZ(): void — disconnects if connected.
+Export isQZConnected(): boolean — returns current connection state.
+Export findPrinter(printerName: string): Promise<boolean> — searches for a printer by name, returns true if found.
+Export printLabel(printerName: string, labelHtml: string): Promise<void> — connects if not already connected, finds the printer, renders the label HTML to a pixel image using a hidden iframe, and sends it to the printer via qz.print(). Throws a descriptive error if anything fails.
+Export testPrinter(printerName: string): Promise<{ connected: boolean; printerFound: boolean; error?: string }> — runs a full connection + printer discovery check without printing anything.
+
+3. Update the organizations schema and API
+
+Add printerName (nullable text) and printingMode (text, default 'manual', values 'manual' or 'auto') columns to organizationsTable in lib/db/src/schema/organizations.ts.
+Run pnpm --filter @workspace/db run push.
+Add printerName and printingMode to the organization schema in lib/api-spec/openapi.yaml.
+Run pnpm --filter @workspace/api-spec run codegen.
+
+4. Update the Settings page
+In artifacts/church-checkin/src/pages/settings/index.tsx, add a new 'Printing' card section below the Branding card with:
+
+A 'Printing Mode' toggle/select with options 'Manual (Print Dialog)' and 'Auto (QZ Tray)'. Saved to printingMode via the existing updateOrg mutation.
+A text input for 'Printer Name' with placeholder Brother QL-810W. This should match exactly how the printer appears in the OS. Saved to printerName via updateOrg.
+A 'Test Connection' button. When clicked it calls testPrinter(printerName) from the printing service and shows one of these toasts:
+
+Green: 'QZ Tray connected · Printer found ✓'
+Yellow: 'QZ Tray connected but printer not found — check the printer name'
+Red: 'QZ Tray not running — download it from qz.io'
+
+
+A small QZ Tray status indicator (green dot / red dot with label 'QZ Tray running' or 'QZ Tray not detected') that automatically checks on page load by calling connectQZ().
+A helper text note under the Printer Name input: 'Must match the printer name exactly as it appears in your computer's printers list.'
+A link 'Download QZ Tray' pointing to https://qz.io/download that opens in a new tab.
+
+5. Update the kiosk check-in flow
+In artifacts/church-checkin/src/pages/checkin/index.tsx:
+
+On component mount, call connectQZ() silently in a useEffect. Store the result in a qzAvailable state variable.
+Read org.printingMode and org.printerName from useGetOrganization().
+After a successful check-in or walk-in, instead of immediately opening LabelPrintDialog:
+
+If printingMode === 'auto' AND qzAvailable AND printerName is set: call printLabel(printerName, labelHtml) where labelHtml is the label rendered using the same markup as LabelPrintDialog's LabelCard component (extract LabelCard to a shared utility that returns an HTML string). Show a 'Printing...' toast. On success show 'Label printed ✓'. On any failure, show 'Auto-print failed — opening print dialog' and open LabelPrintDialog as fallback.
+Otherwise: open LabelPrintDialog as normal (existing behaviour unchanged).
+
+
+Add a small 'Switch to Manual Print' button in the kiosk top bar next to the Walk-in button. Clicking it sets a manualOverride boolean in component state (also persist to sessionStorage as kioskManualOverride). When override is active, show a yellow dismissible banner at the top of the kiosk: 'Manual print mode active' with a 'Restore Auto Print' button that clears the override.
+On component mount, read sessionStorage.getItem('kioskManualOverride') to restore the override state across page refreshes.
+
+6. Extract LabelCard to a shared HTML utility
+The LabelCard component in LabelPrintDialog.tsx renders the label. Extract the label markup into a function renderLabelHtml(label: LabelData): string in a new file artifacts/church-checkin/src/lib/label-renderer.ts that returns a self-contained HTML string (inline styles only, no Tailwind classes, since it will be used outside the React render tree for QZ Tray). Update LabelPrintDialog.tsx to use this function so the label looks identical in both the dialog preview and the printed output.
+Important notes:
+
+QZ Tray connects via WebSocket to localhost — this only works when the browser and QZ Tray are on the same machine. This is expected and correct for a kiosk setup.
+Never let a print failure break the check-in flow. Always fall back to LabelPrintDialog on any error.
+Do not remove or change the existing LabelPrintDialog — it remains the fallback and manual mode UI throughout."

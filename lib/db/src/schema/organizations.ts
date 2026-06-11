@@ -11,6 +11,8 @@ export const organizationsTable = pgTable("organizations", {
   phone: text("phone"),
   website: text("website"),
   printerIp: text("printer_ip"),
+  printerName: text("printer_name"),
+  printingMode: text("printing_mode").notNull().default("manual"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

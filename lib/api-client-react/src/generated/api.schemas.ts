@@ -22,6 +22,9 @@ export interface Organization {
   phone?: string | null;
   /** @nullable */
   website?: string | null;
+  /** @nullable */
+  printerName?: string | null;
+  printingMode?: string;
   updatedAt?: string;
 }
 
@@ -32,6 +35,8 @@ export interface OrganizationInput {
   address?: string;
   phone?: string;
   website?: string;
+  printerName?: string;
+  printingMode?: string;
 }
 
 export interface Form {

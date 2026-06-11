@@ -35,11 +35,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Printer, ExternalLink, Loader2 } from "lucide-react";
 import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 import { useDarkMode } from "@/hooks/use-dark-mode";
+import { connectQZ, testPrinter } from "@/lib/printing";
 
 // ─── Event Categories Card ────────────────────────────────────────────────────
 
@@ -220,6 +222,133 @@ function EventCategoriesCard() {
   );
 }
 
+// ─── Printing Card ────────────────────────────────────────────────────────────
+
+interface PrintingCardProps {
+  printerName: string;
+  printingMode: string;
+  onPrinterNameChange: (v: string) => void;
+  onPrintingModeChange: (v: string) => void;
+}
+
+function PrintingCard({ printerName, printingMode, onPrinterNameChange, onPrintingModeChange }: PrintingCardProps) {
+  const { toast } = useToast();
+  const [qzStatus, setQzStatus] = useState<"checking" | "connected" | "disconnected">("checking");
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    connectQZ().then((ok) => setQzStatus(ok ? "connected" : "disconnected"));
+  }, []);
+
+  const handleTest = async () => {
+    if (!printerName.trim()) {
+      toast({ title: "Enter a printer name first", variant: "destructive" });
+      return;
+    }
+    setTesting(true);
+    try {
+      const result = await testPrinter(printerName.trim());
+      if (result.connected && result.printerFound) {
+        toast({ title: "QZ Tray connected · Printer found ✓" });
+      } else if (result.connected && !result.printerFound) {
+        toast({ title: "QZ Tray connected but printer not found — check the printer name" });
+      } else {
+        toast({ title: "QZ Tray not running — download it from qz.io", variant: "destructive" });
+      }
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <Card className="border-card-border shadow-sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Printer className="w-4 h-4 text-primary" /> Printing
+        </CardTitle>
+        <CardDescription>
+          Configure label printing for the check-in kiosk.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* QZ Tray status indicator */}
+        <div className="flex items-center gap-2">
+          {qzStatus === "checking" ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+          ) : qzStatus === "connected" ? (
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
+          ) : (
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+          )}
+          <span className="text-sm text-muted-foreground">
+            {qzStatus === "checking"
+              ? "Checking QZ Tray…"
+              : qzStatus === "connected"
+              ? "QZ Tray running"
+              : "QZ Tray not detected"}
+          </span>
+          {qzStatus === "disconnected" && (
+            <a
+              href="https://qz.io/download"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-1 text-xs text-primary hover:underline flex items-center gap-0.5"
+            >
+              Download QZ Tray <ExternalLink className="w-3 h-3 ml-0.5" />
+            </a>
+          )}
+        </div>
+
+        {/* Printing mode */}
+        <div className="space-y-2">
+          <Label>Printing Mode</Label>
+          <Select value={printingMode} onValueChange={onPrintingModeChange}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="manual">Manual (Print Dialog)</SelectItem>
+              <SelectItem value="auto">Auto (QZ Tray)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Auto mode silently prints to your label printer via QZ Tray whenever a child is checked in.
+          </p>
+        </div>
+
+        {/* Printer name */}
+        <div className="space-y-2">
+          <Label htmlFor="printerName">Printer Name</Label>
+          <div className="flex gap-2">
+            <Input
+              id="printerName"
+              placeholder="Brother QL-810W"
+              value={printerName}
+              onChange={(e) => onPrinterNameChange(e.target.value)}
+              className="flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleTest}
+              disabled={testing}
+              className="flex-shrink-0 gap-1.5"
+            >
+              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+              {testing ? "Testing…" : "Test Connection"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Must match the printer name exactly as it appears in your computer's printers list.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Settings page ────────────────────────────────────────────────────────────
+
 export default function Settings() {
   const { data: org, isLoading } = useGetOrganization();
   const { toast } = useToast();
@@ -231,6 +360,8 @@ export default function Settings() {
     address: "",
     phone: "",
     website: "",
+    printerName: "",
+    printingMode: "manual",
   });
 
   const { isDark, setIsDark } = useDarkMode();
@@ -245,6 +376,8 @@ export default function Settings() {
         address: org.address || "",
         phone: org.phone || "",
         website: org.website || "",
+        printerName: org.printerName || "",
+        printingMode: org.printingMode || "manual",
       });
     }
   }, [org]);
@@ -347,7 +480,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="space-y-8">
         <Card className="border-card-border shadow-sm">
           <CardHeader>
             <CardTitle>Branding</CardTitle>
@@ -411,12 +544,21 @@ export default function Settings() {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="bg-muted/30 border-t border-border px-6 py-4">
-            <Button type="submit" disabled={updateOrg.isPending} className="ml-auto">
-              {updateOrg.isPending ? "Saving..." : "Save Settings"}
-            </Button>
-          </CardFooter>
         </Card>
+
+        {/* Printing */}
+        <PrintingCard
+          printerName={formData.printerName}
+          printingMode={formData.printingMode}
+          onPrinterNameChange={(v) => setFormData(p => ({ ...p, printerName: v }))}
+          onPrintingModeChange={(v) => setFormData(p => ({ ...p, printingMode: v }))}
+        />
+
+        <div className="flex justify-end">
+          <Button type="submit" disabled={updateOrg.isPending}>
+            {updateOrg.isPending ? "Saving..." : "Save Settings"}
+          </Button>
+        </div>
       </form>
 
       {/* Event Categories */}

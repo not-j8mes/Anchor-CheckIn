@@ -48,6 +48,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
 import { Switch } from "@/components/ui/switch";
+import { connectQZ, printLabel } from "@/lib/printing";
+import { renderLabelsDocument } from "@/lib/label-renderer";
 
 function groupByFamily(children: Child[]): Array<{ guardian: string; children: Child[] }> {
   const map = new Map<string, Child[]>();
@@ -496,7 +498,7 @@ export default function CheckinKiosk() {
   );
 
   const { toast } = useToast();
-  useGetOrganization();
+  const { data: org } = useGetOrganization();
 
   const [collectedLabels, setCollectedLabels] = useState<LabelData[]>([]);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
@@ -504,12 +506,50 @@ export default function CheckinKiosk() {
   const [checkingInGuardian, setCheckingInGuardian] = useState<string | null>(null);
   const [loadingCheckinId, setLoadingCheckinId] = useState<number | null>(null);
 
-  const handleWalkInSuccess = (labels: LabelData[]) => {
-    queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey(childrenParams) });
-    if (printLabels && labels.length > 0) {
+  const [qzAvailable, setQzAvailable] = useState(false);
+  const [manualOverride, setManualOverride] = useState<boolean>(() => {
+    return sessionStorage.getItem("kioskManualOverride") === "true";
+  });
+
+  useEffect(() => {
+    connectQZ().then((ok) => setQzAvailable(ok));
+  }, []);
+
+  const setManualOverrideAndPersist = (value: boolean) => {
+    setManualOverride(value);
+    if (value) {
+      sessionStorage.setItem("kioskManualOverride", "true");
+    } else {
+      sessionStorage.removeItem("kioskManualOverride");
+    }
+  };
+
+  const handleAutoPrint = async (labels: LabelData[]) => {
+    if (!printLabels || labels.length === 0) return;
+
+    const printerName = org?.printerName;
+    const printingMode = org?.printingMode ?? "manual";
+    const useQZ = printingMode === "auto" && qzAvailable && printerName && !manualOverride;
+
+    if (useQZ) {
+      toast({ title: "Printing…" });
+      try {
+        await printLabel(printerName!, renderLabelsDocument(labels));
+        toast({ title: "Label printed ✓" });
+      } catch {
+        toast({ title: "Auto-print failed — opening print dialog", variant: "default" });
+        setCollectedLabels(labels);
+        setPrintDialogOpen(true);
+      }
+    } else {
       setCollectedLabels(labels);
       setPrintDialogOpen(true);
     }
+  };
+
+  const handleWalkInSuccess = (labels: LabelData[]) => {
+    queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey(childrenParams) });
+    handleAutoPrint(labels);
     toast({
       title: labels.length > 1
         ? `${labels.length} children registered and checked in!`
@@ -543,10 +583,7 @@ export default function CheckinKiosk() {
       });
       setSearch("");
       setDebouncedSearch("");
-      if (printLabels && result.labels.length > 0) {
-        setCollectedLabels(result.labels as LabelData[]);
-        setPrintDialogOpen(true);
-      }
+      await handleAutoPrint(result.labels as LabelData[]);
       toast({
         title: result.labels.length > 1
           ? `${result.labels.length} children checked in for ${familyGuardian}`
@@ -627,11 +664,40 @@ export default function CheckinKiosk() {
               aria-label="Print labels on check-in"
             />
           </div>
+          {org?.printingMode === "auto" && !manualOverride && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground text-xs"
+              onClick={() => setManualOverrideAndPersist(true)}
+            >
+              <Printer className="w-3.5 h-3.5" /> Switch to Manual Print
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="gap-2 w-28" onClick={() => setWalkInOpen(true)}>
             <UserPlus className="w-4 h-4" /> Walk-in
           </Button>
         </div>
       </div>
+
+      {/* Manual override banner */}
+      {manualOverride && (
+        <div className="flex items-center justify-between px-6 py-2 bg-amber-50 border-b border-amber-200 text-amber-800 text-sm">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <span className="font-medium">Manual print mode active</span>
+            <span className="text-amber-600">— labels will open in the print dialog instead of printing automatically.</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-amber-700 hover:text-amber-900 hover:bg-amber-100 h-7 text-xs gap-1"
+            onClick={() => setManualOverrideAndPersist(false)}
+          >
+            Restore Auto Print
+          </Button>
+        </div>
+      )}
 
       {/* Main centered content */}
       <div className="flex flex-col flex-1 items-center w-full">

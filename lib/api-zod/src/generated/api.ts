@@ -27,6 +27,8 @@ export const GetOrganizationResponse = zod.object({
   "address": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "website": zod.string().nullish(),
+  "printerName": zod.string().nullish(),
+  "printingMode": zod.string().optional(),
   "updatedAt": zod.string().optional()
 })
 
@@ -40,7 +42,9 @@ export const UpdateOrganizationBody = zod.object({
   "headerText": zod.string().optional(),
   "address": zod.string().optional(),
   "phone": zod.string().optional(),
-  "website": zod.string().optional()
+  "website": zod.string().optional(),
+  "printerName": zod.string().optional(),
+  "printingMode": zod.string().optional()
 })
 
 export const UpdateOrganizationResponse = zod.object({
@@ -51,6 +55,8 @@ export const UpdateOrganizationResponse = zod.object({
   "address": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "website": zod.string().nullish(),
+  "printerName": zod.string().nullish(),
+  "printingMode": zod.string().optional(),
   "updatedAt": zod.string().optional()
 })
 

@@ -1139,6 +1139,10 @@ components:
           type: ["string", "null"]
         website:
           type: ["string", "null"]
+        printerName:
+          type: ["string", "null"]
+        printingMode:
+          type: string
         updatedAt:
           type: string
 
@@ -1157,6 +1161,10 @@ components:
         phone:
           type: string
         website:
+          type: string
+        printerName:
+          type: string
+        printingMode:
           type: string
 
     Form:

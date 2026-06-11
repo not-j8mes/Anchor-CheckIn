@@ -13,4 +13,6 @@ export interface OrganizationInput {
   address?: string;
   phone?: string;
   website?: string;
+  printerName?: string;
+  printingMode?: string;
 }

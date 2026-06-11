@@ -19,5 +19,8 @@ export interface Organization {
   phone?: string | null;
   /** @nullable */
   website?: string | null;
+  /** @nullable */
+  printerName?: string | null;
+  printingMode?: string;
   updatedAt?: string;
 }
