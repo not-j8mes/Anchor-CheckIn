@@ -21,7 +21,9 @@ import {
   useCreateRoom,
   useUpdateRoom,
   useDeleteRoom,
+  useCreateFormField,
   useUpdateRegistrationRoom,
+  useUpdateRegistrationCustomAnswers,
   useUpdateCheckin,
   useDeleteEvent,
   useListEventCategories,
@@ -159,11 +161,14 @@ function EventRoomFormDialog({ room, eventId, open, onOpenChange }: { room?: Roo
   );
 }
 
-function RoomsTabContent({ eventId }: { eventId: number }) {
+function RoomsTabContent({ eventId, formId, roomAssignmentMode }: { eventId: number; formId?: number | null; roomAssignmentMode?: string | null }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: rooms, isLoading } = useListRooms(eventId, {
     query: { enabled: !!eventId, queryKey: getListRoomsQueryKey(eventId) },
+  });
+  const { data: formFields = [] } = useListFormFields(formId ?? 0, {
+    query: { enabled: !!formId, queryKey: getListFormFieldsQueryKey(formId ?? 0) },
   });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState<Room | undefined>(undefined);
@@ -176,8 +181,37 @@ function RoomsTabContent({ eventId }: { eventId: number }) {
     },
   });
 
+  const createFormField = useCreateFormField({
+    mutation: {
+      onSuccess: () => {
+        if (formId) queryClient.invalidateQueries({ queryKey: getListFormFieldsQueryKey(formId) });
+        toast({ title: "Room / Group field added to the registration form" });
+      },
+      onError: () => { toast({ title: "Failed to add field", variant: "destructive" }); },
+    },
+  });
+
+  const hasRoomAssignmentField = formFields.some((f) => f.systemKey === "room_assignment");
   const activeRooms = rooms?.filter((r) => r.isActive) ?? [];
   const inactiveRooms = rooms?.filter((r) => !r.isActive) ?? [];
+
+  const handleAddRoomField = () => {
+    if (!formId) return;
+    createFormField.mutate({
+      formId,
+      data: {
+        fieldKind: "system",
+        systemKey: "room_assignment",
+        label: "Room / Group",
+        fieldType: "select",
+        required: true,
+        sortOrder: formFields.length,
+        placeholder: "Select a room or group",
+        options: "",
+        sectionKey: "child_info",
+      },
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -187,6 +221,28 @@ function RoomsTabContent({ eventId }: { eventId: number }) {
           <Plus className="w-3.5 h-3.5" /> Add Room
         </Button>
       </div>
+
+      {/* Only suggest adding Room/Group to form if assignment mode is "registrant chooses" */}
+      {formId && roomAssignmentMode === "registrant_chooses" && (rooms?.length ?? 0) > 0 && !hasRoomAssignmentField && (
+        <div className="flex items-start gap-3 p-3.5 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/30 text-sm">
+          <DoorOpen className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-blue-900 dark:text-blue-300">Room selection is not on the registration form yet.</p>
+            <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
+              Add the Room / Group field if registrants should choose a room when signing up.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-blue-300 text-blue-800 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950 flex-shrink-0"
+            onClick={handleAddRoomField}
+            disabled={createFormField.isPending}
+          >
+            {createFormField.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Add to form"}
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
@@ -273,11 +329,12 @@ function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; ope
     guardianPhone: child.guardianPhone ?? "",
     guardianEmail: child.guardianEmail ?? "",
     allergies: child.allergies ?? "",
+    medicalNotes: child.medicalNotes ?? "",
     specialNeeds: child.specialNeeds ?? "",
     room: child.room ?? "",
   });
 
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((p) => ({ ...p, [field]: e.target.value }));
+  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((p) => ({ ...p, [field]: e.target.value }));
 
   const updateRegistration = useUpdateRegistration({
     mutation: {
@@ -302,8 +359,9 @@ function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; ope
         guardianLastName: form.guardianLastName.trim() || undefined,
         guardianPhone: form.guardianPhone.trim() || undefined,
         guardianEmail: form.guardianEmail.trim() || undefined,
-        allergies: form.allergies.trim() || undefined,
-        specialNeeds: form.specialNeeds.trim() || undefined,
+        allergies: form.allergies.trim(),
+        medicalNotes: form.medicalNotes.trim(),
+        specialNeeds: form.specialNeeds.trim(),
         room: form.room || undefined,
       },
     });
@@ -323,8 +381,9 @@ function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; ope
               <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.childLastName} onChange={set("childLastName")} /></div>
             </div>
             <div className="space-y-1.5"><Label>Date of Birth</Label><Input type="date" value={form.childDateOfBirth} onChange={set("childDateOfBirth")} /></div>
-            <div className="space-y-1.5"><Label>Allergies</Label><Input value={form.allergies} onChange={set("allergies")} placeholder="e.g. peanuts, latex" /></div>
-            <div className="space-y-1.5"><Label>Special Needs / Notes</Label><Input value={form.specialNeeds} onChange={set("specialNeeds")} /></div>
+            <div className="space-y-1.5"><Label>Allergies</Label><Textarea value={form.allergies} onChange={set("allergies")} placeholder="e.g. peanuts, latex" rows={2} /></div>
+            <div className="space-y-1.5"><Label>Medical Notes</Label><Textarea value={form.medicalNotes} onChange={set("medicalNotes")} placeholder="Any diagnoses, medications, or medical considerations…" rows={2} /></div>
+            <div className="space-y-1.5"><Label>Special Needs / Accommodations</Label><Textarea value={form.specialNeeds} onChange={set("specialNeeds")} placeholder="Describe any special needs or accommodations required…" rows={2} /></div>
             <div className="space-y-1.5">
               <Label>Room</Label>
               {rooms && rooms.length > 0 ? (
@@ -620,19 +679,6 @@ function RegistrationDetailSheet({
       })()
     : null;
 
-  const childForEdit: Child = {
-    id: reg.id,
-    firstName: reg.childFirstName,
-    lastName: reg.childLastName,
-    dateOfBirth: reg.childDateOfBirth,
-    guardianName: reg.guardianName,
-    guardianPhone: reg.guardianPhone,
-    guardianEmail: reg.guardianEmail,
-    allergies: reg.allergies,
-    specialNeeds: reg.specialNeeds,
-    room: reg.room,
-    registrationId: reg.id,
-  };
 
   return (
     <>
@@ -786,13 +832,13 @@ function RegistrationDetailSheet({
         </SheetContent>
       </Sheet>
 
-      {editOpen && (
-        <EventEditChildDialog
-          child={childForEdit}
-          open={editOpen}
-          onOpenChange={handleEditClose}
-        />
-      )}
+      <RegistrationEditDialog
+        key={reg.id}
+        reg={reg}
+        open={editOpen}
+        onOpenChange={handleEditClose}
+        onSaved={() => {}}
+      />
 
       <Dialog open={deleteOpen} onOpenChange={(v) => { if (!deleteRegistration.isPending) setDeleteOpen(v); }}>
         <DialogContent className="sm:max-w-sm">
@@ -1341,6 +1387,9 @@ function RegistrationEditDialog({
     query: { enabled: !!_regEditEventId, queryKey: getListRoomsQueryKey(_regEditEventId) },
   });
 
+  const [tab, setTab] = useState("child");
+  useEffect(() => { if (open) setTab("child"); }, [open]);
+
   const guardianParts = (reg.guardianName ?? "").trim().split(/\s+/);
   const [form, setForm] = useState({
     childFirstName: reg.childFirstName,
@@ -1351,114 +1400,271 @@ function RegistrationEditDialog({
     guardianPhone: reg.guardianPhone ?? "",
     guardianEmail: reg.guardianEmail ?? "",
     allergies: reg.allergies ?? "",
+    medicalNotes: reg.medicalNotes ?? "",
     specialNeeds: reg.specialNeeds ?? "",
+    emergencyContactName: reg.emergencyContactName ?? "",
+    emergencyContactPhone: reg.emergencyContactPhone ?? "",
+    emergencyContactRelationship: reg.emergencyContactRelationship ?? "",
     room: reg.room ?? "",
   });
 
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((p) => ({ ...p, [field]: e.target.value }));
 
-  const updateRegistration = useUpdateRegistration({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(reg.formId) });
-        queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey() });
-        queryClient.invalidateQueries({ queryKey: [`/api/registrations/${reg.id}`] });
-        toast({ title: "Changes saved" });
-        onSaved();
-        onOpenChange(false);
-      },
-      onError: () => toast({ title: "Failed to save changes", variant: "destructive" }),
-    },
+  // Custom answers (for Additional Questions tab)
+  const { data: regDetail, isLoading: detailLoading } = useGetRegistration(reg.id, {
+    query: { enabled: open, queryKey: [`/api/registrations/${reg.id}`] },
   });
+  const [customEdits, setCustomEdits] = useState<Record<number, string>>({});
+  useEffect(() => {
+    if (regDetail?.customAnswers) {
+      const edits: Record<number, string> = {};
+      for (const ca of regDetail.customAnswers) edits[ca.id] = ca.value;
+      setCustomEdits(edits);
+    }
+  }, [regDetail]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const isPickupRelated = (label: string) => {
+    const l = label.toLowerCase();
+    return l.includes("authorized pickup") || l.includes("pickup name") ||
+      l.includes("unauthorized") || l.includes("not authorized") || l.includes("not allowed");
+  };
+  const pickupAnswers = useMemo(
+    () => (regDetail?.customAnswers ?? []).filter((ca) => isPickupRelated(ca.fieldLabel)),
+    [regDetail]
+  );
+  const additionalAnswers = useMemo(
+    () => (regDetail?.customAnswers ?? []).filter((ca) => !isPickupRelated(ca.fieldLabel)),
+    [regDetail]
+  );
+
+  const updateRegistration = useUpdateRegistration();
+  const updateCustomAnswers = useUpdateRegistrationCustomAnswers();
+  const isPending = updateRegistration.isPending || updateCustomAnswers.isPending;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateRegistration.mutate({
-      registrationId: reg.id,
-      data: {
-        childFirstName: form.childFirstName.trim() || undefined,
-        childLastName: form.childLastName.trim() || undefined,
-        childDateOfBirth: form.childDateOfBirth || undefined,
-        guardianFirstName: form.guardianFirstName.trim() || undefined,
-        guardianLastName: form.guardianLastName.trim() || undefined,
-        guardianPhone: form.guardianPhone.trim() || undefined,
-        guardianEmail: form.guardianEmail.trim() || undefined,
-        allergies: form.allergies.trim() || undefined,
-        specialNeeds: form.specialNeeds.trim() || undefined,
-        room: form.room || undefined,
-      },
-    });
+    try {
+      await updateRegistration.mutateAsync({
+        registrationId: reg.id,
+        data: {
+          childFirstName: form.childFirstName.trim() || undefined,
+          childLastName: form.childLastName.trim() || undefined,
+          childDateOfBirth: form.childDateOfBirth || undefined,
+          guardianFirstName: form.guardianFirstName.trim() || undefined,
+          guardianLastName: form.guardianLastName.trim() || undefined,
+          guardianPhone: form.guardianPhone.trim() || undefined,
+          guardianEmail: form.guardianEmail.trim() || undefined,
+          allergies: form.allergies.trim(),
+          medicalNotes: form.medicalNotes.trim(),
+          specialNeeds: form.specialNeeds.trim(),
+          emergencyContactName: form.emergencyContactName.trim(),
+          emergencyContactPhone: form.emergencyContactPhone.trim(),
+          emergencyContactRelationship: form.emergencyContactRelationship.trim(),
+          room: form.room || undefined,
+        },
+      });
+      const changedAnswers = Object.entries(customEdits)
+        .filter(([id, val]) => {
+          const orig = regDetail?.customAnswers.find((ca) => ca.id === Number(id));
+          return orig && orig.value !== val;
+        })
+        .map(([id, value]) => ({ id: Number(id), value }));
+      if (changedAnswers.length > 0) {
+        await updateCustomAnswers.mutateAsync({ registrationId: reg.id, data: { answers: changedAnswers } });
+      }
+      queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(reg.formId) });
+      queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey() });
+      queryClient.invalidateQueries({ queryKey: [`/api/registrations/${reg.id}`] });
+      toast({ title: "Changes saved" });
+      onSaved();
+      onOpenChange(false);
+    } catch {
+      toast({ title: "Failed to save changes", variant: "destructive" });
+    }
   };
 
+  const tabTriggerClass = "rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-3 sm:px-4 h-full text-xs sm:text-sm font-medium";
+
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!updateRegistration.isPending) onOpenChange(v); }}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-serif">
-            Edit — {reg.childFirstName} {reg.childLastName}
-          </DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-5 pt-2">
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Child</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>First Name</Label><Input value={form.childFirstName} onChange={set("childFirstName")} /></div>
-              <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.childLastName} onChange={set("childLastName")} /></div>
+    <Dialog open={open} onOpenChange={(v) => { if (!isPending) onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-2xl flex flex-col p-0 gap-0 max-h-[90vh] overflow-hidden">
+
+        {/* ── Header: title + summary ── */}
+        <div className="px-6 pt-5 pb-3 shrink-0 border-b">
+          <DialogTitle className="text-xl font-serif mb-3">Edit Registrant</DialogTitle>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold leading-tight">{reg.childFirstName} {reg.childLastName}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {[
+                  form.room && `Room: ${form.room}`,
+                  reg.guardianName && `Guardian: ${reg.guardianName}`,
+                ].filter(Boolean).join(" · ")}
+              </p>
             </div>
-            <div className="space-y-1.5">
-              <Label>Date of Birth</Label>
-              <Input type="date" value={form.childDateOfBirth} onChange={set("childDateOfBirth")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Allergies</Label>
-              <Input value={form.allergies} onChange={set("allergies")} placeholder="e.g. peanuts, latex" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Special Needs / Medical Notes</Label>
-              <Input value={form.specialNeeds} onChange={set("specialNeeds")} placeholder="Any medical notes or accommodations" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Room</Label>
-              {rooms && rooms.length > 0 ? (
-                <Select
-                  value={form.room || "__none__"}
-                  onValueChange={(v) => setForm((p) => ({ ...p, room: v === "__none__" ? "" : v }))}
-                >
-                  <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Unassigned</SelectItem>
-                    {rooms.map((r) => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input value={form.room} onChange={set("room")} placeholder="Room name" />
-              )}
-            </div>
+            {(form.allergies || form.medicalNotes || form.specialNeeds) && (
+              <div className="flex gap-1.5 flex-wrap justify-end shrink-0">
+                {form.allergies && <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5">Allergy</Badge>}
+                {form.medicalNotes && <Badge className="bg-amber-500 hover:bg-amber-500 text-white text-[10px] px-1.5 py-0.5">Medical</Badge>}
+                {form.specialNeeds && <Badge className="bg-blue-500 hover:bg-blue-500 text-white text-[10px] px-1.5 py-0.5">Special Needs</Badge>}
+              </div>
+            )}
           </div>
-          <div className="space-y-3 pt-1 border-t border-border">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">Guardian</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>First Name</Label><Input value={form.guardianFirstName} onChange={set("guardianFirstName")} /></div>
-              <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.guardianLastName} onChange={set("guardianLastName")} /></div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Phone</Label>
-              <Input type="tel" value={form.guardianPhone} onChange={set("guardianPhone")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Email</Label>
-              <Input type="email" value={form.guardianEmail} onChange={set("guardianEmail")} />
-            </div>
+        </div>
+
+        {/* ── Tabs + form ── */}
+        <Tabs value={tab} onValueChange={setTab} className="flex flex-col flex-1 min-h-0">
+
+          {/* Tab bar */}
+          <div className="px-6 border-b shrink-0">
+            <TabsList className="rounded-none bg-transparent p-0 h-10 w-full justify-start gap-0">
+              <TabsTrigger value="child" className={tabTriggerClass}>Child Info</TabsTrigger>
+              <TabsTrigger value="guardian" className={tabTriggerClass}>Guardian</TabsTrigger>
+              <TabsTrigger value="emergency" className={tabTriggerClass}>Emergency</TabsTrigger>
+              <TabsTrigger value="additional" className={tabTriggerClass}>
+                Additional
+                {additionalAnswers.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-muted text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 leading-none">{additionalAnswers.length}</span>
+                )}
+              </TabsTrigger>
+            </TabsList>
           </div>
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={updateRegistration.isPending} className="gap-2">
-              {updateRegistration.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </form>
+
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            {/* Scrollable tab content */}
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+
+              {/* ── Child Info ── */}
+              <TabsContent value="child" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5"><Label>First Name</Label><Input value={form.childFirstName} onChange={set("childFirstName")} /></div>
+                  <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.childLastName} onChange={set("childLastName")} /></div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Date of Birth</Label>
+                    <Input type="date" value={form.childDateOfBirth} onChange={set("childDateOfBirth")} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Room / Group</Label>
+                    {rooms && rooms.length > 0 ? (
+                      <Select value={form.room || "__none__"} onValueChange={(v) => setForm((p) => ({ ...p, room: v === "__none__" ? "" : v }))}>
+                        <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Unassigned</SelectItem>
+                          {rooms.map((r) => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input value={form.room} onChange={set("room")} placeholder="Room name" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Safety section */}
+                <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <p className="text-sm font-semibold text-amber-800">Safety Information</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Allergies</Label>
+                    <Textarea value={form.allergies} onChange={set("allergies")} placeholder="e.g. peanuts, latex" rows={2} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Medical Notes</Label>
+                    <Textarea value={form.medicalNotes} onChange={set("medicalNotes")} placeholder="Any diagnoses, medications, or medical considerations…" rows={2} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Special Needs / Accommodations</Label>
+                    <Textarea value={form.specialNeeds} onChange={set("specialNeeds")} placeholder="Describe any special needs or accommodations required…" rows={2} />
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* ── Guardian ── */}
+              <TabsContent value="guardian" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5"><Label>First Name</Label><Input value={form.guardianFirstName} onChange={set("guardianFirstName")} /></div>
+                  <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.guardianLastName} onChange={set("guardianLastName")} /></div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Phone</Label>
+                  <Input type="tel" value={form.guardianPhone} onChange={set("guardianPhone")} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Email</Label>
+                  <Input type="email" value={form.guardianEmail} onChange={set("guardianEmail")} />
+                </div>
+                {pickupAnswers.length > 0 && (
+                  <div className="pt-3 border-t border-border space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pickup Authorization</p>
+                    {pickupAnswers.map((ca) => (
+                      <div key={ca.id} className="space-y-1.5">
+                        <Label>{ca.fieldLabel}</Label>
+                        <Textarea
+                          value={customEdits[ca.id] ?? ca.value}
+                          onChange={(e) => setCustomEdits((p) => ({ ...p, [ca.id]: e.target.value }))}
+                          rows={2}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* ── Emergency Contact ── */}
+              <TabsContent value="emergency" className="mt-0 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5"><Label>Name</Label><Input value={form.emergencyContactName} onChange={set("emergencyContactName")} placeholder="Full name" /></div>
+                  <div className="space-y-1.5"><Label>Relationship</Label><Input value={form.emergencyContactRelationship} onChange={set("emergencyContactRelationship")} placeholder="e.g. Aunt, Neighbor" /></div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Phone</Label>
+                  <Input type="tel" value={form.emergencyContactPhone} onChange={set("emergencyContactPhone")} placeholder="(555) 000-0000" />
+                </div>
+              </TabsContent>
+
+              {/* ── Additional Questions ── */}
+              <TabsContent value="additional" className="mt-0">
+                {detailLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  </div>
+                ) : additionalAnswers.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">
+                    <p className="text-sm">No additional questions for this registration.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {additionalAnswers.map((ca) => (
+                      <div key={ca.id} className="space-y-1.5">
+                        <Label>{ca.fieldLabel}</Label>
+                        <Textarea
+                          value={customEdits[ca.id] ?? ca.value}
+                          onChange={(e) => setCustomEdits((p) => ({ ...p, [ca.id]: e.target.value }))}
+                          rows={2}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+            </div>
+
+            {/* ── Sticky footer ── */}
+            <div className="border-t px-6 py-4 shrink-0 flex items-center justify-end gap-3 bg-background">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>Cancel</Button>
+              <Button type="submit" disabled={isPending} className="gap-2">
+                {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        </Tabs>
+
       </DialogContent>
     </Dialog>
   );
@@ -1909,6 +2115,7 @@ function CheckInDeskContent({
   sessions,
   selectedSessionId,
   onSessionChange,
+  initialPrintLabels,
 }: {
   eventId: number;
   formId?: number | null;
@@ -1925,6 +2132,7 @@ function CheckInDeskContent({
   sessions?: EventSession[];
   selectedSessionId?: number | null;
   onSessionChange?: (id: number | null) => void;
+  initialPrintLabels?: boolean;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1934,6 +2142,9 @@ function CheckInDeskContent({
   const [showAttendance, setShowAttendance] = useState(false);
   const [selectedRegId, setSelectedRegId] = useState<number | null>(null);
   const [addRegOpen, setAddRegOpen] = useState(false);
+  const [printLabels, setPrintLabels] = useState(initialPrintLabels ?? true);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [pendingPrintLabel, setPendingPrintLabel] = useState<LabelData | null>(null);
 
   // Dialog state
   const [pendingCheckinReg, setPendingCheckinReg] = useState<Registration | null>(null);
@@ -1943,11 +2154,15 @@ function CheckInDeskContent({
 
   const createCheckin = useCreateCheckin({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (data) => {
         invalidate();
         toast({ title: isChildEvent ? "Child checked in" : "Checked in" });
         setLoadingId(null);
         setPendingCheckinReg(null);
+        if (printLabels && data.labelData) {
+          setPendingPrintLabel(data.labelData);
+          setPrintDialogOpen(true);
+        }
       },
       onError: (err: unknown) => {
         setLoadingId(null);
@@ -2106,6 +2321,19 @@ function CheckInDeskContent({
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div
+          className={`flex items-center gap-1.5 text-sm font-medium cursor-pointer select-none transition-colors shrink-0 ${printLabels ? "text-primary" : "text-muted-foreground"}`}
+          title={printLabels ? "Label printing on — click to disable" : "Label printing off — click to enable"}
+          onClick={() => setPrintLabels((v) => !v)}
+        >
+          <Printer className="w-4 h-4" />
+          <Switch
+            checked={printLabels}
+            onCheckedChange={setPrintLabels}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Print labels on check-in"
           />
         </div>
         {isChildEvent && (
@@ -2423,6 +2651,12 @@ function CheckInDeskContent({
         eventId={eventId}
         open={addRegOpen}
         onOpenChange={setAddRegOpen}
+      />
+
+      <LabelPrintDialog
+        open={printDialogOpen}
+        onOpenChange={(v) => { setPrintDialogOpen(v); if (!v) setPendingPrintLabel(null); }}
+        labels={pendingPrintLabel ? [pendingPrintLabel] : []}
       />
     </div>
   );
@@ -2768,17 +3002,13 @@ function EventDashboardSection({
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-6">
+    <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-6">
 
-      {/* 1 — Event Header */}
+      {/* 1 — Page Header */}
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1.5 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-serif font-bold leading-tight">{event.name}</h1>
-            <Badge variant="secondary" className="text-xs shrink-0">{regTypeLabel}</Badge>
-            {statusBadge(event.status)}
-          </div>
-          {scheduleSummary}
+        <div>
+          <h1 className="text-2xl font-serif font-bold">Overview</h1>
+          <p className="text-muted-foreground mt-1">Manage this event's registration, check-in, and activity.</p>
         </div>
         <Link href={`/events/${eventId}/settings`} className="shrink-0">
           <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
@@ -2786,6 +3016,14 @@ function EventDashboardSection({
             <span className="hidden sm:inline">Settings</span>
           </Button>
         </Link>
+      </div>
+
+      {/* Event meta row */}
+      <div className="flex items-center gap-2.5 flex-wrap -mt-2 pb-4 border-b border-border/60">
+        <h2 className="text-base font-semibold">{event.name}</h2>
+        <Badge variant="secondary" className="text-xs">{regTypeLabel}</Badge>
+        {statusBadge(event.status)}
+        {scheduleSummary}
       </div>
 
       {/* 2 — Stat Cards */}
@@ -2833,21 +3071,24 @@ function EventDashboardSection({
             <h2 className="text-base font-semibold">Recent Registrations</h2>
             <Link href={`/events/${eventId}/registrations`} className="text-sm text-primary hover:underline">View all</Link>
           </div>
-          <Card>
+          <Card className="overflow-hidden">
             {recentRegistrations.length > 0 ? (
               <CardContent className="p-0 divide-y divide-border">
                 {recentRegistrations.map((reg) => (
-                  <div key={reg.id} className="px-4 py-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-xs shrink-0">
+                  <div key={reg.id} className="px-4 py-3.5 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-sm shrink-0">
                       {reg.childFirstName[0]}{reg.childLastName[0]}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm">{reg.childFirstName} {reg.childLastName}</p>
-                      {reg.guardianName && <p className="text-xs text-muted-foreground truncate">{reg.guardianName}</p>}
+                      <p className="text-xs text-muted-foreground truncate">
+                        {reg.guardianName}{reg.guardianPhone ? ` · ${reg.guardianPhone}` : ""}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground shrink-0">
-                      {format(new Date(reg.createdAt), "MMM d")}
-                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {reg.room && <Badge variant="outline" className="text-[10px] hidden sm:flex">{reg.room}</Badge>}
+                      <p className="text-xs text-muted-foreground">{format(new Date(reg.createdAt), "MMM d")}</p>
+                    </div>
                   </div>
                 ))}
               </CardContent>
@@ -2875,21 +3116,24 @@ function EventDashboardSection({
               <h2 className="text-base font-semibold">Recently Checked In</h2>
               <Link href={`/events/${eventId}/checkin`} className="text-sm text-primary hover:underline">View all</Link>
             </div>
-            <Card>
+            <Card className="overflow-hidden">
               {recentCheckins.length > 0 ? (
                 <CardContent className="p-0 divide-y divide-border">
                   {recentCheckins.map((c) => (
-                    <div key={c.id} className="px-4 py-3 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center font-serif font-bold text-green-800 text-xs shrink-0">
+                    <div key={c.id} className="px-4 py-3.5 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center font-serif font-bold text-green-800 text-sm shrink-0">
                         {c.childFirstName[0]}{c.childLastName[0]}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
-                        {c.room && <p className="text-xs text-muted-foreground">{c.room}</p>}
+                        <p className="text-xs text-muted-foreground truncate">
+                          {c.guardianName}{c.room ? ` · ${c.room}` : ""}
+                        </p>
                       </div>
-                      <p className="text-xs text-green-700 shrink-0">
-                        {format(new Date(c.checkinAt), "h:mm a")}
-                      </p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {c.room && <Badge variant="outline" className="text-[10px] hidden sm:flex">{c.room}</Badge>}
+                        <p className="text-xs text-green-700 font-medium">{format(new Date(c.checkinAt), "h:mm a")}</p>
+                      </div>
                     </div>
                   ))}
                 </CardContent>
@@ -2988,8 +3232,11 @@ function NonChildCheckinSection({
   const [activeTab, setActiveTab] = useState("registrations");
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-6">
-      <h1 className="text-2xl font-serif font-bold">Check-In Desk</h1>
+    <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-6">
+      <div>
+        <h1 className="text-2xl font-serif font-bold">Check-In Desk</h1>
+        <p className="text-muted-foreground mt-1">Search and check participants in or out for this event.</p>
+      </div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full flex flex-wrap h-auto gap-1">
           <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm flex-1">
@@ -3203,7 +3450,7 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
   });
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-5">
+    <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
       <div>
         <h1 className="text-2xl font-serif font-bold">Registration Form</h1>
         <p className="text-muted-foreground mt-1">Build your form, share it, and configure settings.</p>
@@ -3359,10 +3606,10 @@ function ReportsSection({
   requireCheckout: boolean;
 }) {
   return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto w-full space-y-6">
+    <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-6">
       <div>
         <h1 className="text-2xl font-serif font-bold">Reports</h1>
-        <p className="text-muted-foreground mt-1">Attendance history and check-in summaries.</p>
+        <p className="text-muted-foreground mt-1">View attendance history and check-in summaries.</p>
       </div>
 
       {/* Summary stats */}
@@ -3393,13 +3640,26 @@ function ReportsSection({
 
       {/* Attendance sessions */}
       {!attendanceSessions.length ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center text-muted-foreground">
-            <BarChart2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p>No attendance recorded yet.</p>
-            <p className="text-sm mt-1">Check-ins will appear here grouped by date.</p>
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card className="border-dashed">
+            <CardContent className="py-12 text-center text-muted-foreground">
+              <BarChart2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+              <p className="font-medium">No attendance recorded yet.</p>
+              <p className="text-sm mt-1">Once check-ins begin, attendance summaries will appear here.</p>
+            </CardContent>
+          </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 opacity-40 pointer-events-none select-none">
+            {(["Attendance by Date", "Room Attendance", "Registrant Attendance"] as const).map((label) => (
+              <Card key={label}>
+                <CardContent className="p-5">
+                  <p className="text-sm font-medium text-muted-foreground">{label}</p>
+                  <div className="h-10 bg-muted/60 rounded-md mt-3" />
+                  <div className="h-2 bg-muted/40 rounded mt-2 w-2/3" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
@@ -3545,7 +3805,7 @@ function EventSettingsSection({
   });
 
   return (
-    <div className="p-6 md:p-8 max-w-2xl mx-auto w-full space-y-6">
+    <div className="p-6 md:p-8 max-w-[800px] mx-auto w-full space-y-6">
       <div>
         <h1 className="text-2xl font-serif font-bold">Event Settings</h1>
         <p className="text-muted-foreground mt-1">Edit event details and check-in configuration.</p>
@@ -4048,8 +4308,11 @@ export default function EventWorkspace() {
   // ── Check-In Desk ──
   if (section === "checkin") {
     return (
-      <div className="p-6 md:p-8 max-w-5xl mx-auto w-full space-y-5">
-        <h1 className="text-2xl font-serif font-bold">Check-In Desk</h1>
+      <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
+        <div>
+          <h1 className="text-2xl font-serif font-bold">Check-In Desk</h1>
+          <p className="text-muted-foreground mt-1">Search and check children in or out for this event.</p>
+        </div>
         <CheckInDeskContent
           eventId={eventId}
           formId={event.formId}
@@ -4066,6 +4329,7 @@ export default function EventWorkspace() {
           sessions={isRepeating ? eventSessions : undefined}
           selectedSessionId={isRepeating ? resolvedSessionId : undefined}
           onSessionChange={isRepeating ? setSelectedSessionId : undefined}
+          initialPrintLabels={event.printLabels ?? isChildCheckin}
         />
       </div>
     );
@@ -4074,8 +4338,11 @@ export default function EventWorkspace() {
   // ── Registrations ──
   if (section === "registrations") {
     return (
-      <div className="p-6 md:p-8 max-w-4xl mx-auto w-full space-y-5">
-        <h1 className="text-2xl font-serif font-bold">Registrations</h1>
+      <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
+        <div>
+          <h1 className="text-2xl font-serif font-bold">Registrations</h1>
+          <p className="text-muted-foreground mt-1">View and manage everyone registered for this event.</p>
+        </div>
         <ChildrenTabContent
           eventId={eventId}
           formId={event.formId}
@@ -4090,8 +4357,11 @@ export default function EventWorkspace() {
   // ── Groups (family/group events) ──
   if (section === "groups") {
     return (
-      <div className="p-6 md:p-8 max-w-4xl mx-auto w-full space-y-5">
-        <h1 className="text-2xl font-serif font-bold">Groups</h1>
+      <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
+        <div>
+          <h1 className="text-2xl font-serif font-bold">Groups</h1>
+          <p className="text-muted-foreground mt-1">View and manage family and group registrations.</p>
+        </div>
         <FamiliesTabContent eventId={eventId} />
       </div>
     );
@@ -4100,9 +4370,12 @@ export default function EventWorkspace() {
   // ── Rooms ──
   if (section === "rooms") {
     return (
-      <div className="p-6 md:p-8 max-w-3xl mx-auto w-full space-y-5">
-        <h1 className="text-2xl font-serif font-bold">Rooms</h1>
-        <RoomsTabContent eventId={eventId} />
+      <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
+        <div>
+          <h1 className="text-2xl font-serif font-bold">Rooms</h1>
+          <p className="text-muted-foreground mt-1">Create rooms or groups and assign registrants.</p>
+        </div>
+        <RoomsTabContent eventId={eventId} formId={event.formId} roomAssignmentMode={event.roomAssignmentMode} />
       </div>
     );
   }

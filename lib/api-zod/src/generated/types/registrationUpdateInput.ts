@@ -15,6 +15,10 @@ export interface RegistrationUpdateInput {
   guardianPhone?: string;
   guardianEmail?: string;
   allergies?: string;
+  medicalNotes?: string;
   specialNeeds?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
   room?: string;
 }

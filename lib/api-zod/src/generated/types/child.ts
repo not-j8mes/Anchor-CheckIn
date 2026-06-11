@@ -19,6 +19,8 @@ export interface Child {
   /** @nullable */
   allergies?: string | null;
   /** @nullable */
+  medicalNotes?: string | null;
+  /** @nullable */
   specialNeeds?: string | null;
   /** @nullable */
   room?: string | null;

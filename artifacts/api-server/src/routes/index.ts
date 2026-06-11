@@ -13,7 +13,6 @@ import adminRouter from "./admin";
 import roomsRouter from "./rooms";
 import eventCategoriesRouter from "./event-categories";
 import eventSessionsRouter from "./event-sessions";
-
 const router: IRouter = Router();
 
 router.use(healthRouter);
@@ -30,5 +29,6 @@ router.use(statsRouter);
 router.use(adminRouter);
 router.use(roomsRouter);
 router.use(eventCategoriesRouter);
+
 
 export default router;

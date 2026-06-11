@@ -148,34 +148,43 @@
   }
 }
 
+/* @page must be top-level — browsers ignore it inside @media print */
+@page {
+  size: 62mm auto;
+  margin: 0;
+}
+
 @media print {
+  html,
+  body {
+    width: 62mm;
+    margin: 0;
+    padding: 0;
+  }
+
   body * {
     visibility: hidden;
   }
-  
-  .print\:block {
-    display: block !important;
-  }
-  
-  .print\:hidden {
-    display: none !important;
-  }
 
-  [role="dialog"] > div > div:nth-child(2) > div,
-  [role="dialog"] > div > div:nth-child(2) > div * {
-    visibility: visible;
-  }
-  
-  [role="dialog"] > div > div:nth-child(2) > div {
+  #print-labels {
+    display: block !important;
     position: absolute;
     left: 0;
     top: 0;
-    width: 4in !important;
-    height: 2in !important;
-    border: none !important;
-    box-shadow: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    width: 62mm;
+  }
+
+  #print-labels,
+  #print-labels * {
+    visibility: visible !important;
+  }
+
+  .print-label-wrapper {
+    width: 62mm;
+    min-height: 40mm;
     page-break-after: always;
+    box-sizing: border-box;
+    background: white;
+    color: black;
   }
 }

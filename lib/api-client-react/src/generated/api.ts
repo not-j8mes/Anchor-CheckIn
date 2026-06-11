@@ -60,8 +60,10 @@ import type {
   Room,
   RoomInput,
   UpdateCheckinInput,
+  UpdateCustomAnswersInput,
   UpdateEventCategoryInput,
   UpdateEventInput,
+  UpdateRegistrationCustomAnswers200,
   UpdateRoomInput
 } from './api.schemas';
 
@@ -2439,6 +2441,78 @@ export const useUpdateRegistrationRoom = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateRegistrationRoomMutationOptions(options));
+    }
+
+export const getUpdateRegistrationCustomAnswersUrl = (registrationId: number,) => {
+
+
+
+
+  return `/api/registrations/${registrationId}/custom-answers`
+}
+
+/**
+ * @summary Batch-update custom answer values for a registration
+ */
+export const updateRegistrationCustomAnswers = async (registrationId: number,
+    updateCustomAnswersInput: UpdateCustomAnswersInput, options?: RequestInit): Promise<UpdateRegistrationCustomAnswers200> => {
+
+  return customFetch<UpdateRegistrationCustomAnswers200>(getUpdateRegistrationCustomAnswersUrl(registrationId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      updateCustomAnswersInput,)
+  }
+);}
+
+
+
+
+export const getUpdateRegistrationCustomAnswersMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRegistrationCustomAnswers>>, TError,{registrationId: number;data: BodyType<UpdateCustomAnswersInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRegistrationCustomAnswers>>, TError,{registrationId: number;data: BodyType<UpdateCustomAnswersInput>}, TContext> => {
+
+const mutationKey = ['updateRegistrationCustomAnswers'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRegistrationCustomAnswers>>, {registrationId: number;data: BodyType<UpdateCustomAnswersInput>}> = (props) => {
+          const {registrationId,data} = props ?? {};
+
+          return  updateRegistrationCustomAnswers(registrationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRegistrationCustomAnswersMutationResult = NonNullable<Awaited<ReturnType<typeof updateRegistrationCustomAnswers>>>
+    export type UpdateRegistrationCustomAnswersMutationBody = BodyType<UpdateCustomAnswersInput>
+    export type UpdateRegistrationCustomAnswersMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Batch-update custom answer values for a registration
+ */
+export const useUpdateRegistrationCustomAnswers = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRegistrationCustomAnswers>>, TError,{registrationId: number;data: BodyType<UpdateCustomAnswersInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRegistrationCustomAnswers>>,
+        TError,
+        {registrationId: number;data: BodyType<UpdateCustomAnswersInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateRegistrationCustomAnswersMutationOptions(options));
     }
 
 export const getListRoomsUrl = (eventId: number,) => {

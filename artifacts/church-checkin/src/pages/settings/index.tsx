@@ -230,7 +230,7 @@ export default function Settings() {
     logoUrl: "",
     address: "",
     phone: "",
-    website: ""
+    website: "",
   });
 
   const { isDark, setIsDark } = useDarkMode();
@@ -244,7 +244,7 @@ export default function Settings() {
         logoUrl: org.logoUrl || "",
         address: org.address || "",
         phone: org.phone || "",
-        website: org.website || ""
+        website: org.website || "",
       });
     }
   }, [org]);

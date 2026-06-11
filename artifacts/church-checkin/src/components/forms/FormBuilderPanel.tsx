@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useGetForm,
   useUpdateForm,
@@ -50,7 +50,9 @@ import {
   Sparkles,
   MessageSquare,
   Search,
+  Check,
   CheckCircle2,
+  Pencil,
   Eye,
   Users,
   User,
@@ -59,6 +61,7 @@ import {
   Info,
   DoorOpen,
   RefreshCw,
+  Phone,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -72,7 +75,7 @@ import {
 
 // ─── Section definitions ───────────────────────────────────────────────────────
 
-type SectionKey = "guardian_info" | "child_info" | "additional_questions";
+type SectionKey = "guardian_info" | "child_info" | "emergency_contact" | "additional_questions";
 
 interface SectionDef {
   key: SectionKey;
@@ -80,6 +83,7 @@ interface SectionDef {
   description?: string;
   repeats?: boolean;
   headerClass: string;
+  titleClass: string;
   iconClass: string;
   Icon: React.ElementType;
   addSystemLabel: string;
@@ -90,9 +94,10 @@ const SECTIONS: SectionDef[] = [
   {
     key: "guardian_info",
     title: "Parent / Guardian Information",
-    headerClass: "bg-primary text-primary-foreground",
-    iconClass: "text-primary-foreground",
-    Icon: User,
+    headerClass: "bg-amber-50 border-b border-amber-100",
+    titleClass: "text-amber-900",
+    iconClass: "text-amber-700",
+    Icon: Users,
     addSystemLabel: "Add Guardian Field",
     addCustomLabel: "Add Custom Question",
   },
@@ -101,17 +106,29 @@ const SECTIONS: SectionDef[] = [
     title: "Child Information",
     description: "This section repeats when a parent registers another child.",
     repeats: true,
-    headerClass: "bg-secondary text-secondary-foreground",
-    iconClass: "text-secondary-foreground",
+    headerClass: "bg-orange-50 border-b border-orange-100",
+    titleClass: "text-orange-900",
+    iconClass: "text-orange-700",
     Icon: Baby,
     addSystemLabel: "Add Child Field",
     addCustomLabel: "Add Custom Question",
   },
   {
+    key: "emergency_contact",
+    title: "Emergency Contact Information",
+    headerClass: "bg-rose-50 border-b border-rose-100",
+    titleClass: "text-rose-900",
+    iconClass: "text-rose-700",
+    Icon: Phone,
+    addSystemLabel: "Add Emergency Field",
+    addCustomLabel: "Add Custom Question",
+  },
+  {
     key: "additional_questions",
     title: "Additional Questions",
-    headerClass: "bg-muted/70 text-foreground border-b border-border",
-    iconClass: "text-muted-foreground",
+    headerClass: "bg-slate-50 border-b border-slate-100",
+    titleClass: "text-slate-800",
+    iconClass: "text-slate-500",
     Icon: MessageSquare,
     addSystemLabel: "Add System Field",
     addCustomLabel: "Add Custom Question",
@@ -120,19 +137,20 @@ const SECTIONS: SectionDef[] = [
 
 const SECTION_CATEGORY_MAP: Record<SystemFieldCategory, SectionKey> = {
   guardian: "guardian_info",
-  emergency_safety: "guardian_info",
+  emergency_safety: "emergency_contact",
   participant: "child_info",
   rooms: "child_info",
   individual: "additional_questions",
 };
 
 function getFieldSection(field: FormField): SectionKey {
-  // Explicit sectionKey always wins — lets template fields override category defaults
-  if (field.sectionKey) return field.sectionKey as SectionKey;
+  // System fields always auto-place by category (ignores any stored sectionKey, which may be stale).
   if (field.fieldKind === "system" && field.systemKey) {
     const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
     if (def) return SECTION_CATEGORY_MAP[def.category] ?? "additional_questions";
   }
+  // Custom fields: explicit sectionKey wins.
+  if (field.sectionKey) return field.sectionKey as SectionKey;
   return "additional_questions";
 }
 
@@ -162,8 +180,9 @@ const CATEGORY_DISPLAY_LABELS: Record<SystemFieldCategory, string> = {
 
 // Categories that are auto-placed — shown in the picker per section
 const SECTION_CATEGORY_FILTER: Record<SectionKey, SystemFieldCategory[]> = {
-  guardian_info: ["guardian", "emergency_safety"],
+  guardian_info: ["guardian"],
   child_info: ["participant", "rooms"],
+  emergency_contact: ["emergency_safety"],
   additional_questions: ["individual", "guardian", "emergency_safety", "participant", "rooms"],
 };
 
@@ -175,6 +194,7 @@ interface FormBuilderPanelProps {
   formId: number;
   eventId?: number;
   hideAdditionalPeople?: boolean;
+  hideSettings?: boolean;
 }
 
 // ─── FieldCard ──────────────────────────────────────────────────────────────────
@@ -186,23 +206,71 @@ interface FieldCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onMove: (dir: "up" | "down") => void;
+  onInlineUpdate: (updates: Partial<FormFieldInput>, onSaved?: () => void) => void;
 }
 
-function FieldCard({ field, index, total, onEdit, onDelete, onMove }: FieldCardProps) {
+function FieldCard({ field, index, total, onEdit, onDelete, onMove, onInlineUpdate }: FieldCardProps) {
   const isSystem = field.fieldKind === FormFieldFieldKind.system;
   const sysDef = isSystem && field.systemKey ? getSystemField(field.systemKey) : undefined;
 
-  const subtitle = isSystem
-    ? [
-        "System Field",
-        sysDef ? CATEGORY_DISPLAY_LABELS[sysDef.category] : "System",
-        field.required ? "Required" : "Optional",
-      ].join(" · ")
-    : [
-        "Custom Question",
-        FIELD_TYPE_LABELS[field.fieldType] ?? field.fieldType,
-        field.required ? "Required" : "Optional",
-      ].join(" · ");
+  const [labelEditing, setLabelEditing] = useState(false);
+  const [labelDraft, setLabelDraft] = useState(field.label);
+  const [placeholderEditing, setPlaceholderEditing] = useState(false);
+  const [placeholderDraft, setPlaceholderDraft] = useState(field.placeholder ?? "");
+  const [savedFlash, setSavedFlash] = useState(false);
+  const labelInputRef = useRef<HTMLInputElement>(null);
+  const placeholderInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!labelEditing) setLabelDraft(field.label);
+  }, [field.label, labelEditing]);
+
+  useEffect(() => {
+    if (!placeholderEditing) setPlaceholderDraft(field.placeholder ?? "");
+  }, [field.placeholder, placeholderEditing]);
+
+  useEffect(() => {
+    if (labelEditing) labelInputRef.current?.focus();
+  }, [labelEditing]);
+
+  useEffect(() => {
+    if (placeholderEditing) placeholderInputRef.current?.focus();
+  }, [placeholderEditing]);
+
+  const flashSaved = () => {
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1500);
+  };
+
+  const handleLabelSave = () => {
+    setLabelEditing(false);
+    const trimmed = labelDraft.trim();
+    if (!trimmed) { setLabelDraft(field.label); return; }
+    if (trimmed === field.label) return;
+    onInlineUpdate({ label: trimmed });
+  };
+
+  const handleLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") { e.preventDefault(); handleLabelSave(); }
+    if (e.key === "Escape") { setLabelEditing(false); setLabelDraft(field.label); }
+  };
+
+  const handlePlaceholderSave = () => {
+    setPlaceholderEditing(false);
+    if (placeholderDraft === (field.placeholder ?? "")) return;
+    onInlineUpdate({ placeholder: placeholderDraft }, flashSaved);
+  };
+
+  const handlePlaceholderKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") { e.preventDefault(); handlePlaceholderSave(); }
+    if (e.key === "Escape") { setPlaceholderEditing(false); setPlaceholderDraft(field.placeholder ?? ""); }
+  };
+
+  const metaText = isSystem
+    ? `System · ${sysDef ? CATEGORY_DISPLAY_LABELS[sysDef.category] : "System"} · ${FIELD_TYPE_LABELS[field.fieldType] ?? field.fieldType}`
+    : `Custom · ${FIELD_TYPE_LABELS[field.fieldType] ?? field.fieldType}`;
+
+  const showPlaceholder = !["checkbox", "select", "multiselect"].includes(field.fieldType);
 
   return (
     <div className="flex items-stretch rounded-lg border border-border bg-background hover:shadow-sm transition-shadow overflow-hidden">
@@ -218,30 +286,105 @@ function FieldCard({ field, index, total, onEdit, onDelete, onMove }: FieldCardP
       </div>
 
       {/* Content */}
-      <div className="p-3 flex-1 flex justify-between items-center gap-3">
-        <div className="flex items-start gap-2.5 min-w-0">
-          <div className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center ${isSystem ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+      <div className="p-3 flex-1 min-w-0">
+        {/* Row 1: icon + label + required checkbox + saved flash + action buttons */}
+        <div className="flex items-center gap-2">
+          <div className={`flex-shrink-0 w-5 h-5 rounded flex items-center justify-center ${isSystem ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
             {isSystem ? <Sparkles className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-medium text-sm text-foreground truncate">{field.label}</span>
-              {field.required && <span className="text-xs text-destructive font-bold">*</span>}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+
+          {/* Editable label */}
+          <div className="flex-1 min-w-0">
+            {labelEditing ? (
+              <input
+                ref={labelInputRef}
+                className="w-full text-sm font-medium rounded border border-input bg-background px-1.5 py-0.5 outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 text-foreground"
+                value={labelDraft}
+                onChange={(e) => setLabelDraft(e.target.value)}
+                onBlur={handleLabelSave}
+                onKeyDown={handleLabelKeyDown}
+                aria-label="Rename field label"
+              />
+            ) : (
+              <button
+                type="button"
+                className="group/label inline-flex items-center gap-1.5 max-w-full rounded px-1.5 py-0.5 -ml-1.5 cursor-pointer hover:bg-amber-50 transition-colors"
+                onClick={() => setLabelEditing(true)}
+                title="Click to rename"
+                aria-label={`Rename field: ${field.label}`}
+              >
+                <span className="text-sm font-medium text-foreground truncate">{field.label}</span>
+                <Pencil className="w-3 h-3 flex-shrink-0 text-muted-foreground/30 group-hover/label:text-amber-600 transition-colors" />
+              </button>
+            )}
+          </div>
+
+          {/* Required pill toggle */}
+          <button
+            type="button"
+            onClick={() => onInlineUpdate({ required: !field.required })}
+            aria-pressed={!!field.required}
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${
+              field.required
+                ? "bg-amber-50 border-amber-400/80 text-amber-900 hover:bg-amber-100 focus-visible:ring-amber-400"
+                : "bg-background border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground focus-visible:ring-border"
+            }`}
+          >
+            {field.required && <Check className="w-3 h-3 flex-shrink-0" />}
+            Required
+          </button>
+
+          {/* Saved flash */}
+          {savedFlash && (
+            <span className="text-xs text-green-600 flex items-center gap-0.5 flex-shrink-0 animate-in fade-in duration-150">
+              <CheckCircle2 className="w-3 h-3" /> Saved
+            </span>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground" onClick={onEdit}>
+              <Settings className="w-3 h-3 mr-1" /> Edit
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+              onClick={onDelete}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={onEdit}>Edit</Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={onDelete}
-          >
-            <Trash2 className="w-3 h-3" />
-          </Button>
-        </div>
+
+        {/* Row 2: metadata */}
+        <p className="text-xs text-muted-foreground mt-1 ml-7">{metaText}</p>
+
+        {/* Row 3: placeholder (text-based fields only) */}
+        {showPlaceholder && (
+          <div className="mt-1 ml-7">
+            {placeholderEditing ? (
+              <input
+                ref={placeholderInputRef}
+                className="w-full text-xs text-muted-foreground bg-transparent border-b border-primary/50 outline-none py-0.5"
+                value={placeholderDraft}
+                onChange={(e) => setPlaceholderDraft(e.target.value)}
+                onBlur={handlePlaceholderSave}
+                onKeyDown={handlePlaceholderKeyDown}
+                placeholder="Enter placeholder text…"
+                aria-label="Edit placeholder text"
+              />
+            ) : (
+              <button
+                type="button"
+                className="text-xs italic cursor-text text-left block text-muted-foreground/50 hover:text-muted-foreground"
+                onClick={() => setPlaceholderEditing(true)}
+              >
+                {field.placeholder ? field.placeholder : "Add placeholder…"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -249,7 +392,7 @@ function FieldCard({ field, index, total, onEdit, onDelete, onMove }: FieldCardP
 
 // ─── Main component ─────────────────────────────────────────────────────────────
 
-export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalPeople = false }: FormBuilderPanelProps) {
+export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalPeople = false, hideSettings = false }: FormBuilderPanelProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -314,12 +457,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     },
   });
 
-  const updateFormField = useUpdateFormField({
-    mutation: {
-      onSuccess: () => { toast({ title: "Field updated" }); setModalMode("none"); invalidateFields(); },
-      onError: () => { toast({ title: "Failed to update field", variant: "destructive" }); },
-    },
-  });
+  const updateFormField = useUpdateFormField();
 
   const deleteFormField = useDeleteFormField({
     mutation: {
@@ -354,6 +492,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     const result: Record<SectionKey, FormField[]> = {
       guardian_info: [],
       child_info: [],
+      emergency_contact: [],
       additional_questions: [],
     };
     sorted.forEach((f) => result[getFieldSection(f)].push(f));
@@ -380,26 +519,50 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
   };
 
   const handleSaveField = () => {
-    if (!editingField?.label?.trim()) {
+    if (!editingField?.id && !editingField?.label?.trim()) {
       toast({ title: "Label is required", variant: "destructive" });
       return;
     }
     const data: FormFieldInput = {
-      label: editingField.label.trim(),
-      fieldType: editingField.fieldType as FormFieldInput["fieldType"] ?? "text",
-      required: !!editingField.required,
-      sortOrder: editingField.sortOrder ?? (fields?.length ?? 0),
-      placeholder: editingField.placeholder ?? "",
-      options: editingField.options ?? "",
-      fieldKind: editingField.fieldKind as FormFieldInput["fieldKind"],
-      systemKey: editingField.systemKey ?? undefined,
-      sectionKey: editingField.sectionKey ?? "additional_questions",
+      label: editingField?.label?.trim() ?? "",
+      fieldType: editingField?.fieldType as FormFieldInput["fieldType"] ?? "text",
+      required: !!editingField?.required,
+      sortOrder: editingField?.sortOrder ?? (fields?.length ?? 0),
+      placeholder: editingField?.placeholder ?? "",
+      options: editingField?.options ?? "",
+      fieldKind: editingField?.fieldKind as FormFieldInput["fieldKind"],
+      systemKey: editingField?.systemKey ?? undefined,
+      sectionKey: editingField?.sectionKey ?? "additional_questions",
     };
-    if (editingField.id) {
-      updateFormField.mutate({ formId, fieldId: editingField.id, data });
+    if (editingField?.id) {
+      updateFormField.mutate({ formId, fieldId: editingField.id, data }, {
+        onSuccess: () => { setModalMode("none"); invalidateFields(); },
+        onError: () => { toast({ title: "Failed to update field", variant: "destructive" }); },
+      });
     } else {
       createFormField.mutate({ formId, data: { ...data, fieldKind: "custom" } });
     }
+  };
+
+  const handleInlineUpdate = (field: FormField, updates: Partial<FormFieldInput>, onSaved?: () => void) => {
+    const data: FormFieldInput = {
+      label: field.label,
+      fieldType: field.fieldType as FormFieldInput["fieldType"],
+      required: !!field.required,
+      sortOrder: field.sortOrder,
+      fieldKind: field.fieldKind as FormFieldInput["fieldKind"],
+      // Use ?? undefined so null values are omitted from the JSON body —
+      // Drizzle skips undefined fields in SET, preserving the DB value.
+      systemKey: field.systemKey ?? undefined,
+      sectionKey: field.sectionKey ?? undefined,
+      placeholder: field.placeholder ?? undefined,
+      options: field.options ?? undefined,
+      ...updates,
+    };
+    updateFormField.mutate({ formId, fieldId: field.id, data }, {
+      onSuccess: () => { invalidateFields(); onSaved?.(); },
+      onError: () => { toast({ title: "Failed to update field", variant: "destructive" }); },
+    });
   };
 
   const handleDeleteField = (field: FormField) => {
@@ -420,8 +583,8 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     if (dir === "down" && idx === sectionArr.length - 1) return;
     const swapIdx = dir === "up" ? idx - 1 : idx + 1;
     [sectionArr[idx], sectionArr[swapIdx]] = [sectionArr[swapIdx], sectionArr[idx]];
-    // Rebuild full global order: guardian → child → additional
-    const orderedIds = (["guardian_info", "child_info", "additional_questions"] as SectionKey[]).flatMap(
+    // Rebuild full global order: guardian → child → emergency → additional
+    const orderedIds = (["guardian_info", "child_info", "emergency_contact", "additional_questions"] as SectionKey[]).flatMap(
       (s) => (s === section ? sectionArr : fieldsBySection[s]).map((f) => f.id)
     );
     reorderFormFields.mutate({ formId, data: { fieldIds: orderedIds } });
@@ -460,9 +623,9 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className={`grid grid-cols-1 gap-6 ${hideSettings ? "" : "md:grid-cols-3"}`}>
       {/* ── Left: field builder ───────────────────────────────────────────────── */}
-      <div className="md:col-span-2 space-y-4">
+      <div className={`space-y-4 ${hideSettings ? "" : "md:col-span-2"}`}>
         {hasRegistrations && (
           <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30 px-4 py-3 text-sm">
             <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
@@ -476,7 +639,10 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         )}
 
         <div className="flex justify-between items-center gap-2 flex-wrap">
-          <h2 className="text-lg font-serif font-bold">Form Fields</h2>
+          <div>
+            <h2 className="text-lg font-serif font-bold">Form Fields</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Click a field name to rename it. Use the Required toggle to mark fields as required or optional.</p>
+          </div>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" onClick={() => setModalMode("preview")}>
               <Eye className="w-4 h-4 mr-1.5" /> Preview
@@ -502,12 +668,12 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
               return (
                 <div key={section.key} className="rounded-xl border border-border overflow-hidden shadow-sm">
                   {/* Section header */}
-                  <div className={`px-5 py-3.5 flex items-center justify-between ${section.headerClass}`}>
+                  <div className={`px-4 py-2.5 flex items-center justify-between ${section.headerClass}`}>
                     <div className="flex items-center gap-2.5">
                       <section.Icon className={`w-4 h-4 ${section.iconClass}`} />
-                      <span className="font-semibold text-sm">{section.title}</span>
+                      <span className={`font-semibold text-sm ${section.titleClass}`}>{section.title}</span>
                       {section.repeats && (
-                        <span className="flex items-center gap-1 text-xs opacity-80 ml-1">
+                        <span className={`flex items-center gap-1 text-xs opacity-70 ml-1 ${section.titleClass}`}>
                           <RefreshCw className="w-3 h-3" />
                           Repeats per child
                         </span>
@@ -518,7 +684,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 text-xs opacity-80 hover:opacity-100 hover:bg-white/20"
+                          className={`h-7 text-xs opacity-70 hover:opacity-100 hover:bg-black/10 ${section.titleClass}`}
                           onClick={() => openSystemPicker(section.key)}
                         >
                           <Sparkles className="w-3 h-3 mr-1" />
@@ -528,7 +694,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 text-xs opacity-80 hover:opacity-100 hover:bg-white/20"
+                        className={`h-7 text-xs opacity-70 hover:opacity-100 hover:bg-black/10 ${section.titleClass}`}
                         onClick={() => openCustomEditor(section.key)}
                       >
                         <Plus className="w-3 h-3 mr-1" />
@@ -539,7 +705,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
 
                   {/* Section description */}
                   {section.description && (
-                    <div className="px-5 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                    <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
                       <Info className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                       <p className="text-xs text-muted-foreground">{section.description}</p>
                     </div>
@@ -561,6 +727,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                           onEdit={() => openFieldEditor(field)}
                           onDelete={() => handleDeleteField(field)}
                           onMove={(dir) => handleMoveSectionField(field.id, section.key, dir)}
+                          onInlineUpdate={(updates, onSaved) => handleInlineUpdate(field, updates, onSaved)}
                         />
                       ))
                     )}
@@ -607,6 +774,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                     } else return;
                     reorderFormFields.mutate({ formId, data: { fieldIds: reordered.map((f) => f.id) } });
                   }}
+                  onInlineUpdate={(updates, onSaved) => handleInlineUpdate(field, updates, onSaved)}
                 />
               ))
             )}
@@ -615,7 +783,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
       </div>
 
       {/* ── Right: form settings sidebar ──────────────────────────────────────── */}
-      <div>
+      {!hideSettings && <div>
         <Card className="border-card-border shadow-sm sticky top-6">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -689,7 +857,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
             </Button>
           </CardFooter>
         </Card>
-      </div>
+      </div>}
 
       {/* ── System Field Picker ───────────────────────────────────────────────── */}
       <Dialog open={modalMode === "system-picker"} onOpenChange={(open) => !open && setModalMode("none")}>
@@ -805,112 +973,170 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                 : "Add Custom Question"}
             </DialogTitle>
             <DialogDescription>
-              {isEditingSystemField
-                ? "You can rename the label and change required/placeholder. Field type is fixed."
+              {editingField?.id
+                ? "Advanced settings. Label, required, and placeholder are editable directly on the field card."
                 : "Configure this custom question."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {isEditingSystemField && editingField?.systemKey && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/5 border border-primary/20">
-                <Sparkles className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                <div className="text-xs">
-                  <span className="font-medium text-primary">System field</span>
-                  <span className="text-muted-foreground ml-1.5">key: <code className="font-mono">{editingField.systemKey}</code></span>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label>Field Label</Label>
-              <Input
-                value={editingField?.label ?? ""}
-                onChange={(e) => setEditingField((p) => ({ ...p, label: e.target.value }))}
-                placeholder="e.g. T-Shirt Size"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Field Type</Label>
-                {isEditingSystemField ? (
-                  <div className="h-9 px-3 py-2 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground flex items-center">
-                    {FIELD_TYPE_LABELS[editingField?.fieldType ?? "text"] ?? editingField?.fieldType}
+            {/* ── Editing an existing field: advanced settings only ── */}
+            {editingField?.id ? (
+              <>
+                {isEditingSystemField && editingField.systemKey && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-primary/5 border border-primary/20">
+                    <Sparkles className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                    <div className="text-xs">
+                      <span className="font-medium text-primary">System field</span>
+                      <span className="text-muted-foreground ml-1.5">key: <code className="font-mono">{editingField.systemKey}</code></span>
+                    </div>
                   </div>
-                ) : (
-                  <Select
-                    value={editingField?.fieldType ?? "text"}
-                    onValueChange={(v) => setEditingField((p) => ({ ...p, fieldType: v as FormField["fieldType"] }))}
-                  >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="text">Short Text</SelectItem>
-                      <SelectItem value="textarea">Long Text</SelectItem>
-                      <SelectItem value="select">Dropdown</SelectItem>
-                      <SelectItem value="multiselect">Multiple Choice</SelectItem>
-                      <SelectItem value="checkbox">Checkbox</SelectItem>
-                      <SelectItem value="date">Date</SelectItem>
-                      <SelectItem value="phone">Phone Number</SelectItem>
-                      <SelectItem value="email">Email</SelectItem>
-                      <SelectItem value="number">Number</SelectItem>
-                    </SelectContent>
-                  </Select>
                 )}
-              </div>
 
-              <div className="flex items-center gap-2 pt-7">
-                <Switch
-                  id="fe-required"
-                  checked={editingField?.required ?? false}
-                  onCheckedChange={(c) => setEditingField((p) => ({ ...p, required: c }))}
-                />
-                <Label htmlFor="fe-required">Required</Label>
-              </div>
-            </div>
+                {/* Field type — readonly for system, editable for custom */}
+                <div className="space-y-1.5">
+                  <Label>Field Type</Label>
+                  {isEditingSystemField ? (
+                    <div className="h-9 px-3 py-2 rounded-md border border-input bg-muted/40 text-sm text-muted-foreground flex items-center">
+                      {FIELD_TYPE_LABELS[editingField?.fieldType ?? "text"] ?? editingField?.fieldType}
+                    </div>
+                  ) : (
+                    <Select
+                      value={editingField?.fieldType ?? "text"}
+                      onValueChange={(v) => setEditingField((p) => ({ ...p, fieldType: v as FormField["fieldType"] }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="text">Short Text</SelectItem>
+                        <SelectItem value="textarea">Long Text</SelectItem>
+                        <SelectItem value="select">Dropdown</SelectItem>
+                        <SelectItem value="multiselect">Multiple Choice</SelectItem>
+                        <SelectItem value="checkbox">Checkbox</SelectItem>
+                        <SelectItem value="date">Date</SelectItem>
+                        <SelectItem value="phone">Phone Number</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="number">Number</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
 
-            {/* Section selector — custom questions only */}
-            {!isEditingSystemField && isChildCheckin && (
-              <div className="space-y-1.5">
-                <Label>Section</Label>
-                <Select
-                  value={editingField?.sectionKey ?? "additional_questions"}
-                  onValueChange={(v) => setEditingField((p) => ({ ...p, sectionKey: v }))}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {SECTIONS.map((s) => (
-                      <SelectItem key={s.key} value={s.key}>{s.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">Choose which section this question appears in.</p>
-              </div>
-            )}
-
-            {(editingField?.fieldType === "select" || editingField?.fieldType === "multiselect") && (
-              <div className="space-y-1.5 animate-in fade-in zoom-in duration-200">
-                <Label>Options (comma-separated)</Label>
-                <Input
-                  value={editingField?.options ?? ""}
-                  onChange={(e) => setEditingField((p) => ({ ...p, options: e.target.value }))}
-                  placeholder="Option A, Option B, Option C"
-                  disabled={isEditingSystemField}
-                />
-                {isEditingSystemField && (
-                  <p className="text-xs text-muted-foreground">Options are fixed for system fields.</p>
+                {/* Options — custom select/multiselect only */}
+                {!isEditingSystemField && (editingField?.fieldType === "select" || editingField?.fieldType === "multiselect") && (
+                  <div className="space-y-1.5 animate-in fade-in zoom-in duration-200">
+                    <Label>Options (comma-separated)</Label>
+                    <Input
+                      value={editingField?.options ?? ""}
+                      onChange={(e) => setEditingField((p) => ({ ...p, options: e.target.value }))}
+                      placeholder="Option A, Option B, Option C"
+                    />
+                  </div>
                 )}
-              </div>
-            )}
 
-            {!["checkbox", "select", "multiselect"].includes(editingField?.fieldType ?? "text") && (
-              <div className="space-y-1.5">
-                <Label>Placeholder (optional)</Label>
-                <Input
-                  value={editingField?.placeholder ?? ""}
-                  onChange={(e) => setEditingField((p) => ({ ...p, placeholder: e.target.value }))}
-                />
-              </div>
+                {/* Section selector */}
+                {isChildCheckin && !isEditingSystemField && (
+                  <div className="space-y-1.5">
+                    <Label>Section</Label>
+                    <Select
+                      value={editingField?.sectionKey ?? "additional_questions"}
+                      onValueChange={(v) => setEditingField((p) => ({ ...p, sectionKey: v }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SECTIONS.map((s) => (
+                          <SelectItem key={s.key} value={s.key}>{s.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {isChildCheckin && isEditingSystemField && (
+                  <p className="text-xs text-muted-foreground">System fields are auto-placed by category and cannot be moved.</p>
+                )}
+              </>
+            ) : (
+              /* ── Adding a new custom field: full form ── */
+              <>
+                <div className="space-y-1.5">
+                  <Label>Field Label</Label>
+                  <Input
+                    value={editingField?.label ?? ""}
+                    onChange={(e) => setEditingField((p) => ({ ...p, label: e.target.value }))}
+                    placeholder="e.g. T-Shirt Size"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Field Type</Label>
+                    <Select
+                      value={editingField?.fieldType ?? "text"}
+                      onValueChange={(v) => setEditingField((p) => ({ ...p, fieldType: v as FormField["fieldType"] }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="text">Short Text</SelectItem>
+                        <SelectItem value="textarea">Long Text</SelectItem>
+                        <SelectItem value="select">Dropdown</SelectItem>
+                        <SelectItem value="multiselect">Multiple Choice</SelectItem>
+                        <SelectItem value="checkbox">Checkbox</SelectItem>
+                        <SelectItem value="date">Date</SelectItem>
+                        <SelectItem value="phone">Phone Number</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="number">Number</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-7">
+                    <Switch
+                      id="fe-required"
+                      checked={editingField?.required ?? false}
+                      onCheckedChange={(c) => setEditingField((p) => ({ ...p, required: c }))}
+                    />
+                    <Label htmlFor="fe-required">Required</Label>
+                  </div>
+                </div>
+
+                {isChildCheckin && (
+                  <div className="space-y-1.5">
+                    <Label>Section</Label>
+                    <Select
+                      value={editingField?.sectionKey ?? "additional_questions"}
+                      onValueChange={(v) => setEditingField((p) => ({ ...p, sectionKey: v }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SECTIONS.map((s) => (
+                          <SelectItem key={s.key} value={s.key}>{s.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {(editingField?.fieldType === "select" || editingField?.fieldType === "multiselect") && (
+                  <div className="space-y-1.5 animate-in fade-in zoom-in duration-200">
+                    <Label>Options (comma-separated)</Label>
+                    <Input
+                      value={editingField?.options ?? ""}
+                      onChange={(e) => setEditingField((p) => ({ ...p, options: e.target.value }))}
+                      placeholder="Option A, Option B, Option C"
+                    />
+                  </div>
+                )}
+
+                {!["checkbox", "select", "multiselect"].includes(editingField?.fieldType ?? "text") && (
+                  <div className="space-y-1.5">
+                    <Label>Placeholder (optional)</Label>
+                    <Input
+                      value={editingField?.placeholder ?? ""}
+                      onChange={(e) => setEditingField((p) => ({ ...p, placeholder: e.target.value }))}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -949,9 +1175,9 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                   {/* Guardian section */}
                   {fieldsBySection.guardian_info.length > 0 && (
                     <div>
-                      <div className="bg-primary px-6 py-3.5 flex items-center gap-2">
-                        <User className="w-4 h-4 text-primary-foreground" />
-                        <span className="text-base font-semibold text-primary-foreground">Parent / Guardian Information</span>
+                      <div className="bg-amber-50 border-b border-amber-100 px-6 py-3.5 flex items-center gap-2">
+                        <Users className="w-4 h-4 text-amber-700" />
+                        <span className="text-base font-semibold text-amber-900">Parent / Guardian Information</span>
                       </div>
                       <div className="px-6 py-5 space-y-5">
                         {fieldsBySection.guardian_info.map((field) => (
@@ -964,9 +1190,9 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                   {/* Child section */}
                   {fieldsBySection.child_info.length > 0 && (
                     <div className="border-t border-border">
-                      <div className="bg-secondary px-6 py-3.5 flex items-center gap-2">
-                        <Baby className="w-4 h-4 text-secondary-foreground" />
-                        <span className="text-base font-semibold text-secondary-foreground">Child Information</span>
+                      <div className="bg-orange-50 border-b border-orange-100 px-6 py-3.5 flex items-center gap-2">
+                        <Baby className="w-4 h-4 text-orange-700" />
+                        <span className="text-base font-semibold text-orange-900">Child Information</span>
                       </div>
                       <div className="px-6 py-5 space-y-5">
                         {fieldsBySection.child_info.map((field) => (
@@ -983,12 +1209,27 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                     </button>
                   </div>
 
+                  {/* Emergency Contact section */}
+                  {fieldsBySection.emergency_contact.length > 0 && (
+                    <div className="border-t border-border">
+                      <div className="bg-rose-50 border-b border-rose-100 px-6 py-3.5 flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-rose-700" />
+                        <span className="text-base font-semibold text-rose-900">Emergency Contact Information</span>
+                      </div>
+                      <div className="px-6 py-5 space-y-5">
+                        {fieldsBySection.emergency_contact.map((field) => (
+                          <PreviewField key={field.id} field={field} rooms={eventRooms} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Additional Questions — separate section, shown once, never repeats */}
                   {fieldsBySection.additional_questions.length > 0 && (
                     <div className="border-t border-border">
-                      <div className="bg-muted/70 border-b border-border px-6 py-3.5 flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-base font-semibold text-foreground">Additional Questions</span>
+                      <div className="bg-slate-50 border-b border-slate-100 px-6 py-3.5 flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-slate-500" />
+                        <span className="text-base font-semibold text-slate-800">Additional Questions</span>
                       </div>
                       <div className="px-6 py-5 space-y-5">
                         {fieldsBySection.additional_questions.map((field) => (

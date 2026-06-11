@@ -715,7 +715,11 @@ export const ListRegistrationsResponseItem = zod.object({
   "guardianPhone": zod.string().optional(),
   "guardianEmail": zod.string().nullish(),
   "allergies": zod.string().nullish(),
+  "medicalNotes": zod.string().nullish(),
   "specialNeeds": zod.string().nullish(),
+  "emergencyContactName": zod.string().nullish(),
+  "emergencyContactPhone": zod.string().nullish(),
+  "emergencyContactRelationship": zod.string().nullish(),
   "room": zod.string().nullish(),
   "createdAt": zod.string()
 })
@@ -740,7 +744,11 @@ export const GetRegistrationResponse = zod.object({
   "guardianPhone": zod.string().optional(),
   "guardianEmail": zod.string().nullish(),
   "allergies": zod.string().nullish(),
+  "medicalNotes": zod.string().nullish(),
   "specialNeeds": zod.string().nullish(),
+  "emergencyContactName": zod.string().nullish(),
+  "emergencyContactPhone": zod.string().nullish(),
+  "emergencyContactRelationship": zod.string().nullish(),
   "room": zod.string().nullish(),
   "createdAt": zod.string(),
   "formVersion": zod.union([zod.object({
@@ -796,7 +804,11 @@ export const UpdateRegistrationBody = zod.object({
   "guardianPhone": zod.string().optional(),
   "guardianEmail": zod.string().optional(),
   "allergies": zod.string().optional(),
+  "medicalNotes": zod.string().optional(),
   "specialNeeds": zod.string().optional(),
+  "emergencyContactName": zod.string().optional(),
+  "emergencyContactPhone": zod.string().optional(),
+  "emergencyContactRelationship": zod.string().optional(),
   "room": zod.string().optional()
 })
 
@@ -811,7 +823,11 @@ export const UpdateRegistrationResponse = zod.object({
   "guardianPhone": zod.string().optional(),
   "guardianEmail": zod.string().nullish(),
   "allergies": zod.string().nullish(),
+  "medicalNotes": zod.string().nullish(),
   "specialNeeds": zod.string().nullish(),
+  "emergencyContactName": zod.string().nullish(),
+  "emergencyContactPhone": zod.string().nullish(),
+  "emergencyContactRelationship": zod.string().nullish(),
   "room": zod.string().nullish(),
   "createdAt": zod.string()
 })
@@ -847,9 +863,32 @@ export const UpdateRegistrationRoomResponse = zod.object({
   "guardianPhone": zod.string().optional(),
   "guardianEmail": zod.string().nullish(),
   "allergies": zod.string().nullish(),
+  "medicalNotes": zod.string().nullish(),
   "specialNeeds": zod.string().nullish(),
+  "emergencyContactName": zod.string().nullish(),
+  "emergencyContactPhone": zod.string().nullish(),
+  "emergencyContactRelationship": zod.string().nullish(),
   "room": zod.string().nullish(),
   "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Batch-update custom answer values for a registration
+ */
+export const UpdateRegistrationCustomAnswersParams = zod.object({
+  "registrationId": zod.coerce.number()
+})
+
+export const UpdateRegistrationCustomAnswersBody = zod.object({
+  "answers": zod.array(zod.object({
+  "id": zod.number(),
+  "value": zod.string()
+}))
+})
+
+export const UpdateRegistrationCustomAnswersResponse = zod.object({
+  "updated": zod.number().optional()
 })
 
 
@@ -953,6 +992,7 @@ export const ListChildrenResponseItem = zod.object({
   "guardianPhone": zod.string().optional(),
   "guardianEmail": zod.string().nullish(),
   "allergies": zod.string().nullish(),
+  "medicalNotes": zod.string().nullish(),
   "specialNeeds": zod.string().nullish(),
   "room": zod.string().nullish(),
   "lastCheckinAt": zod.string().nullish(),
@@ -980,6 +1020,7 @@ export const GetChildResponse = zod.object({
   "guardianPhone": zod.string().optional(),
   "guardianEmail": zod.string().nullish(),
   "allergies": zod.string().nullish(),
+  "medicalNotes": zod.string().nullish(),
   "specialNeeds": zod.string().nullish(),
   "room": zod.string().nullish(),
   "lastCheckinAt": zod.string().nullish(),
@@ -1199,7 +1240,11 @@ export const GetDashboardStatsResponse = zod.object({
   "guardianPhone": zod.string().optional(),
   "guardianEmail": zod.string().nullish(),
   "allergies": zod.string().nullish(),
+  "medicalNotes": zod.string().nullish(),
   "specialNeeds": zod.string().nullish(),
+  "emergencyContactName": zod.string().nullish(),
+  "emergencyContactPhone": zod.string().nullish(),
+  "emergencyContactRelationship": zod.string().nullish(),
   "room": zod.string().nullish(),
   "createdAt": zod.string()
 })).optional()

@@ -14,7 +14,6 @@ const DEFAULT_QUESTIONS = [
   { label: "Phone Number", type: "phone", required: true, order: 4, isChildField: false, fieldKey: "guardianPhone", placeholder: "(555) 000-0000" },
   { label: "Email Address", type: "email", required: false, order: 5, isChildField: false, fieldKey: "guardianEmail", placeholder: "email@example.com" },
   { label: "Allergies or Medical Notes", type: "textarea", required: false, order: 6, isChildField: true, fieldKey: "allergies", placeholder: "List any allergies or medical conditions..." },
-  { label: "Special Needs or Accommodations", type: "textarea", required: false, order: 7, isChildField: true, fieldKey: "specialNeeds", placeholder: "Describe any special needs..." },
 ];
 
 /**
@@ -31,9 +30,8 @@ const TEMPLATE_CHILD_CHECKIN = [
   { fieldKind: "system", systemKey: "guardian_email",            label: "Parent / Guardian Email",              fieldType: "email",    required: true,  sortOrder: 6,  placeholder: "email@example.com",                             options: null,     sectionKey: null },
   { fieldKind: "system", systemKey: "allergies",                 label: "Allergies",                            fieldType: "textarea", required: false, sortOrder: 7,  placeholder: "List any food, medication, or environmental allergies…", options: null, sectionKey: null },
   { fieldKind: "system", systemKey: "medical_notes",             label: "Medical Notes",                        fieldType: "textarea", required: false, sortOrder: 8,  placeholder: "Any diagnoses, medications, or medical considerations…",  options: null, sectionKey: null },
-  { fieldKind: "system", systemKey: "special_needs",             label: "Special Needs / Accommodations",       fieldType: "textarea", required: true,  sortOrder: 9,  placeholder: "Describe any special needs or accommodations required…",  options: null, sectionKey: null },
-  { fieldKind: "system", systemKey: "emergency_contact_name",    label: "Emergency Contact Name",               fieldType: "text",     required: true,  sortOrder: 10, placeholder: "Full name",                                     options: null,     sectionKey: "additional_questions" },
-  { fieldKind: "system", systemKey: "emergency_contact_phone",   label: "Emergency Contact Phone",              fieldType: "phone",    required: true,  sortOrder: 11, placeholder: "(555) 000-0000",                                options: null,     sectionKey: "additional_questions" },
+  { fieldKind: "system", systemKey: "emergency_contact_name",    label: "Emergency Contact Name",               fieldType: "text",     required: true,  sortOrder: 9,  placeholder: "Full name",                                     options: null,     sectionKey: null },
+  { fieldKind: "system", systemKey: "emergency_contact_phone",   label: "Emergency Contact Phone",              fieldType: "phone",    required: true,  sortOrder: 10, placeholder: "(555) 000-0000",                                options: null,     sectionKey: null },
 ] as const;
 
 /**

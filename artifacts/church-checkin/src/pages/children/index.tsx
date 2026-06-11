@@ -70,8 +70,8 @@ function EditChildDialog({ child, open, onOpenChange }: EditChildDialogProps) {
         guardianLastName: form.guardianLastName.trim() || undefined,
         guardianPhone: form.guardianPhone.trim() || undefined,
         guardianEmail: form.guardianEmail.trim() || undefined,
-        allergies: form.allergies.trim() || undefined,
-        specialNeeds: form.specialNeeds.trim() || undefined,
+        allergies: form.allergies.trim(),
+        specialNeeds: form.specialNeeds.trim(),
         room: form.room || undefined,
       },
     });

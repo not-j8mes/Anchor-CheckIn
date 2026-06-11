@@ -334,7 +334,11 @@ router.get("/forms/:formId/registrations", async (req, res) => {
         guardianPhone: registrationsTable.guardianPhone,
         guardianEmail: registrationsTable.guardianEmail,
         allergies: registrationsTable.allergies,
+        medicalNotes: registrationsTable.medicalNotes,
         specialNeeds: registrationsTable.specialNeeds,
+        emergencyContactName: registrationsTable.emergencyContactName,
+        emergencyContactPhone: registrationsTable.emergencyContactPhone,
+        emergencyContactRelationship: registrationsTable.emergencyContactRelationship,
         room: registrationsTable.room,
         createdAt: registrationsTable.createdAt,
         submittedAt: registrationsTable.submittedAt,
@@ -346,10 +350,15 @@ router.get("/forms/:formId/registrations", async (req, res) => {
         guardianLastNameJoined: guardiansTable.lastName,
         guardianPhoneJoined: guardiansTable.phone,
         guardianEmailJoined: guardiansTable.email,
+        // Emergency contact fallback from normalized table
+        ecName: emergencyContactsTable.name,
+        ecPhone: emergencyContactsTable.phone,
+        ecRelationship: emergencyContactsTable.relationship,
       })
       .from(registrationsTable)
       .leftJoin(participantsTable, eq(registrationsTable.participantId, participantsTable.id))
       .leftJoin(guardiansTable, eq(registrationsTable.guardianId, guardiansTable.id))
+      .leftJoin(emergencyContactsTable, eq(emergencyContactsTable.participantId, registrationsTable.participantId))
       .where(eq(registrationsTable.formId, formId))
       .orderBy(desc(registrationsTable.createdAt));
 
@@ -377,7 +386,11 @@ router.get("/forms/:formId/registrations", async (req, res) => {
         guardianPhone,
         guardianEmail,
         allergies: row.allergies,
+        medicalNotes: row.medicalNotes,
         specialNeeds: row.specialNeeds,
+        emergencyContactName: row.emergencyContactName ?? row.ecName ?? null,
+        emergencyContactPhone: row.emergencyContactPhone ?? row.ecPhone ?? null,
+        emergencyContactRelationship: row.emergencyContactRelationship ?? row.ecRelationship ?? null,
         room: row.room,
         createdAt: row.createdAt,
         submittedAt: row.submittedAt,
@@ -405,6 +418,20 @@ router.get("/registrations/:registrationId", async (req, res) => {
     if (!reg) {
       res.status(404).json({ error: "Not found" });
       return;
+    }
+
+    // Fallback: populate emergency contact from normalized table if flat columns are missing
+    if (reg.participantId && (!reg.emergencyContactName && !reg.emergencyContactPhone)) {
+      const [ec] = await db
+        .select()
+        .from(emergencyContactsTable)
+        .where(eq(emergencyContactsTable.participantId, reg.participantId))
+        .limit(1);
+      if (ec) {
+        reg.emergencyContactName = ec.name;
+        reg.emergencyContactPhone = ec.phone;
+        reg.emergencyContactRelationship = ec.relationship ?? null;
+      }
     }
 
     // ── Legacy answers (from the old answers table) ───────────────────────────
@@ -505,7 +532,9 @@ router.put("/registrations/:registrationId", async (req, res) => {
   const {
     childFirstName, childLastName, childDateOfBirth,
     guardianFirstName, guardianLastName, guardianPhone, guardianEmail,
-    allergies, specialNeeds, room,
+    allergies, medicalNotes, specialNeeds,
+    emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
+    room,
   } = req.body as Record<string, string | undefined>;
 
   try {
@@ -529,7 +558,11 @@ router.put("/registrations/:registrationId", async (req, res) => {
         ...(guardianPhone !== undefined && { guardianPhone }),
         ...(guardianEmail !== undefined && { guardianEmail: guardianEmail || null }),
         ...(allergies !== undefined && { allergies: allergies || null }),
+        ...(medicalNotes !== undefined && { medicalNotes: medicalNotes || null }),
         ...(specialNeeds !== undefined && { specialNeeds: specialNeeds || null }),
+        ...(emergencyContactName !== undefined && { emergencyContactName: emergencyContactName || null }),
+        ...(emergencyContactPhone !== undefined && { emergencyContactPhone: emergencyContactPhone || null }),
+        ...(emergencyContactRelationship !== undefined && { emergencyContactRelationship: emergencyContactRelationship || null }),
         ...(room !== undefined && { room: room || null }),
       })
       .where(eq(registrationsTable.id, registrationId))
@@ -542,8 +575,33 @@ router.put("/registrations/:registrationId", async (req, res) => {
         ...(childLastName !== undefined && { lastName: childLastName }),
         ...(childDateOfBirth !== undefined && { dateOfBirth: childDateOfBirth || null }),
         ...(allergies !== undefined && { allergies: allergies || null }),
+        ...(medicalNotes !== undefined && { medicalNotes: medicalNotes || null }),
         ...(specialNeeds !== undefined && { specialNeeds: specialNeeds || null }),
       }).where(eq(participantsTable.id, reg.participantId));
+    }
+
+    // Sync emergency contact record
+    const ecChanged = emergencyContactName !== undefined || emergencyContactPhone !== undefined || emergencyContactRelationship !== undefined;
+    if (ecChanged && reg.participantId) {
+      const [existing] = await db
+        .select()
+        .from(emergencyContactsTable)
+        .where(eq(emergencyContactsTable.participantId, reg.participantId))
+        .limit(1);
+      if (existing) {
+        await db.update(emergencyContactsTable).set({
+          ...(emergencyContactName !== undefined && { name: emergencyContactName || existing.name }),
+          ...(emergencyContactPhone !== undefined && { phone: emergencyContactPhone || existing.phone }),
+          ...(emergencyContactRelationship !== undefined && { relationship: emergencyContactRelationship || null }),
+        }).where(eq(emergencyContactsTable.id, existing.id));
+      } else if (emergencyContactName && emergencyContactPhone) {
+        await db.insert(emergencyContactsTable).values({
+          participantId: reg.participantId,
+          name: emergencyContactName,
+          phone: emergencyContactPhone,
+          relationship: emergencyContactRelationship || null,
+        });
+      }
     }
 
     // Sync guardian record
@@ -559,6 +617,34 @@ router.put("/registrations/:registrationId", async (req, res) => {
     res.json(updated);
   } catch (err) {
     req.log.error({ err }, "Failed to update registration");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── PATCH /registrations/:registrationId/custom-answers ─────────────────────
+
+router.patch("/registrations/:registrationId/custom-answers", async (req, res) => {
+  const registrationId = parseInt(req.params.registrationId, 10);
+  if (isNaN(registrationId)) { res.status(400).json({ error: "Invalid registrationId" }); return; }
+
+  const { answers } = req.body as { answers?: Array<{ id: number; value: string }> };
+  if (!Array.isArray(answers)) { res.status(400).json({ error: "answers array required" }); return; }
+
+  try {
+    let updated = 0;
+    for (const { id, value } of answers) {
+      await db
+        .update(registrationCustomAnswersTable)
+        .set({ answerValue: String(value) })
+        .where(and(
+          eq(registrationCustomAnswersTable.id, id),
+          eq(registrationCustomAnswersTable.registrationId, registrationId)
+        ));
+      updated++;
+    }
+    res.json({ updated });
+  } catch (err) {
+    req.log.error({ err }, "Failed to update custom answers");
     res.status(500).json({ error: "Internal server error" });
   }
 });

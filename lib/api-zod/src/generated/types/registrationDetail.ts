@@ -25,7 +25,15 @@ export interface RegistrationDetail {
   /** @nullable */
   allergies?: string | null;
   /** @nullable */
+  medicalNotes?: string | null;
+  /** @nullable */
   specialNeeds?: string | null;
+  /** @nullable */
+  emergencyContactName?: string | null;
+  /** @nullable */
+  emergencyContactPhone?: string | null;
+  /** @nullable */
+  emergencyContactRelationship?: string | null;
   /** @nullable */
   room?: string | null;
   createdAt: string;

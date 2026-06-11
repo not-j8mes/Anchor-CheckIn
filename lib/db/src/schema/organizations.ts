@@ -10,6 +10,7 @@ export const organizationsTable = pgTable("organizations", {
   address: text("address"),
   phone: text("phone"),
   website: text("website"),
+  printerIp: text("printer_ip"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

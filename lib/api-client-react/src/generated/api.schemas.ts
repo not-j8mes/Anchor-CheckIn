@@ -233,7 +233,15 @@ export interface Registration {
   /** @nullable */
   allergies?: string | null;
   /** @nullable */
+  medicalNotes?: string | null;
+  /** @nullable */
   specialNeeds?: string | null;
+  /** @nullable */
+  emergencyContactName?: string | null;
+  /** @nullable */
+  emergencyContactPhone?: string | null;
+  /** @nullable */
+  emergencyContactRelationship?: string | null;
   /** @nullable */
   room?: string | null;
   createdAt: string;
@@ -323,7 +331,15 @@ export interface RegistrationDetail {
   /** @nullable */
   allergies?: string | null;
   /** @nullable */
+  medicalNotes?: string | null;
+  /** @nullable */
   specialNeeds?: string | null;
+  /** @nullable */
+  emergencyContactName?: string | null;
+  /** @nullable */
+  emergencyContactPhone?: string | null;
+  /** @nullable */
+  emergencyContactRelationship?: string | null;
   /** @nullable */
   room?: string | null;
   createdAt: string;
@@ -352,6 +368,15 @@ export interface UpdateRoomInput {
   room: string | null;
 }
 
+export type UpdateCustomAnswersInputAnswersItem = {
+  id: number;
+  value: string;
+};
+
+export interface UpdateCustomAnswersInput {
+  answers: UpdateCustomAnswersInputAnswersItem[];
+}
+
 export interface AnswerInput {
   questionId: number;
   value: string;
@@ -369,6 +394,8 @@ export interface Child {
   guardianEmail?: string | null;
   /** @nullable */
   allergies?: string | null;
+  /** @nullable */
+  medicalNotes?: string | null;
   /** @nullable */
   specialNeeds?: string | null;
   /** @nullable */
@@ -653,7 +680,11 @@ export interface RegistrationUpdateInput {
   guardianPhone?: string;
   guardianEmail?: string;
   allergies?: string;
+  medicalNotes?: string;
   specialNeeds?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelationship?: string;
   room?: string;
 }
 
@@ -692,6 +723,10 @@ export interface CreateEventCategoryInput {
 export interface UpdateEventCategoryInput {
   name: string;
 }
+
+export type UpdateRegistrationCustomAnswers200 = {
+  updated?: number;
+};
 
 export type ListChildrenParams = {
 search?: string;

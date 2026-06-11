@@ -17,7 +17,14 @@ import { randomBytes } from "crypto";
 const router = Router();
 
 function generateLabelCode(): string {
-  return randomBytes(3).toString("hex").toUpperCase();
+  // Excludes easily confused characters: 0/O, 1/I
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = randomBytes(6);
+  let code = "";
+  for (const byte of bytes) {
+    code += chars[byte % chars.length];
+  }
+  return code;
 }
 
 function serializeCheckin(c: typeof checkinsTable.$inferSelect) {

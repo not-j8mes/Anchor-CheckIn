@@ -678,6 +678,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/Registration"
 
+  /registrations/{registrationId}/custom-answers:
+    patch:
+      operationId: updateRegistrationCustomAnswers
+      tags: [registrations]
+      summary: Batch-update custom answer values for a registration
+      parameters:
+        - name: registrationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCustomAnswersInput"
+      responses:
+        "200":
+          description: Number of rows updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: integer
+
   /events/{eventId}/rooms:
     get:
       operationId: listRooms
@@ -1350,7 +1378,15 @@ components:
           type: ["string", "null"]
         allergies:
           type: ["string", "null"]
+        medicalNotes:
+          type: ["string", "null"]
         specialNeeds:
+          type: ["string", "null"]
+        emergencyContactName:
+          type: ["string", "null"]
+        emergencyContactPhone:
+          type: ["string", "null"]
+        emergencyContactRelationship:
           type: ["string", "null"]
         room:
           type: ["string", "null"]
@@ -1381,7 +1417,15 @@ components:
           type: ["string", "null"]
         allergies:
           type: ["string", "null"]
+        medicalNotes:
+          type: ["string", "null"]
         specialNeeds:
+          type: ["string", "null"]
+        emergencyContactName:
+          type: ["string", "null"]
+        emergencyContactPhone:
+          type: ["string", "null"]
+        emergencyContactRelationship:
           type: ["string", "null"]
         room:
           type: ["string", "null"]
@@ -1488,6 +1532,21 @@ components:
         room:
           type: ["string", "null"]
 
+    UpdateCustomAnswersInput:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            required: [id, value]
+            properties:
+              id:
+                type: integer
+              value:
+                type: string
+
     FieldSubmission:
       type: object
       required: [fieldId, value]
@@ -1540,6 +1599,8 @@ components:
         guardianEmail:
           type: ["string", "null"]
         allergies:
+          type: ["string", "null"]
+        medicalNotes:
           type: ["string", "null"]
         specialNeeds:
           type: ["string", "null"]
@@ -1972,7 +2033,15 @@ components:
           type: string
         allergies:
           type: string
+        medicalNotes:
+          type: string
         specialNeeds:
+          type: string
+        emergencyContactName:
+          type: string
+        emergencyContactPhone:
+          type: string
+        emergencyContactRelationship:
           type: string
         room:
           type: string
@@ -2043,3 +2112,4 @@ components:
       properties:
         name:
           type: string
+

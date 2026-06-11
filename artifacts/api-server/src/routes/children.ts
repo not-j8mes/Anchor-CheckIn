@@ -32,6 +32,7 @@ async function buildChild(reg: typeof registrationsTable.$inferSelect) {
     guardianPhone: reg.guardianPhone,
     guardianEmail: reg.guardianEmail,
     allergies: reg.allergies,
+    medicalNotes: reg.medicalNotes,
     specialNeeds: reg.specialNeeds,
     room: reg.room,
     lastCheckinAt: lastCheckin[0]?.checkinAt?.toISOString() ?? null,

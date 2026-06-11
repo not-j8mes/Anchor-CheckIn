@@ -7,6 +7,7 @@ import {
   useDeleteCheckin,
   useListEvents,
   useSubmitRegistration,
+  useGetOrganization,
   getListChildrenQueryKey,
   getGetFormBySlugQueryKey,
   getFormBySlug,
@@ -42,9 +43,11 @@ import {
   Plus,
   Trash2,
   User,
+  Printer,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
+import { Switch } from "@/components/ui/switch";
 
 function groupByFamily(children: Child[]): Array<{ guardian: string; children: Child[] }> {
   const map = new Map<string, Child[]>();
@@ -472,8 +475,16 @@ export default function CheckinKiosk() {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [printLabels, setPrintLabels] = useState<boolean>(() => {
+    return localStorage.getItem("checkin:printLabels") !== "false";
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+
+  const handlePrintLabelsToggle = (val: boolean) => {
+    setPrintLabels(val);
+    localStorage.setItem("checkin:printLabels", String(val));
+  };
 
   const childrenParams = {
     search: debouncedSearch || undefined,
@@ -485,6 +496,8 @@ export default function CheckinKiosk() {
   );
 
   const { toast } = useToast();
+  useGetOrganization();
+
   const [collectedLabels, setCollectedLabels] = useState<LabelData[]>([]);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [walkInOpen, setWalkInOpen] = useState(false);
@@ -492,9 +505,11 @@ export default function CheckinKiosk() {
   const [loadingCheckinId, setLoadingCheckinId] = useState<number | null>(null);
 
   const handleWalkInSuccess = (labels: LabelData[]) => {
-    setCollectedLabels(labels);
-    setPrintDialogOpen(true);
     queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey(childrenParams) });
+    if (printLabels && labels.length > 0) {
+      setCollectedLabels(labels);
+      setPrintDialogOpen(true);
+    }
     toast({
       title: labels.length > 1
         ? `${labels.length} children registered and checked in!`
@@ -526,10 +541,12 @@ export default function CheckinKiosk() {
           })),
         },
       });
-      setCollectedLabels(result.labels as LabelData[]);
-      setPrintDialogOpen(true);
       setSearch("");
       setDebouncedSearch("");
+      if (printLabels && result.labels.length > 0) {
+        setCollectedLabels(result.labels as LabelData[]);
+        setPrintDialogOpen(true);
+      }
       toast({
         title: result.labels.length > 1
           ? `${result.labels.length} children checked in for ${familyGuardian}`
@@ -596,9 +613,24 @@ export default function CheckinKiosk() {
           {selectedEvent.name}
           <span className="text-xs text-muted-foreground/60">(change)</span>
         </button>
-        <Button variant="outline" size="sm" className="gap-2 w-28" onClick={() => setWalkInOpen(true)}>
-          <UserPlus className="w-4 h-4" /> Walk-in
-        </Button>
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex items-center gap-1.5 text-sm font-medium cursor-pointer select-none transition-colors ${printLabels ? "text-primary" : "text-muted-foreground"}`}
+            title={printLabels ? "Label printing on" : "Label printing off"}
+            onClick={() => handlePrintLabelsToggle(!printLabels)}
+          >
+            <Printer className="w-4 h-4" />
+            <Switch
+              checked={printLabels}
+              onCheckedChange={handlePrintLabelsToggle}
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Print labels on check-in"
+            />
+          </div>
+          <Button variant="outline" size="sm" className="gap-2 w-28" onClick={() => setWalkInOpen(true)}>
+            <UserPlus className="w-4 h-4" /> Walk-in
+          </Button>
+        </div>
       </div>
 
       {/* Main centered content */}

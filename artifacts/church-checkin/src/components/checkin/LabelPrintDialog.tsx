@@ -18,71 +18,85 @@ interface LabelCardProps {
 
 function LabelCard({ label, index, total }: LabelCardProps) {
   return (
-    <div className="label-card w-full border border-border rounded-lg bg-white text-black overflow-hidden">
-      {/* Child Name Tag */}
-      <div className="p-4 bg-white flex flex-col justify-between" style={{ minHeight: "140px" }}>
-        <div className="flex justify-between items-start">
-          <div className="text-[10px] font-medium text-gray-500 uppercase tracking-wider">
+    <div
+      className="label-card bg-white text-black overflow-hidden"
+      style={{
+        width: "62mm",
+        boxSizing: "border-box",
+        fontFamily: "Arial, sans-serif",
+        border: "1px solid #d1d5db",
+      }}
+    >
+      {/* Main section */}
+      <div style={{ padding: "3mm 3.5mm 2mm" }}>
+        {/* Header row */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5mm" }}>
+          <span style={{ fontSize: "6pt", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
             {label.organizationName || "Church Check-In"}
+          </span>
+          <span style={{ fontSize: "6pt", color: "#9ca3af", fontFamily: "monospace" }}>
+            {format(new Date(label.checkinDate), "MMM d, h:mm a")}
             {total > 1 && (
-              <span className="ml-2 text-primary font-bold">
+              <span style={{ marginLeft: "1.5mm", color: "#2563eb", fontWeight: 700 }}>
                 {index + 1}/{total}
               </span>
             )}
-          </div>
-          <div className="text-[10px] text-gray-500 font-mono">
-            {format(new Date(label.checkinDate), "MMM d, h:mm a")}
-          </div>
+          </span>
         </div>
 
-        <div className="my-2">
-          <h2 className="text-3xl font-bold leading-none tracking-tight">{label.childName}</h2>
-          <div className="flex justify-between items-end mt-2">
-            <span className="text-sm font-medium text-gray-700">{label.room || "No Room Assigned"}</span>
-            <span className="text-sm text-gray-500">{label.guardianName}</span>
-          </div>
+        {/* Child name */}
+        <div style={{ fontSize: "20pt", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.01em", marginBottom: "1mm" }}>
+          {label.childName}
         </div>
 
-        <div className="flex justify-between items-end">
-          <div className="flex flex-col max-w-[60%] gap-0.5">
+        {/* Room + guardian */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2mm" }}>
+          <span style={{ fontSize: "9pt", fontWeight: 600, color: "#374151" }}>
+            {label.room || "No Room Assigned"}
+          </span>
+          <span style={{ fontSize: "8pt", color: "#6b7280" }}>{label.guardianName}</span>
+        </div>
+
+        {/* Alerts */}
+        {(label.allergies || label.specialNeeds) && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1mm", marginBottom: "2mm" }}>
             {label.allergies && (
-              <span className="text-xs font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded inline-block w-fit">
-                ALG: {label.allergies}
-              </span>
+              <div style={{ fontSize: "7.5pt", fontWeight: 700, color: "#dc2626", background: "#fef2f2", border: "0.5px solid #fca5a5", borderRadius: "2px", padding: "0.8mm 1.5mm" }}>
+                ⚠ ALLERGY: {label.allergies}
+              </div>
             )}
             {label.specialNeeds && (
-              <span className="text-xs font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded inline-block w-fit">
-                NOTE: {label.specialNeeds}
-              </span>
+              <div style={{ fontSize: "7.5pt", fontWeight: 700, color: "#b45309", background: "#fffbeb", border: "0.5px solid #fcd34d", borderRadius: "2px", padding: "0.8mm 1.5mm" }}>
+                ℹ {label.specialNeeds}
+              </div>
             )}
           </div>
-          <div className="text-xl font-mono font-bold tracking-widest bg-gray-100 px-2 py-1 rounded">
+        )}
+
+        {/* Security code */}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "2mm" }}>
+          <div style={{ fontFamily: "monospace", fontSize: "18pt", fontWeight: 800, letterSpacing: "0.12em", background: "#f3f4f6", padding: "1mm 2.5mm", borderRadius: "2px", border: "0.5px solid #d1d5db" }}>
             {label.labelCode}
           </div>
         </div>
       </div>
 
-      {/* Dotted separator */}
-      <div className="border-t-2 border-dashed border-gray-300 w-full" />
+      {/* Dashed separator */}
+      <div style={{ borderTop: "1.5px dashed #d1d5db", margin: "0 3mm" }} />
 
-      {/* Guardian Security Stub */}
-      <div className="p-3 bg-gray-50 flex flex-col justify-between" style={{ minHeight: "72px" }}>
-        <div className="flex justify-between items-center">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+      {/* Guardian stub */}
+      <div style={{ background: "#f9fafb", padding: "2mm 3.5mm", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: "5.5pt", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.8mm" }}>
             Pickup Security Stub
-          </span>
-          <span className="text-[10px] text-gray-400 font-mono">
-            {format(new Date(label.checkinDate), "MMM d")}
-          </span>
+          </div>
+          <div style={{ fontSize: "8pt", fontWeight: 600 }}>{label.guardianName}</div>
+          <div style={{ fontSize: "6.5pt", color: "#6b7280" }}>
+            {label.childName}{label.room ? ` · ${label.room}` : ""}
+          </div>
         </div>
-        <div className="flex justify-between items-end mt-1">
-          <div>
-            <div className="text-sm font-semibold">{label.guardianName}</div>
-            <div className="text-xs text-gray-500">For: {label.childName} · {label.room || "No Room"}</div>
-          </div>
-          <div className="text-lg font-mono font-bold tracking-widest text-gray-800">
-            {label.labelCode}
-          </div>
+        <div style={{ fontFamily: "monospace", fontSize: "15pt", fontWeight: 800, letterSpacing: "0.1em", color: "#1f2937" }}>
+          {label.labelCode}
         </div>
       </div>
     </div>
@@ -98,10 +112,6 @@ interface LabelPrintDialogProps {
 export function LabelPrintDialog({ open, onOpenChange, labels }: LabelPrintDialogProps) {
   if (labels.length === 0) return null;
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <>
       {/* Print-only area — rendered outside dialog so window.print() captures it */}
@@ -114,17 +124,14 @@ export function LabelPrintDialog({ open, onOpenChange, labels }: LabelPrintDialo
       </div>
 
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-sm print:hidden" aria-describedby={undefined}>
+        <DialogContent className="max-w-xs print:hidden" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>
-              {labels.length > 1
-                ? `Print ${labels.length} Labels`
-                : "Print Check-In Label"}
+              {labels.length > 1 ? `Print ${labels.length} Labels` : "Print Check-In Label"}
             </DialogTitle>
           </DialogHeader>
 
-          {/* Scrollable label preview */}
-          <div className="max-h-[55vh] overflow-y-auto space-y-4 py-2 pr-1">
+          <div className="overflow-y-auto max-h-[65vh] space-y-4 py-2 flex flex-col items-center">
             {labels.map((label, i) => (
               <LabelCard key={i} label={label} index={i} total={labels.length} />
             ))}
@@ -134,7 +141,7 @@ export function LabelPrintDialog({ open, onOpenChange, labels }: LabelPrintDialo
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               <X className="w-4 h-4 mr-1" /> Close
             </Button>
-            <Button onClick={handlePrint} data-testid="button-print-labels">
+            <Button onClick={() => window.print()} data-testid="button-print-labels">
               <Printer className="w-4 h-4 mr-2" />
               Print {labels.length > 1 ? `All ${labels.length} Labels` : "Label"}
             </Button>
