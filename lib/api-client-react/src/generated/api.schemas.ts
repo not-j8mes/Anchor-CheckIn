@@ -432,6 +432,10 @@ export interface CheckIn {
   pickupPersonName?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  checkoutMethod?: string | null;
+  /** @nullable */
+  checkoutReason?: string | null;
   updatedAt?: string;
 }
 
@@ -492,6 +496,18 @@ export interface BatchCheckinResult {
   labels: LabelData[];
 }
 
+export interface BulkCheckoutInput {
+  eventId: number;
+  reason: string;
+  note?: string;
+  checkoutAt?: string;
+}
+
+export interface BulkCheckoutResult {
+  count: number;
+  checkins: CheckIn[];
+}
+
 export interface EventCheckin {
   id: number;
   registrationId: number;
@@ -510,6 +526,10 @@ export interface EventCheckin {
   pickupPersonName?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  checkoutMethod?: string | null;
+  /** @nullable */
+  checkoutReason?: string | null;
 }
 
 export interface DayCount {

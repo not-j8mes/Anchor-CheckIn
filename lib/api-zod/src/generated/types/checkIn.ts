@@ -23,5 +23,9 @@ export interface CheckIn {
   pickupPersonName?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  checkoutMethod?: string | null;
+  /** @nullable */
+  checkoutReason?: string | null;
   updatedAt?: string;
 }

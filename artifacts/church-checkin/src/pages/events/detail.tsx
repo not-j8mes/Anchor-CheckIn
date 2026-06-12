@@ -28,6 +28,9 @@ import {
   useDeleteEvent,
   useListEventCategories,
   useCreateEventCategory,
+  useBulkCheckout,
+  getFormBySlug,
+  getGetFormBySlugQueryKey,
   getGetEventQueryKey,
   getListEventsQueryKey,
   getGetFormQueryKey,
@@ -47,8 +50,7 @@ import {
   type EventWithForm,
   type FormField,
 } from "@workspace/api-client-react";
-import { SYSTEM_FIELDS_BY_KEY } from "@/lib/systemFields";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -92,14 +94,37 @@ import {
   ChevronRight,
   User,
   Repeat,
+  MoreHorizontal,
+  PowerOff,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { FormBuilderPanel } from "@/components/forms/FormBuilderPanel";
+import {
+  RegistrationFormBody,
+  getFieldSection,
+} from "@/components/registration/RegistrationFormBody";
 
+
+const BULK_CHECKOUT_REASON_LABELS: Record<string, string> = {
+  end_of_event: "End of event",
+  forgot_individual: "Forgot to check out individually",
+  emergency_closure: "Emergency closure",
+  other: "Other",
+};
+
+const BULK_CHECKOUT_REASONS = Object.entries(BULK_CHECKOUT_REASON_LABELS).map(
+  ([value, label]) => ({ value, label }),
+);
 
 function statusBadge(status: string) {
   if (status === "active") return <Badge className="bg-green-100 text-green-800 border-green-200">Active</Badge>;
@@ -423,74 +448,16 @@ function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; ope
 
 // ─── Manual Registration Dialog ───────────────────────────────────────────────
 
-function isGuardianOrSafetyField(field: FormField): boolean {
-  if (field.fieldKind !== "system" || !field.systemKey) return false;
-  const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
-  return def?.category === "guardian" || def?.category === "emergency_safety";
-}
-
-function ManualRegFieldInput({
-  field,
-  value,
-  onChange,
-}: {
-  field: FormField;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const { fieldType, placeholder, options, required } = field;
-
-  if (fieldType === "textarea") {
-    return (
-      <Textarea
-        required={required}
-        placeholder={placeholder ?? ""}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={2}
-      />
-    );
-  }
-
-  if ((fieldType === "select" || fieldType === "multiselect") && options) {
-    return (
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue placeholder={placeholder ?? "Select…"} />
-        </SelectTrigger>
-        <SelectContent>
-          {options.split(",").map((opt) => (
-            <SelectItem key={opt.trim()} value={opt.trim()}>{opt.trim()}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    );
-  }
-
-  return (
-    <Input
-      type={
-        fieldType === "date" ? "date"
-          : fieldType === "email" ? "email"
-          : fieldType === "phone" ? "tel"
-          : "text"
-      }
-      required={required}
-      placeholder={placeholder ?? ""}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
-}
-
 function ManualRegistrationDialog({
   formId,
+  embedSlug,
   isChildCheckin,
   eventId,
   open,
   onOpenChange,
 }: {
   formId: number | null | undefined;
+  embedSlug: string | null | undefined;
   isChildCheckin: boolean;
   eventId: number;
   open: boolean;
@@ -499,72 +466,94 @@ function ManualRegistrationDialog({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: formFields = [], isLoading: fieldsLoading } = useListFormFields(formId ?? 0, {
-    query: { enabled: !!formId, queryKey: getListFormFieldsQueryKey(formId ?? 0) },
+  const { data: form, isLoading: fieldsLoading } = useQuery({
+    queryKey: getGetFormBySlugQueryKey(embedSlug ?? ""),
+    queryFn: () => getFormBySlug(embedSlug!),
+    enabled: open && !!embedSlug,
   });
+  const formFields: FormField[] = form?.formFields ?? [];
 
-  const guardianFields = formFields.filter(isGuardianOrSafetyField);
-  const participantFields = formFields.filter((f) => !isGuardianOrSafetyField(f));
+  const { data: rooms = [] } = useListRooms(eventId, {
+    query: { enabled: open && !!eventId, queryKey: getListRoomsQueryKey(eventId) },
+  });
 
   const [guardianAnswers, setGuardianAnswers] = useState<Record<number, string>>({});
-  const [participantAnswers, setParticipantAnswers] = useState<Record<number, string>>({});
+  const [childrenAnswers, setChildrenAnswers] = useState<Record<number, string>[]>([{}]);
+  const [emergencyAnswers, setEmergencyAnswers] = useState<Record<number, string>>({});
+  const [additionalAnswers, setAdditionalAnswers] = useState<Record<number, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const submitReg = useSubmitRegistration({
-    mutation: {
-      onSuccess: () => {
-        if (formId) queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(formId) });
-        queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey({ eventId }) });
-        toast({ title: isChildCheckin ? "Child registered" : "Registrant added" });
-        onOpenChange(false);
-        setGuardianAnswers({});
-        setParticipantAnswers({});
-      },
-      onError: () => toast({ title: "Failed to add registration", variant: "destructive" }),
-    },
-  });
+  const submitReg = useSubmitRegistration();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formId) return;
-    const fields: { fieldId: number; value: string }[] = [
-      ...participantFields.map((f) => ({ fieldId: f.id, value: participantAnswers[f.id] ?? "" })),
-      ...guardianFields.map((f) => ({ fieldId: f.id, value: guardianAnswers[f.id] ?? "" })),
-    ];
-    submitReg.mutate({ formId, data: { fields } });
+  const resetForm = () => {
+    setGuardianAnswers({});
+    setChildrenAnswers([{}]);
+    setEmergencyAnswers({});
+    setAdditionalAnswers({});
   };
 
-  const renderSection = (
-    fields: FormField[],
-    answers: Record<number, string>,
-    setAnswers: React.Dispatch<React.SetStateAction<Record<number, string>>>,
-    heading: string
-  ) => (
-    <div className="space-y-4">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{heading}</p>
-      {fields.map((field) => (
-        <div key={field.id} className="space-y-1.5">
-          <Label className="text-sm font-medium flex items-center gap-1">
-            {field.label}
-            {field.required && <span className="text-destructive">*</span>}
-          </Label>
-          <ManualRegFieldInput
-            field={field}
-            value={answers[field.id] ?? ""}
-            onChange={(v) => setAnswers((p) => ({ ...p, [field.id]: v }))}
-          />
-        </div>
-      ))}
-    </div>
-  );
+  const roomAssignmentFieldId = formFields.find((f) => f.systemKey === "room_assignment")?.id;
+
+  const resolvedFormId = form?.id ?? formId;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resolvedFormId) return;
+    setIsSubmitting(true);
+    try {
+      for (const childAnswerMap of childrenAnswers) {
+        const fields: { fieldId: number; value: string }[] = [];
+        for (const f of formFields.filter((f) => getFieldSection(f) === "guardian_info")) {
+          fields.push({ fieldId: f.id, value: guardianAnswers[f.id] ?? "" });
+        }
+        for (const f of formFields.filter((f) => getFieldSection(f) === "child_info")) {
+          fields.push({ fieldId: f.id, value: childAnswerMap[f.id] ?? "" });
+        }
+        for (const f of formFields.filter((f) => getFieldSection(f) === "emergency_contact")) {
+          fields.push({ fieldId: f.id, value: emergencyAnswers[f.id] ?? "" });
+        }
+        for (const f of formFields.filter((f) => getFieldSection(f) === "additional_questions")) {
+          fields.push({ fieldId: f.id, value: additionalAnswers[f.id] ?? "" });
+        }
+        const selectedRoom = roomAssignmentFieldId
+          ? (childAnswerMap[roomAssignmentFieldId] ?? "")
+          : "";
+        await submitReg.mutateAsync({
+          formId: resolvedFormId,
+          data: { fields, ...(selectedRoom ? { room: selectedRoom } : {}) },
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(resolvedFormId) });
+      queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
+      queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey({ eventId }) });
+      const count = childrenAnswers.length;
+      toast({
+        title: isChildCheckin
+          ? count > 1 ? `${count} children added successfully.` : "Child added successfully."
+          : count > 1 ? `${count} registrants added successfully.` : "Registrant added successfully.",
+      });
+      onOpenChange(false);
+      resetForm();
+    } catch {
+      toast({ title: "Failed to add registration", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+    <Dialog
+      open={open}
+      onOpenChange={(v) => { if (!isSubmitting) { onOpenChange(v); if (!v) resetForm(); } }}
+    >
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add {isChildCheckin ? "Child" : "Registrant"}</DialogTitle>
+          <DialogTitle className="text-xl font-serif">
+            Add {isChildCheckin ? "Child" : "Registrant"}
+          </DialogTitle>
         </DialogHeader>
 
-        {!formId ? (
+        {!embedSlug ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             No registration form is linked to this event.
           </p>
@@ -574,23 +563,46 @@ function ManualRegistrationDialog({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6 pt-1">
-            {participantFields.length > 0 &&
-              renderSection(
-                participantFields,
-                participantAnswers,
-                setParticipantAnswers,
-                isChildCheckin ? "Child Information" : "Attendee Information"
-              )}
-            {guardianFields.length > 0 &&
-              renderSection(
-                guardianFields,
-                guardianAnswers,
-                setGuardianAnswers,
-                "Parent / Guardian"
-              )}
-            <DialogFooter>
-              <Button type="submit" className="w-full" disabled={submitReg.isPending}>
-                {submitReg.isPending ? "Saving…" : `Add ${isChildCheckin ? "Child" : "Registrant"}`}
+            <RegistrationFormBody
+              formFields={formFields}
+              rooms={rooms}
+              isChildCheckin={isChildCheckin}
+              guardianAnswers={guardianAnswers}
+              childrenAnswers={childrenAnswers}
+              emergencyAnswers={emergencyAnswers}
+              additionalAnswers={additionalAnswers}
+              onGuardianChange={(fieldId, value) =>
+                setGuardianAnswers((prev) => ({ ...prev, [fieldId]: value }))
+              }
+              onChildChange={(childIndex, fieldId, value) =>
+                setChildrenAnswers((prev) => {
+                  const next = [...prev];
+                  next[childIndex] = { ...next[childIndex], [fieldId]: value };
+                  return next;
+                })
+              }
+              onEmergencyChange={(fieldId, value) =>
+                setEmergencyAnswers((prev) => ({ ...prev, [fieldId]: value }))
+              }
+              onAdditionalChange={(fieldId, value) =>
+                setAdditionalAnswers((prev) => ({ ...prev, [fieldId]: value }))
+              }
+              onAddChild={() => setChildrenAnswers((prev) => [...prev, {}])}
+              onRemoveChild={(index) =>
+                setChildrenAnswers((prev) => prev.filter((_, i) => i !== index))
+              }
+            />
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => { onOpenChange(false); resetForm(); }}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting} className="gap-2">
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {isSubmitting
+                  ? "Saving…"
+                  : childrenAnswers.length > 1
+                    ? `Add ${childrenAnswers.length} ${isChildCheckin ? "Children" : "Registrants"}`
+                    : `Add ${isChildCheckin ? "Child" : "Registrant"}`}
               </Button>
             </DialogFooter>
           </form>
@@ -888,12 +900,14 @@ function RegistrationDetailSheet({
 function ChildrenTabContent({
   eventId,
   formId,
+  embedSlug,
   isChildCheckin = true,
   onExportCsv,
   isExporting = false,
 }: {
   eventId: number;
   formId?: number | null;
+  embedSlug?: string | null;
   isChildCheckin?: boolean;
   onExportCsv?: () => void;
   isExporting?: boolean;
@@ -946,36 +960,54 @@ function ChildrenTabContent({
   }, [registrations, search, roomFilter, alertsOnly, sort]);
 
   return (
-    <div className="space-y-3">
-      {/* Row 1: search + actions */}
-      <div className="flex items-center gap-2">
+    <div className="space-y-5">
+      {/* Page header */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-serif font-bold">Registrations</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Search and manage everyone registered for this event.
+          </p>
+        </div>
+        {onExportCsv && (
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onExportCsv}
+              disabled={isExporting}
+              className="text-muted-foreground hover:text-foreground gap-1.5"
+            >
+              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              <span className="hidden sm:inline">Export CSV</span>
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Search + Add */}
+      <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
           <Input
-            className="pl-9"
+            className="pl-11 h-12 text-base"
             placeholder={isChildCheckin ? "Search by name, guardian, phone, or room…" : "Search by name or contact…"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        {onExportCsv && (
-          <Button variant="outline" size="sm" onClick={onExportCsv} disabled={isExporting} className="shrink-0 gap-1.5">
-            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            <span className="hidden sm:inline">Export CSV</span>
-          </Button>
-        )}
-        <Button size="sm" className="shrink-0 gap-1.5" onClick={() => setAddRegOpen(true)}>
-          <Plus className="w-4 h-4" />
+        <Button className="shrink-0 gap-2 h-12 px-5 text-base font-semibold" onClick={() => setAddRegOpen(true)}>
+          <Plus className="w-5 h-5" />
           <span className="hidden sm:inline">{isChildCheckin ? "Add Child" : "Add Registrant"}</span>
           <span className="sm:hidden">Add</span>
         </Button>
       </div>
 
-      {/* Row 2: filters + sort + count */}
+      {/* Filter row */}
       <div className="flex items-center gap-2 flex-wrap">
         {rooms.length > 0 && (
           <Select value={roomFilter} onValueChange={setRoomFilter}>
-            <SelectTrigger className="h-8 text-xs w-auto min-w-[110px]">
+            <SelectTrigger className="h-9 text-sm w-auto min-w-[120px]">
               <SelectValue placeholder="All rooms" />
             </SelectTrigger>
             <SelectContent>
@@ -990,21 +1022,21 @@ function ChildrenTabContent({
           <button
             type="button"
             onClick={() => setAlertsOnly((v) => !v)}
-            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-xs font-medium border transition-colors ${
+            className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-md text-sm font-medium border transition-colors ${
               alertsOnly
                 ? "bg-red-50 text-red-700 border-red-200"
                 : "bg-background text-muted-foreground border-border hover:border-red-200 hover:text-red-700"
             }`}
           >
-            <AlertTriangle className="w-3 h-3" />
+            <AlertTriangle className="w-3.5 h-3.5" />
             Alerts only
-            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${alertsOnly ? "bg-red-100" : "bg-muted"}`}>
+            <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${alertsOnly ? "bg-red-100" : "bg-muted"}`}>
               {alertCount}
             </span>
           </button>
         )}
         <Select value={sort} onValueChange={(v) => setSort(v as "name" | "date")}>
-          <SelectTrigger className="h-8 text-xs w-auto min-w-[110px]">
+          <SelectTrigger className="h-9 text-sm w-auto min-w-[120px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1012,7 +1044,7 @@ function ChildrenTabContent({
             <SelectItem value="name">Name A–Z</SelectItem>
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground ml-auto">
+        <p className="text-sm text-muted-foreground ml-auto">
           {filtered.length !== registrations.length
             ? `${filtered.length} of ${registrations.length} `
             : `${registrations.length} `}
@@ -1022,10 +1054,10 @@ function ChildrenTabContent({
         </p>
       </div>
 
-      {/* List */}
+      {/* Registration cards */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
       ) : !registrations.length ? (
         <Card>
@@ -1041,50 +1073,49 @@ function ChildrenTabContent({
         </Card>
       ) : !filtered.length ? (
         <Card>
-          <CardContent className="py-10 text-center text-muted-foreground">
+          <CardContent className="py-12 text-center text-muted-foreground">
             <p className="text-sm">No registrations match the current filters.</p>
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden p-0">
-          <div className="divide-y divide-border">
-            {filtered.map((reg) => (
-              <button
-                key={reg.id}
-                type="button"
-                onClick={() => setSelectedReg(reg)}
-                className="w-full text-left flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors group"
-              >
-                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-sm shrink-0">
+        <div className="space-y-2">
+          {filtered.map((reg) => (
+            <Card
+              key={reg.id}
+              className="cursor-pointer transition-colors hover:bg-muted/30"
+              onClick={() => setSelectedReg(reg)}
+            >
+              <CardContent className="px-4 py-4 flex items-start gap-4">
+                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5">
                   {reg.childFirstName[0]}{reg.childLastName[0]}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm">{reg.childFirstName} {reg.childLastName}</p>
-                    {reg.room && (
-                      <Badge variant="outline" className="text-[10px] hidden sm:flex shrink-0">{reg.room}</Badge>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center flex-wrap gap-2">
+                    <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
+                    {(reg.allergies || reg.specialNeeds) && (
+                      <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 gap-1">
+                        <AlertTriangle className="w-2.5 h-2.5" /> Alert
+                      </Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {reg.guardianName}
-                    {reg.guardianPhone ? ` · ${reg.guardianPhone}` : ""}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+                    {reg.guardianName && <span>{reg.guardianName}</span>}
+                    {reg.guardianPhone && <span>{reg.guardianPhone}</span>}
+                    {reg.room && (
+                      <span className="text-xs font-medium px-1.5 py-0.5 bg-primary/10 text-primary rounded">{reg.room}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {(reg.allergies || reg.specialNeeds) && (
-                    <Badge className="text-[10px] bg-red-100 text-red-800 border-none hover:bg-red-100 gap-1">
-                      <AlertTriangle className="w-2.5 h-2.5" /> Alert
-                    </Badge>
-                  )}
-                  <span className="text-xs text-muted-foreground hidden sm:block w-10 text-right">
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <span className="text-xs text-muted-foreground">
                     {format(new Date(reg.createdAt), "MMM d")}
                   </span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 </div>
-              </button>
-            ))}
-          </div>
-        </Card>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
 
       {selectedReg && (
@@ -1100,6 +1131,7 @@ function ChildrenTabContent({
 
       <ManualRegistrationDialog
         formId={formId}
+        embedSlug={embedSlug}
         isChildCheckin={isChildCheckin}
         eventId={eventId}
         open={addRegOpen}
@@ -1956,7 +1988,21 @@ function ChildDetailSheet({
                           <span className="font-medium">{format(new Date(checkin.checkoutAt), "h:mm a, MMM d")}</span>
                         </div>
                       )}
-                      {checkin.pickupPersonName && (
+                      {checkin.checkoutAt && checkin.checkoutMethod === "bulk_admin" && (
+                        <div className="flex justify-between px-4 py-2.5">
+                          <span className="text-muted-foreground">Checkout method</span>
+                          <span className="font-medium text-amber-700">Bulk checkout by admin</span>
+                        </div>
+                      )}
+                      {checkin.checkoutMethod === "bulk_admin" && checkin.checkoutReason && (
+                        <div className="flex justify-between px-4 py-2.5">
+                          <span className="text-muted-foreground">Reason</span>
+                          <span className="font-medium">
+                            {BULK_CHECKOUT_REASON_LABELS[checkin.checkoutReason] ?? checkin.checkoutReason}
+                          </span>
+                        </div>
+                      )}
+                      {checkin.pickupPersonName && checkin.checkoutMethod !== "bulk_admin" && (
                         <div className="flex justify-between px-4 py-2.5">
                           <span className="text-muted-foreground">Picked Up By</span>
                           <span className="font-medium">{checkin.pickupPersonName}</span>
@@ -2088,6 +2134,148 @@ function ChildDetailSheet({
   );
 }
 
+// ─── End Session / Bulk Checkout dialog ──────────────────────────────────────
+
+function EndSessionDialog({
+  open,
+  onOpenChange,
+  eventId,
+  eventName,
+  checkedInCount,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  eventId: number;
+  eventName: string;
+  checkedInCount: number;
+  onSuccess: (count: number) => void;
+}) {
+  const { toast } = useToast();
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const bulkCheckout = useBulkCheckout();
+
+  const reset = () => { setReason(""); setNote(""); setConfirm(""); };
+  const canSubmit = !!reason && confirm === "CHECK OUT" && !submitting;
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setSubmitting(true);
+    try {
+      const result = await bulkCheckout.mutateAsync({
+        data: { eventId, reason, note: note || undefined },
+      });
+      onSuccess(result.count);
+      onOpenChange(false);
+      reset();
+    } catch {
+      toast({ title: "Bulk checkout failed — please try again.", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!submitting) { onOpenChange(v); if (!v) reset(); } }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-serif flex items-center gap-2">
+            <PowerOff className="w-5 h-5 text-destructive" />
+            End Session / Check Out Remaining
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Event</span>
+              <span className="font-medium">{eventName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Currently checked in</span>
+              <span className="font-bold">{checkedInCount}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Checkout time</span>
+              <span className="font-medium">
+                {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex gap-2 text-sm text-amber-800">
+            <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <p>
+              This will check out all children who are currently checked in. Use this only at
+              the end of the event or when individual checkout was not recorded.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Reason <span className="text-destructive">*</span>
+            </Label>
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger><SelectValue placeholder="Select a reason…" /></SelectTrigger>
+              <SelectContent>
+                {BULK_CHECKOUT_REASONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Additional note <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Any context for this bulk checkout…"
+              rows={2}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
+              Type <span className="font-mono font-bold">CHECK OUT</span> to confirm
+            </Label>
+            <Input
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="CHECK OUT"
+              className="font-mono"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { onOpenChange(false); reset(); }}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={!canSubmit}
+            onClick={handleSubmit}
+            className="gap-2"
+          >
+            {submitting
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <PowerOff className="w-4 h-4" />
+            }
+            Check Out All Remaining
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Check-In Desk ─────────────────────────────────────────────────────────────
 
 type DeskFilter = "all" | "not_checked_in" | "checked_in" | "checked_out";
@@ -2101,7 +2289,9 @@ const DESK_FILTER_LABELS: Record<DeskFilter, string> = {
 
 function CheckInDeskContent({
   eventId,
+  eventName,
   formId,
+  embedSlug,
   registrations,
   checkins,
   regsLoading,
@@ -2118,7 +2308,9 @@ function CheckInDeskContent({
   initialPrintLabels,
 }: {
   eventId: number;
+  eventName: string;
   formId?: number | null;
+  embedSlug?: string | null;
   registrations: Registration[] | undefined;
   checkins: EventCheckin[] | undefined;
   regsLoading: boolean;
@@ -2149,8 +2341,14 @@ function CheckInDeskContent({
   // Dialog state
   const [pendingCheckinReg, setPendingCheckinReg] = useState<Registration | null>(null);
   const [pendingCheckout, setPendingCheckout] = useState<{ reg: Registration; checkin: EventCheckin } | null>(null);
+  const [endSessionOpen, setEndSessionOpen] = useState(false);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
+
+  const handleEndSession = (count: number) => {
+    toast({ title: `${count} ${count === 1 ? "child" : "children"} checked out.` });
+    invalidate();
+  };
 
   const createCheckin = useCreateCheckin({
     mutation: {
@@ -2308,7 +2506,62 @@ function CheckInDeskContent({
         </div>
       )}
 
-      {/* Search + Export */}
+      {/* Page header: title + secondary utilities */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-serif font-bold">Check-In Desk</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {isChildEvent
+              ? "Search and check children in or out for this event."
+              : "Search and check participants in or out for this event."}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <div
+            className={`flex items-center gap-1.5 text-sm font-medium cursor-pointer select-none transition-colors px-2 py-1.5 rounded-md hover:bg-muted/60 ${printLabels ? "text-primary" : "text-muted-foreground"}`}
+            title={printLabels ? "Label printing on — click to disable" : "Label printing off — click to enable"}
+            onClick={() => setPrintLabels((v) => !v)}
+          >
+            <Printer className="w-4 h-4" />
+            <Switch
+              checked={printLabels}
+              onCheckedChange={setPrintLabels}
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Print labels on check-in"
+            />
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onExportCsv}
+            disabled={isExporting}
+            className="text-muted-foreground hover:text-foreground gap-1.5"
+          >
+            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            <span className="hidden sm:inline">Export CSV</span>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="text-muted-foreground px-2">
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {isChildEvent && (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive gap-2 cursor-pointer"
+                  onClick={() => setEndSessionOpen(true)}
+                >
+                  <PowerOff className="w-4 h-4" />
+                  End Session / Check Out Remaining
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Search + Add Registrant */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
@@ -2323,34 +2576,11 @@ function CheckInDeskContent({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div
-          className={`flex items-center gap-1.5 text-sm font-medium cursor-pointer select-none transition-colors shrink-0 ${printLabels ? "text-primary" : "text-muted-foreground"}`}
-          title={printLabels ? "Label printing on — click to disable" : "Label printing off — click to enable"}
-          onClick={() => setPrintLabels((v) => !v)}
-        >
-          <Printer className="w-4 h-4" />
-          <Switch
-            checked={printLabels}
-            onCheckedChange={setPrintLabels}
-            onClick={(e) => e.stopPropagation()}
-            aria-label="Print labels on check-in"
-          />
-        </div>
         {isChildEvent && (
-          <Button size="sm" className="shrink-0 gap-1.5" onClick={() => setAddRegOpen(true)}>
-            <Plus className="w-4 h-4" /> Add Registrant
+          <Button className="shrink-0 gap-2 h-12 px-5 text-base font-semibold" onClick={() => setAddRegOpen(true)}>
+            <Plus className="w-5 h-5" /> Add Registrant
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onExportCsv}
-          disabled={isExporting}
-          className="text-muted-foreground hover:text-foreground shrink-0 gap-1.5"
-        >
-          {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          <span className="hidden md:inline">Export CSV</span>
-        </Button>
       </div>
 
       {/* Filter pills */}
@@ -2513,11 +2743,13 @@ function CheckInDeskContent({
                     {status === "checked_out" && checkin && (
                       <>
                         <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Checked Out</Badge>
-                        {checkin.pickupPersonName && (
+                        {checkin.checkoutMethod === "bulk_admin" ? (
+                          <p className="text-[11px] text-amber-700 text-right">Bulk checkout by admin</p>
+                        ) : checkin.pickupPersonName ? (
                           <p className="text-[11px] text-muted-foreground text-right max-w-[120px] truncate">
                             Picked up by {checkin.pickupPersonName}
                           </p>
-                        )}
+                        ) : null}
                         <Button
                           size="sm"
                           variant="outline"
@@ -2647,6 +2879,7 @@ function CheckInDeskContent({
 
       <ManualRegistrationDialog
         formId={formId}
+        embedSlug={embedSlug}
         isChildCheckin={isChildEvent}
         eventId={eventId}
         open={addRegOpen}
@@ -2657,6 +2890,14 @@ function CheckInDeskContent({
         open={printDialogOpen}
         onOpenChange={(v) => { setPrintDialogOpen(v); if (!v) setPendingPrintLabel(null); }}
         labels={pendingPrintLabel ? [pendingPrintLabel] : []}
+      />
+      <EndSessionDialog
+        open={endSessionOpen}
+        onOpenChange={setEndSessionOpen}
+        eventId={eventId}
+        eventName={eventName}
+        checkedInCount={counts.checked_in}
+        onSuccess={handleEndSession}
       />
     </div>
   );
@@ -3007,7 +3248,7 @@ function EventDashboardSection({
       {/* 1 — Page Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-serif font-bold">Overview</h1>
+          <h1 className="text-2xl font-serif font-bold">Dashboard</h1>
           <p className="text-muted-foreground mt-1">Manage this event's registration, check-in, and activity.</p>
         </div>
         <Link href={`/events/${eventId}/settings`} className="shrink-0">
@@ -4309,13 +4550,11 @@ export default function EventWorkspace() {
   if (section === "checkin") {
     return (
       <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
-        <div>
-          <h1 className="text-2xl font-serif font-bold">Check-In Desk</h1>
-          <p className="text-muted-foreground mt-1">Search and check children in or out for this event.</p>
-        </div>
         <CheckInDeskContent
           eventId={eventId}
+          eventName={event.name}
           formId={event.formId}
+          embedSlug={event.formEmbedSlug}
           registrations={registrations}
           checkins={checkins}
           regsLoading={regsLoading}
@@ -4339,13 +4578,10 @@ export default function EventWorkspace() {
   if (section === "registrations") {
     return (
       <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
-        <div>
-          <h1 className="text-2xl font-serif font-bold">Registrations</h1>
-          <p className="text-muted-foreground mt-1">View and manage everyone registered for this event.</p>
-        </div>
         <ChildrenTabContent
           eventId={eventId}
           formId={event.formId}
+          embedSlug={event.formEmbedSlug}
           isChildCheckin={isChildCheckin}
           onExportCsv={handleExportCsv}
           isExporting={isExporting}

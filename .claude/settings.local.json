@@ -29,7 +29,8 @@
       "Bash(sed -n '1672,1710p' /home/runner/workspace/lib/api-spec/openapi.yaml)",
       "Bash(claude install *)",
       "Bash(node *)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
     ]
   }
 }

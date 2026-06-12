@@ -168,7 +168,9 @@ export const ListEventCheckinsResponseItem = zod.object({
   "checkinAt": zod.string(),
   "checkoutAt": zod.string().nullish(),
   "pickupPersonName": zod.string().nullish(),
-  "notes": zod.string().nullish()
+  "notes": zod.string().nullish(),
+  "checkoutMethod": zod.string().nullish(),
+  "checkoutReason": zod.string().nullish()
 })
 export const ListEventCheckinsResponse = zod.array(ListEventCheckinsResponseItem)
 
@@ -1038,6 +1040,38 @@ export const GetChildResponse = zod.object({
 
 
 /**
+ * @summary Check out all currently checked-in children for an event
+ */
+export const BulkCheckoutBody = zod.object({
+  "eventId": zod.number(),
+  "reason": zod.string(),
+  "note": zod.string().optional(),
+  "checkoutAt": zod.string().optional()
+})
+
+export const BulkCheckoutResponse = zod.object({
+  "count": zod.number(),
+  "checkins": zod.array(zod.object({
+  "id": zod.number(),
+  "childId": zod.number(),
+  "childFirstName": zod.string(),
+  "childLastName": zod.string(),
+  "guardianName": zod.string().optional(),
+  "checkinAt": zod.string(),
+  "checkoutAt": zod.string().nullish(),
+  "room": zod.string().nullish(),
+  "labelCode": zod.string().optional(),
+  "labelPrinted": zod.boolean().optional(),
+  "pickupPersonName": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "checkoutMethod": zod.string().nullish(),
+  "checkoutReason": zod.string().nullish(),
+  "updatedAt": zod.string().optional()
+}))
+})
+
+
+/**
  * @summary Check in multiple children with a shared family security code
  */
 export const BatchCheckinBody = zod.object({
@@ -1069,6 +1103,8 @@ export const ListCheckinsResponseItem = zod.object({
   "labelPrinted": zod.boolean().optional(),
   "pickupPersonName": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "checkoutMethod": zod.string().nullish(),
+  "checkoutReason": zod.string().nullish(),
   "updatedAt": zod.string().optional()
 })
 export const ListCheckinsResponse = zod.array(ListCheckinsResponseItem)
@@ -1108,6 +1144,8 @@ export const UpdateCheckinResponse = zod.object({
   "labelPrinted": zod.boolean().optional(),
   "pickupPersonName": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "checkoutMethod": zod.string().nullish(),
+  "checkoutReason": zod.string().nullish(),
   "updatedAt": zod.string().optional()
 })
 
@@ -1145,6 +1183,8 @@ export const CheckoutChildResponse = zod.object({
   "labelPrinted": zod.boolean().optional(),
   "pickupPersonName": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "checkoutMethod": zod.string().nullish(),
+  "checkoutReason": zod.string().nullish(),
   "updatedAt": zod.string().optional()
 })
 
@@ -1169,6 +1209,8 @@ export const UndoCheckoutResponse = zod.object({
   "labelPrinted": zod.boolean().optional(),
   "pickupPersonName": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "checkoutMethod": zod.string().nullish(),
+  "checkoutReason": zod.string().nullish(),
   "updatedAt": zod.string().optional()
 })
 

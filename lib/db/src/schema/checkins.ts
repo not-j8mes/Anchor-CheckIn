@@ -18,6 +18,8 @@ export const checkinsTable = pgTable("checkins", {
   labelPrinted: boolean("label_printed").notNull().default(false),
   pickupPersonName: text("pickup_person_name"),
   notes: text("notes"),
+  checkoutMethod: text("checkout_method"),
+  checkoutReason: text("checkout_reason"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

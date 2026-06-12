@@ -128,6 +128,53 @@ router.post("/checkins/walkin", async (req, res) => {
   }
 });
 
+// Bulk checkout — must be registered BEFORE /checkins/:checkinId routes
+router.post("/checkins/bulk-checkout", async (req, res) => {
+  const { eventId, reason, note, checkoutAt } = (req.body ?? {}) as {
+    eventId?: number; reason?: string; note?: string; checkoutAt?: string;
+  };
+  if (!eventId || !reason) {
+    res.status(400).json({ error: "eventId and reason are required" });
+    return;
+  }
+  try {
+    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    if (!event) { res.status(404).json({ error: "Event not found" }); return; }
+
+    const regs = await db
+      .select({ id: registrationsTable.id })
+      .from(registrationsTable)
+      .where(eq(registrationsTable.eventId, eventId));
+    if (regs.length === 0) { res.json({ count: 0, checkins: [] }); return; }
+
+    const regIds = regs.map((r) => r.id);
+    const active = await db
+      .select({ id: checkinsTable.id })
+      .from(checkinsTable)
+      .where(and(inArray(checkinsTable.registrationId, regIds), isNull(checkinsTable.checkoutAt)));
+
+    if (active.length === 0) { res.json({ count: 0, checkins: [] }); return; }
+
+    const now = checkoutAt ? new Date(checkoutAt) : new Date();
+    const updated = await db
+      .update(checkinsTable)
+      .set({
+        checkoutAt: now,
+        checkoutMethod: "bulk_admin",
+        checkoutReason: reason,
+        notes: note?.trim() || null,
+        updatedAt: new Date(),
+      })
+      .where(inArray(checkinsTable.id, active.map((c) => c.id)))
+      .returning();
+
+    res.json({ count: updated.length, checkins: updated.map(serializeCheckin) });
+  } catch (err) {
+    req.log.error({ err }, "Failed bulk checkout");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // Batch check-in — must be registered BEFORE /checkins/:checkinId routes
 router.post("/checkins/batch", async (req, res) => {
   const { items } = req.body as { items: Array<{ registrationId: number; room?: string }> };

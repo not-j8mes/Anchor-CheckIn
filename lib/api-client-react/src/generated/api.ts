@@ -22,6 +22,8 @@ import type {
 import type {
   BatchCheckinInput,
   BatchCheckinResult,
+  BulkCheckoutInput,
+  BulkCheckoutResult,
   CheckIn,
   CheckInInput,
   CheckInWithLabel,
@@ -2970,6 +2972,77 @@ export function useGetChild<TData = Awaited<ReturnType<typeof getChild>>, TError
 
 
 
+
+export const getBulkCheckoutUrl = () => {
+
+
+
+
+  return `/api/checkins/bulk-checkout`
+}
+
+/**
+ * @summary Check out all currently checked-in children for an event
+ */
+export const bulkCheckout = async (bulkCheckoutInput: BulkCheckoutInput, options?: RequestInit): Promise<BulkCheckoutResult> => {
+
+  return customFetch<BulkCheckoutResult>(getBulkCheckoutUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bulkCheckoutInput,)
+  }
+);}
+
+
+
+
+export const getBulkCheckoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkCheckout>>, TError,{data: BodyType<BulkCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkCheckout>>, TError,{data: BodyType<BulkCheckoutInput>}, TContext> => {
+
+const mutationKey = ['bulkCheckout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkCheckout>>, {data: BodyType<BulkCheckoutInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkCheckout(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof bulkCheckout>>>
+    export type BulkCheckoutMutationBody = BodyType<BulkCheckoutInput>
+    export type BulkCheckoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Check out all currently checked-in children for an event
+ */
+export const useBulkCheckout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkCheckout>>, TError,{data: BodyType<BulkCheckoutInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkCheckout>>,
+        TError,
+        {data: BodyType<BulkCheckoutInput>},
+        TContext
+      > => {
+      return useMutation(getBulkCheckoutMutationOptions(options));
+    }
 
 export const getBatchCheckinUrl = () => {
 

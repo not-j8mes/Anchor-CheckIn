@@ -11,6 +11,8 @@ export * from './answerInput';
 export * from './batchCheckinInput';
 export * from './batchCheckinInputItemsItem';
 export * from './batchCheckinResult';
+export * from './bulkCheckoutInput';
+export * from './bulkCheckoutResult';
 export * from './checkIn';
 export * from './checkInInput';
 export * from './checkInWithLabel';
