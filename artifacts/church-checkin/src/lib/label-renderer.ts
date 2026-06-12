@@ -103,8 +103,8 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
 
   </div>
 
-  <!-- Right: dark vertical code strip -->
-  <div style="flex-shrink:0;width:15mm;background:#111827;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5mm;padding:3mm 0;">
+  <!-- Right: dark vertical code strip, floating with margin -->
+  <div style="flex-shrink:0;width:14mm;background:#111827;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5mm;padding:3mm 0;margin:2.5mm 3mm 2.5mm 0;">
     ${codeChars}
   </div>
 
