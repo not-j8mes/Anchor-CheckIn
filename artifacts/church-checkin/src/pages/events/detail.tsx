@@ -2408,11 +2408,7 @@ function CheckInDeskContent({
   };
 
   const handleCheckinClick = (reg: Registration) => {
-    if (reg.allergies || reg.specialNeeds) {
-      setPendingCheckinReg(reg);
-    } else {
-      doCheckin(reg);
-    }
+    doCheckin(reg);
   };
 
   // When a session is selected, only look at check-ins for that session.
