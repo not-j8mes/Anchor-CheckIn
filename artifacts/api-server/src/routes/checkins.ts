@@ -19,7 +19,7 @@ const router = Router();
 function generateLabelCode(): string {
   // Excludes easily confused characters: 0/O, 1/I
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = randomBytes(6);
+  const bytes = randomBytes(4);
   let code = "";
   for (const byte of bytes) {
     code += chars[byte % chars.length];

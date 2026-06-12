@@ -67,7 +67,7 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
     .split("")
     .map(
       (ch) =>
-        `<span style="font-family:'Courier New',Courier,monospace;font-size:16pt;font-weight:900;color:#fff;line-height:1;letter-spacing:0;">${escHtml(ch)}</span>`
+        `<span style="font-family:'Courier New',Courier,monospace;font-size:20pt;font-weight:900;color:#fff;line-height:1;letter-spacing:0;">${escHtml(ch)}</span>`
     )
     .join("");
 
