@@ -149,15 +149,17 @@
 }
 
 /* @page must be top-level — browsers ignore it inside @media print */
+/* Brother QL-810W: 62mm tape cut to 90mm — landscape content layout */
 @page {
-  size: 62mm auto;
+  size: 90mm 62mm;
   margin: 0;
 }
 
 @media print {
   html,
   body {
-    width: 62mm;
+    width: 90mm;
+    height: 62mm;
     margin: 0;
     padding: 0;
   }
@@ -171,7 +173,7 @@
     position: absolute;
     left: 0;
     top: 0;
-    width: 62mm;
+    width: 90mm;
   }
 
   #print-labels,
@@ -180,8 +182,8 @@
   }
 
   .print-label-wrapper {
-    width: 62mm;
-    min-height: 40mm;
+    width: 90mm;
+    height: 62mm;
     page-break-after: always;
     box-sizing: border-box;
     background: white;

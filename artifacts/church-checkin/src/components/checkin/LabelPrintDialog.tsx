@@ -33,17 +33,18 @@ export function LabelPrintDialog({ open, onOpenChange, labels }: LabelPrintDialo
       </div>
 
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-xs print:hidden" aria-describedby={undefined}>
+        <DialogContent className="max-w-sm print:hidden" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>
               {labels.length > 1 ? `Print ${labels.length} Labels` : "Print Check-In Label"}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="overflow-y-auto max-h-[65vh] space-y-4 py-2 flex flex-col items-center">
+          <div className="overflow-auto max-h-[70vh] space-y-4 py-2 flex flex-col items-center">
             {labels.map((label, i) => (
               <div
                 key={i}
+                style={{ transform: "scale(0.85)", transformOrigin: "top center" }}
                 dangerouslySetInnerHTML={{ __html: renderLabelHtml(label, i, labels.length) }}
               />
             ))}

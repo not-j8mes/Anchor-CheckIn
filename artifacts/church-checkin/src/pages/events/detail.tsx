@@ -1082,7 +1082,7 @@ function ChildrenTabContent({
           {filtered.map((reg) => (
             <Card
               key={reg.id}
-              className="cursor-pointer transition-colors hover:bg-muted/30"
+              className="cursor-pointer transition-all hover:bg-muted/40 hover:shadow-sm group"
               onClick={() => setSelectedReg(reg)}
             >
               <CardContent className="px-4 py-4 flex items-start gap-4">
@@ -1110,7 +1110,10 @@ function ChildrenTabContent({
                   <span className="text-xs text-muted-foreground">
                     {format(new Date(reg.createdAt), "MMM d")}
                   </span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center gap-1 text-muted-foreground group-hover:text-foreground transition-colors">
+                    <span className="text-xs hidden sm:block opacity-0 group-hover:opacity-60 transition-opacity">View</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -2677,15 +2680,20 @@ function CheckInDeskContent({
                         </span>
                       )}
                       {status === "checked_in" && checkin && (
-                        <span className="text-green-700 font-medium flex items-center gap-1.5">
-                          <LogIn className="w-3 h-3" />
-                          In {format(new Date(checkin.checkinAt), "h:mm a")}
+                        <div className="space-y-1.5">
+                          <span className="text-green-700 font-medium flex items-center gap-1.5">
+                            <LogIn className="w-3 h-3" />
+                            Checked in {format(new Date(checkin.checkinAt), "h:mm a")}
+                          </span>
                           {labelType === "child_security" && checkin.labelCode && (
-                            <span className="font-mono font-bold tracking-wide bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
-                              {checkin.labelCode}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground font-medium">Pickup Code</span>
+                              <span className="font-mono font-bold tracking-widest text-sm bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-1 rounded-md">
+                                {checkin.labelCode}
+                              </span>
+                            </div>
                           )}
-                        </span>
+                        </div>
                       )}
                       {status === "checked_out" && checkin && (
                         <span className="text-amber-700 font-medium flex items-center gap-1.5">
@@ -3271,37 +3279,54 @@ function EventDashboardSection({
       {statsSection}
 
       {/* 3 — Primary Hero Action */}
-      <div className={`relative overflow-hidden rounded-2xl border ${heroColors.border} ${heroColors.bg} p-6 flex items-center gap-5`}>
-        <div className={`w-14 h-14 rounded-xl ${heroColors.iconBg} flex items-center justify-center shrink-0`}>
-          {heroIcon}
+      <div className={`relative overflow-hidden rounded-2xl border ${heroColors.border} ${heroColors.bg} p-5`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className={`w-12 h-12 rounded-xl ${heroColors.iconBg} flex items-center justify-center shrink-0`}>
+              {heroIcon}
+            </div>
+            <div className="min-w-0">
+              <h2 className={`text-lg font-serif font-bold ${heroColors.titleColor}`}>{heroTitle}</h2>
+              <p className={`text-sm ${heroColors.descColor} mt-0.5`}>{heroDescription}</p>
+              {trackAttendance && (
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${heroColors.border} ${heroColors.iconBg} ${heroColors.descColor}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                    Check-in open
+                  </span>
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${heroColors.border} ${heroColors.iconBg} ${heroColors.descColor}`}>
+                    <Printer className="w-3 h-3" />
+                    {(event.printLabels ?? isChildCheckin) ? "Labels on" : "Labels off"}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="sm:shrink-0 pl-16 sm:pl-0">
+            {trackAttendance ? (
+              <Link href={heroHref}>
+                <Button size="lg" className={`gap-2 ${heroColors.btnClass}`}>
+                  <LogIn className="w-4 h-4" />
+                  {heroButtonLabel}
+                </Button>
+              </Link>
+            ) : registrationUrl ? (
+              <a href={registrationUrl} target="_blank" rel="noopener noreferrer">
+                <Button className={`gap-2 ${heroColors.btnClass}`}>
+                  <ExternalLink className="w-4 h-4" />
+                  {heroButtonLabel}
+                </Button>
+              </a>
+            ) : (
+              <Link href={`/events/${eventId}/form`}>
+                <Button className={`gap-2 ${heroColors.btnClass}`}>
+                  <FileEdit className="w-4 h-4" />
+                  Set Up Form
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
-        <div className="flex-1 min-w-0">
-          <h2 className={`text-xl font-serif font-bold ${heroColors.titleColor}`}>{heroTitle}</h2>
-          <p className={`text-sm ${heroColors.descColor} mt-0.5`}>{heroDescription}</p>
-          {trackAttendance ? (
-            <Link href={heroHref}>
-              <Button size="lg" className={`mt-3 gap-2 ${heroColors.btnClass}`}>
-                <LogIn className="w-4 h-4" />
-                {heroButtonLabel}
-              </Button>
-            </Link>
-          ) : registrationUrl ? (
-            <a href={registrationUrl} target="_blank" rel="noopener noreferrer">
-              <Button className={`mt-3 gap-2 ${heroColors.btnClass}`}>
-                <ExternalLink className="w-4 h-4" />
-                {heroButtonLabel}
-              </Button>
-            </a>
-          ) : (
-            <Link href={`/events/${eventId}/form`}>
-              <Button className={`mt-3 gap-2 ${heroColors.btnClass}`}>
-                <FileEdit className="w-4 h-4" />
-                Set Up Form
-              </Button>
-            </Link>
-          )}
-        </div>
-
       </div>
 
       {/* 4 — Recent Activity */}
@@ -3706,7 +3731,7 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
 
         <TabsContent value="build" className="mt-5">
           {event.formId ? (
-            <FormBuilderPanel formId={event.formId} eventId={eventId} hideAdditionalPeople={isChildCheckin} />
+            <FormBuilderPanel formId={event.formId} eventId={eventId} hideAdditionalPeople={isChildCheckin} hideSettings />
           ) : (
             <Card>
               <CardContent className="p-10 text-center text-muted-foreground">
@@ -3889,13 +3914,21 @@ function ReportsSection({
               <p className="text-sm mt-1">Once check-ins begin, attendance summaries will appear here.</p>
             </CardContent>
           </Card>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 opacity-40 pointer-events-none select-none">
-            {(["Attendance by Date", "Room Attendance", "Registrant Attendance"] as const).map((label) => (
-              <Card key={label}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {([
+              { title: "Attendance by Date", desc: "Available after check-ins begin." },
+              { title: "Room Attendance", desc: "Available after check-ins begin." },
+              { title: "Registrant Attendance", desc: "Available after check-ins begin." },
+            ] as const).map(({ title, desc }) => (
+              <Card key={title} className="border-border/60">
                 <CardContent className="p-5">
-                  <p className="text-sm font-medium text-muted-foreground">{label}</p>
-                  <div className="h-10 bg-muted/60 rounded-md mt-3" />
-                  <div className="h-2 bg-muted/40 rounded mt-2 w-2/3" />
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className="text-sm font-medium text-foreground">{title}</p>
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide shrink-0">
+                      No data yet
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{desc}</p>
                 </CardContent>
               </Card>
             ))}

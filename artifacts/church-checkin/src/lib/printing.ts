@@ -83,13 +83,15 @@ export async function printLabel(printerName: string, labelHtml: string): Promis
   const found = await findPrinter(printerName);
   if (!found) throw new Error(`Printer "${printerName}" not found`);
 
-  // 62mm × 90mm label in inches (1 inch = 25.4mm)
+  // Brother QL-810W: 62mm tape (2.44") × 90mm cut length (3.54").
+  // HTML content is 90mm wide × 62mm tall (landscape). QZ Tray orientation:landscape
+  // rotates the content 90° so it prints correctly on the portrait tape feed.
   const config = qz.configs.create(printerName, {
     size: { width: 2.44, height: 3.54 },
     units: "in",
     density: 300,
-    orientation: "portrait",
-    scaleContent: true,
+    orientation: "landscape",
+    scaleContent: false,
     interpolation: "bicubic",
   });
 
