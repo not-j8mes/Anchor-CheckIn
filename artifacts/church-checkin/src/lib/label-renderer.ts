@@ -35,13 +35,12 @@ const USERS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9"
 /**
  * Renders a single 90mm × 62mm landscape label.
  *
- * Layout:
- *   Outer row:
- *     Left  — full-height flex column:
- *               Header: org name + date
- *               Body:   room pill → first name → last name → "Allergies: …"
- *               Footer: person icon + Parent/Guardian
- *     Right — full-height dark strip with label code chars stacked vertically
+ * Layout (outer column):
+ *   Header  — full-width: org name + date
+ *   Middle  — flex row (flex:1):
+ *               Left: room pill → first name → last name → allergies
+ *               Right: dark rounded pill with code chars stacked vertically
+ *   Footer  — full-width: person icon + Parent/Guardian
  */
 export function renderLabelHtml(label: LabelData, index: number, total: number): string {
   const dateStr = format(new Date(label.checkinDate), "MMM d, h:mm a");
@@ -54,19 +53,16 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
   const fnSize = firstNameFontSize(firstName);
   const lnSize = lastNameFontSize(lastName);
 
-  // Room pill — shown above the name
   const roomPill = label.room
     ? `<div style="display:inline-flex;align-items:center;gap:1.2mm;font-size:6.5pt;font-weight:600;color:#374151;background:#fff;border-radius:9999px;padding:0.7mm 2.5mm;border:1px solid #9ca3af;white-space:nowrap;margin-bottom:1.5mm;align-self:flex-start;">${USERS_ICON}&nbsp;${escHtml(label.room)}</div>`
     : "";
 
-  // Allergies line — only shown when present
   const allergyLine = label.allergies
     ? `<div style="font-size:7pt;color:#374151;margin-top:2mm;line-height:1.3;"><strong style="font-weight:700;color:#111827;">Allergies:</strong>&nbsp;${escHtml(label.allergies)}</div>`
     : "";
 
   const guardianDisplay = label.guardianName ? escHtml(label.guardianName) : "—";
 
-  // Vertical code — each character on its own line
   const codeChars = label.labelCode
     .split("")
     .map(
@@ -76,36 +72,38 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
     .join("");
 
   return `
-<div style="width:90mm;height:62mm;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;background:#fff;border:1px solid #d1d5db;border-radius:3px;color:#111827;overflow:hidden;display:flex;flex-direction:row;">
+<div style="width:90mm;height:62mm;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;background:#fff;border:1px solid #d1d5db;border-radius:3px;color:#111827;overflow:hidden;display:flex;flex-direction:column;">
 
-  <!-- Left: full-height content column -->
-  <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;">
+  <!-- Header (full width) -->
+  <div style="padding:2mm 3.5mm;display:flex;justify-content:space-between;align-items:center;border-bottom:0.5px solid #d1d5db;flex-shrink:0;">
+    <span style="font-size:6.5pt;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;">${escHtml(label.organizationName || "Church Check-In")}</span>
+    <span style="font-size:6pt;color:#6b7280;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr + counter)}</span>
+  </div>
 
-    <!-- Header -->
-    <div style="padding:2mm 3.5mm;display:flex;justify-content:space-between;align-items:center;border-bottom:0.5px solid #d1d5db;flex-shrink:0;">
-      <span style="font-size:6.5pt;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:46mm;">${escHtml(label.organizationName || "Church Check-In")}</span>
-      <span style="font-size:6pt;color:#6b7280;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr + counter)}</span>
-    </div>
+  <!-- Middle: names left + code right -->
+  <div style="flex:1;display:flex;flex-direction:row;min-height:0;overflow:hidden;">
 
-    <!-- Body: room → name → allergies -->
-    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:2mm 3.5mm 1.5mm 3.5mm;min-height:0;overflow:hidden;">
+    <!-- Left: names + badges -->
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:2mm 2mm 2mm 3.5mm;min-width:0;overflow:hidden;">
       ${roomPill}
       <div style="font-size:${fnSize};font-weight:900;line-height:0.93;color:#111827;letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(firstName)}</div>
       ${lastName ? `<div style="font-size:${lnSize};font-weight:700;color:#111827;line-height:1.2;margin-top:1mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(lastName)}</div>` : ""}
       ${allergyLine}
     </div>
 
-    <!-- Footer -->
-    <div style="border-top:0.5px solid #d1d5db;padding:1.8mm 3.5mm;display:flex;align-items:center;gap:1.5mm;flex-shrink:0;">
-      ${PERSON_ICON}
-      <span style="font-size:7pt;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="font-weight:700;color:#111827;">Parent/Guardian:</strong>&nbsp;${guardianDisplay}</span>
+    <!-- Right: dark rounded code strip, inset within middle section -->
+    <div style="flex-shrink:0;display:flex;align-items:center;padding:2.5mm 3mm 2.5mm 0;">
+      <div style="width:14mm;height:100%;background:#111827;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5mm;padding:2mm 0;box-sizing:border-box;">
+        ${codeChars}
+      </div>
     </div>
 
   </div>
 
-  <!-- Right: dark vertical code strip, floating with margin -->
-  <div style="flex-shrink:0;width:14mm;background:#111827;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5mm;padding:3mm 0;margin:2.5mm 3mm 2.5mm 0;">
-    ${codeChars}
+  <!-- Footer (full width) -->
+  <div style="border-top:0.5px solid #d1d5db;padding:1.8mm 3.5mm;display:flex;align-items:center;gap:1.5mm;flex-shrink:0;">
+    ${PERSON_ICON}
+    <span style="font-size:7pt;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="font-weight:700;color:#111827;">Parent/Guardian:</strong>&nbsp;${guardianDisplay}</span>
   </div>
 
 </div>`.trim();
