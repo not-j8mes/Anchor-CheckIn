@@ -5,46 +5,42 @@ import type { LabelData } from "@workspace/api-client-react";
 // Name-sizing helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Font size for the first name in the left column (~59mm usable width).
- * Column = 90mm label − 7mm h-padding − 2mm gap − 22mm code column.
- */
 export function firstNameFontSize(name: string): string {
   const n = name.length;
-  if (n <= 6)  return "44pt";
-  if (n <= 8)  return "36pt";
-  if (n <= 10) return "30pt";
-  if (n <= 13) return "24pt";
-  return "20pt";
+  if (n <= 5)  return "54pt";
+  if (n <= 7)  return "44pt";
+  if (n <= 9)  return "36pt";
+  if (n <= 12) return "28pt";
+  return "22pt";
 }
 
 export function lastNameFontSize(name: string): string {
-  if (name.length <= 14) return "14pt";
-  if (name.length <= 20) return "12pt";
-  return "10pt";
+  if (name.length <= 14) return "17pt";
+  if (name.length <= 20) return "14pt";
+  return "11pt";
 }
 
 // ---------------------------------------------------------------------------
-// SVG icons (inline, no external deps)
+// SVG icons
 // ---------------------------------------------------------------------------
 
-const PERSON_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;flex-shrink:0;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+const PERSON_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;flex-shrink:0;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
 
-const USERS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;flex-shrink:0;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
+const USERS_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;flex-shrink:0;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
 
 // ---------------------------------------------------------------------------
 // Label renderer
 // ---------------------------------------------------------------------------
 
 /**
- * Renders a single 90mm × 62mm landscape label as a self-contained HTML
- * string with inline styles only.
+ * Renders a single 90mm × 62mm landscape label.
+ * Pure black & white — no colour fills on badges or backgrounds.
  *
  * Layout:
- *   Header  — org name (bold navy, uppercase) + date/time (gray)
- *   Body    — left col: first name (large navy), last name, room pill + alerts
- *             right col: "Pickup Code" label + bordered code box, centered vertically
- *   Footer  — person icon + "Parent/Guardian: name"  (no dashed stub)
+ *   Header  — org name (bold, uppercase) + date
+ *   Body    — left col: first name (large), last name, room pill + alert badges
+ *             right col: Pickup Code box, centered vertically
+ *   Footer  — person icon + Parent/Guardian
  */
 export function renderLabelHtml(label: LabelData, index: number, total: number): string {
   const dateStr = format(new Date(label.checkinDate), "MMM d, h:mm a");
@@ -57,56 +53,58 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
   const fnSize = firstNameFontSize(firstName);
   const lnSize = lastNameFontSize(lastName);
 
+  // B&W pill: white bg, black border, dark text
   const roomPill = label.room
-    ? `<span style="display:inline-flex;align-items:center;gap:1.5mm;font-size:7pt;font-weight:600;color:#374151;background:#f1f5f9;border-radius:9999px;padding:0.9mm 2.5mm;border:0.5px solid #e2e8f0;white-space:nowrap;">${USERS_ICON}&nbsp;${escHtml(label.room)}</span>`
+    ? `<span style="display:inline-flex;align-items:center;gap:1.5mm;font-size:7.5pt;font-weight:600;color:#111827;background:#fff;border-radius:9999px;padding:1mm 3mm;border:1px solid #9ca3af;white-space:nowrap;">${USERS_ICON}&nbsp;${escHtml(label.room)}</span>`
     : "";
 
+  // B&W alert badges: white bg, black border, bold text
   const allergyBadge = label.allergies
-    ? `<span style="display:inline-block;font-size:6pt;font-weight:700;color:#dc2626;background:#fef2f2;border:0.5px solid #fca5a5;border-radius:9999px;padding:0.5mm 2mm;white-space:nowrap;">&#9888; Allergy</span>`
+    ? `<span style="display:inline-block;font-size:6.5pt;font-weight:700;color:#111827;background:#fff;border:1px solid #374151;border-radius:9999px;padding:0.6mm 2.5mm;white-space:nowrap;">&#9888; ALLERGY</span>`
     : "";
   const medicalBadge = label.specialNeeds
-    ? `<span style="display:inline-block;font-size:6pt;font-weight:700;color:#b45309;background:#fffbeb;border:0.5px solid #fcd34d;border-radius:9999px;padding:0.5mm 2mm;white-space:nowrap;">&#x2139; Medical</span>`
+    ? `<span style="display:inline-block;font-size:6.5pt;font-weight:700;color:#111827;background:#fff;border:1px solid #374151;border-radius:9999px;padding:0.6mm 2.5mm;white-space:nowrap;">&#x2139; MEDICAL</span>`
     : "";
 
   const badgesRow =
     roomPill || allergyBadge || medicalBadge
-      ? `<div style="display:flex;align-items:center;gap:1.5mm;margin-top:2mm;flex-wrap:nowrap;overflow:hidden;">${roomPill}${allergyBadge}${medicalBadge}</div>`
+      ? `<div style="display:flex;align-items:center;gap:2mm;margin-top:3mm;flex-wrap:nowrap;overflow:hidden;">${roomPill}${allergyBadge}${medicalBadge}</div>`
       : "";
 
   const guardianDisplay = label.guardianName ? escHtml(label.guardianName) : "—";
 
   return `
-<div style="width:90mm;height:62mm;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;background:#fff;border:1px solid #d1d5db;border-radius:3px;color:#1a2e4a;overflow:hidden;display:flex;flex-direction:column;">
+<div style="width:90mm;height:62mm;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;background:#fff;border:1px solid #d1d5db;border-radius:3px;color:#111827;overflow:hidden;display:flex;flex-direction:column;">
 
-  <!-- Header: org name + date -->
-  <div style="padding:1.8mm 3.5mm;display:flex;justify-content:space-between;align-items:center;border-bottom:0.5px solid #e5e7eb;flex-shrink:0;">
-    <span style="font-size:6pt;font-weight:800;color:#1a2e4a;text-transform:uppercase;letter-spacing:0.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:56mm;">${escHtml(label.organizationName || "Church Check-In")}</span>
-    <span style="font-size:5.5pt;color:#9ca3af;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr + counter)}</span>
+  <!-- Header -->
+  <div style="padding:2mm 4mm;display:flex;justify-content:space-between;align-items:center;border-bottom:0.5px solid #d1d5db;flex-shrink:0;">
+    <span style="font-size:6.5pt;font-weight:800;color:#111827;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:56mm;">${escHtml(label.organizationName || "Church Check-In")}</span>
+    <span style="font-size:6pt;color:#6b7280;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr + counter)}</span>
   </div>
 
-  <!-- Main body: names left, code centered-right -->
-  <div style="flex:1;display:flex;padding:2.5mm 3.5mm 2mm 3.5mm;gap:2mm;min-height:0;overflow:hidden;">
+  <!-- Body: names left | code right -->
+  <div style="flex:1;display:flex;padding:3mm 4mm 2.5mm 4mm;gap:3mm;min-height:0;overflow:hidden;">
 
-    <!-- Left: first name, last name, room + badges -->
-    <div style="flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden;">
-      <div style="font-size:${fnSize};font-weight:900;line-height:0.95;color:#1a2e4a;letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(firstName)}</div>
-      ${lastName ? `<div style="font-size:${lnSize};font-weight:700;color:#1a2e4a;line-height:1.2;margin-top:1mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(lastName)}</div>` : ""}
+    <!-- Left: names + badges, vertically centered -->
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0;overflow:hidden;">
+      <div style="font-size:${fnSize};font-weight:900;line-height:0.92;color:#111827;letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(firstName)}</div>
+      ${lastName ? `<div style="font-size:${lnSize};font-weight:700;color:#111827;line-height:1.2;margin-top:1.5mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(lastName)}</div>` : ""}
       ${badgesRow}
     </div>
 
-    <!-- Right: pickup code, centered vertically -->
-    <div style="flex-shrink:0;width:22mm;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2mm;">
-      <span style="font-size:5.5pt;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:0.07em;white-space:nowrap;">Pickup Code</span>
-      <div style="border:1.5px solid #1a2e4a;border-radius:3px;padding:1.5mm 1.5mm;text-align:center;">
-        <span style="font-family:'Courier New',Courier,monospace;font-size:12pt;font-weight:800;letter-spacing:0.1em;color:#1a2e4a;display:block;line-height:1;">${escHtml(label.labelCode)}</span>
+    <!-- Right: pickup code, centered -->
+    <div style="flex-shrink:0;width:24mm;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5mm;">
+      <span style="font-size:5.5pt;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;">Pickup Code</span>
+      <div style="border:2px solid #111827;border-radius:3px;padding:2mm 2mm;text-align:center;width:100%;box-sizing:border-box;">
+        <span style="font-family:'Courier New',Courier,monospace;font-size:13pt;font-weight:800;letter-spacing:0.1em;color:#111827;display:block;line-height:1;">${escHtml(label.labelCode)}</span>
       </div>
     </div>
   </div>
 
-  <!-- Footer: guardian (no dashed stub) -->
-  <div style="border-top:0.5px solid #e5e7eb;padding:1.8mm 3.5mm;display:flex;align-items:center;gap:1.5mm;flex-shrink:0;">
+  <!-- Footer -->
+  <div style="border-top:0.5px solid #d1d5db;padding:1.8mm 4mm;display:flex;align-items:center;gap:1.5mm;flex-shrink:0;">
     ${PERSON_ICON}
-    <span style="font-size:6.5pt;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="font-weight:700;">Parent/Guardian:</strong>&nbsp;${guardianDisplay}</span>
+    <span style="font-size:7pt;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="font-weight:700;color:#111827;">Parent/Guardian:</strong>&nbsp;${guardianDisplay}</span>
   </div>
 
 </div>`.trim();
