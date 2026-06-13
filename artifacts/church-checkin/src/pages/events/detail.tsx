@@ -2760,6 +2760,24 @@ function CheckInDeskContent({
                         >
                           <Undo2 className="w-3 h-3" /> Undo
                         </button>
+                        <button
+                          type="button"
+                          className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                          onClick={() => {
+                            const reprintData: LabelData = {
+                              childName: `${reg.childFirstName} ${reg.childLastName}`,
+                              guardianName: reg.guardianName ?? "",
+                              labelCode: checkin.labelCode,
+                              checkinDate: checkin.checkinAt,
+                              room: reg.room ?? null,
+                              allergies: reg.allergies ?? null,
+                              specialNeeds: reg.specialNeeds ?? null,
+                            };
+                            printLabelDirectly([reprintData], labelType);
+                          }}
+                        >
+                          <Printer className="w-3 h-3" /> Reprint
+                        </button>
                       </>
                     )}
 
