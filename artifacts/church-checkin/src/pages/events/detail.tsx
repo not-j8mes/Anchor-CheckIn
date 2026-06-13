@@ -106,6 +106,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
+import { printLabels as printLabelDirectly } from "@/lib/label-renderer";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { FormBuilderPanel } from "@/components/forms/FormBuilderPanel";
@@ -2356,13 +2357,17 @@ function CheckInDeskContent({
   const createCheckin = useCreateCheckin({
     mutation: {
       onSuccess: (data) => {
+        console.log("CHECK_IN_SUCCESS");
         invalidate();
         toast({ title: isChildEvent ? "Child checked in" : "Checked in" });
         setLoadingId(null);
         setPendingCheckinReg(null);
-        if (printLabels && data.labelData) {
+        if (data.labelData) {
           setPendingPrintLabel(data.labelData);
-          setPrintDialogOpen(true);
+          if (printLabels) {
+            console.log("PRINT_LABEL_DIRECTLY");
+            printLabelDirectly([data.labelData]);
+          }
         }
       },
       onError: (err: unknown) => {
@@ -2516,6 +2521,21 @@ function CheckInDeskContent({
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {pendingPrintLabel && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground gap-1.5"
+              title="Reprint last label"
+              onClick={() => {
+                console.log("OPEN_PRINT_MODAL");
+                setPrintDialogOpen(true);
+              }}
+            >
+              <Repeat className="w-4 h-4" />
+              <span className="hidden sm:inline">Reprint</span>
+            </Button>
+          )}
           <div
             className={`flex items-center gap-1.5 text-sm font-medium cursor-pointer select-none transition-colors px-2 py-1.5 rounded-md hover:bg-muted/60 ${printLabels ? "text-primary" : "text-muted-foreground"}`}
             title={printLabels ? "Label printing on — click to disable" : "Label printing off — click to enable"}
