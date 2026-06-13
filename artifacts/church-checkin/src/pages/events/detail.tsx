@@ -1093,18 +1093,15 @@ function ChildrenTabContent({
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center flex-wrap gap-2">
                     <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
-                    {(reg.allergies || reg.specialNeeds) && (
-                      <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 gap-1">
-                        <AlertTriangle className="w-2.5 h-2.5" /> Alert
-                      </Badge>
+                    {reg.room && (
+                      <Badge className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50 rounded-full font-medium">{reg.room}</Badge>
+                    )}
+                    {reg.allergies && (
+                      <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">Allergy</Badge>
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-                    {reg.guardianName && <span>{reg.guardianName}</span>}
-                    {reg.guardianPhone && <span>{reg.guardianPhone}</span>}
-                    {reg.room && (
-                      <span className="text-xs font-medium px-1.5 py-0.5 bg-primary/10 text-primary rounded">{reg.room}</span>
-                    )}
+                    <span><span className="font-medium text-foreground/80">Parent/Guardian:</span> {reg.guardianName || "—"}{reg.guardianPhone && <> · {reg.guardianPhone}</>}</span>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1 flex-shrink-0">
@@ -2363,10 +2360,15 @@ function CheckInDeskContent({
         setLoadingId(null);
         setPendingCheckinReg(null);
         if (data.labelData) {
-          setPendingPrintLabel(data.labelData);
+          const labelToPrint = labelType === "child_security"
+            ? data.labelData
+            : labelType === "simple_name_tag"
+            ? { ...data.labelData, labelCode: "", room: null, allergies: null, specialNeeds: null, guardianName: undefined }
+            : { ...data.labelData, labelCode: "" };
+          setPendingPrintLabel(labelToPrint);
           if (printLabels) {
             console.log("PRINT_LABEL_DIRECTLY");
-            printLabelDirectly([data.labelData]);
+            printLabelDirectly([labelToPrint], labelType);
           }
         }
       },
@@ -2675,19 +2677,18 @@ function CheckInDeskContent({
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center flex-wrap gap-2">
                       <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
+                      {reg.room && (
+                        <Badge className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50 rounded-full font-medium">{reg.room}</Badge>
+                      )}
                       {reg.allergies && (
-                        <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100">Allergy</Badge>
+                        <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">Allergy</Badge>
                       )}
                       {reg.specialNeeds && (
-                        <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">Medical</Badge>
+                        <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">Medical</Badge>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-                      {reg.guardianName && <span>{reg.guardianName}</span>}
-                      {reg.guardianPhone && <span>{reg.guardianPhone}</span>}
-                      {reg.room && (
-                        <span className="text-xs font-medium px-1.5 py-0.5 bg-primary/10 text-primary rounded">{reg.room}</span>
-                      )}
+                      <span><span className="font-medium text-foreground/80">Parent/Guardian:</span> {reg.guardianName || "—"}{reg.guardianPhone && <> · {reg.guardianPhone}</>}</span>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-xs">
                       {status === "not_checked_in" && (
@@ -2727,12 +2728,11 @@ function CheckInDeskContent({
                   <div className="flex flex-col items-end gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     {status === "not_checked_in" && (
                       <Button
-                        size="sm"
-                        className="gap-1.5 min-w-[96px]"
+                        className="gap-2 h-11 px-5 font-semibold min-w-[108px]"
                         disabled={acting}
                         onClick={() => handleCheckinClick(reg)}
                       >
-                        {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogIn className="w-3.5 h-3.5" />}
+                        {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
                         Check In
                       </Button>
                     )}
@@ -2741,13 +2741,12 @@ function CheckInDeskContent({
                       <>
                         {requireCheckout ? (
                           <Button
-                            size="sm"
                             variant="outline"
-                            className="gap-1.5 min-w-[96px] border-amber-300 text-amber-800 hover:bg-amber-50 hover:border-amber-400"
+                            className="gap-2 h-11 px-5 font-semibold min-w-[108px] border-amber-300 text-amber-800 hover:bg-amber-50 hover:border-amber-400"
                             disabled={acting}
                             onClick={() => setPendingCheckout({ reg, checkin })}
                           >
-                            {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+                            {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
                             Check Out
                           </Button>
                         ) : (
@@ -4292,15 +4291,19 @@ function EventSettingsSection({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="simple_name">Simple name label</SelectItem>
+                  <SelectItem value="simple_name_tag">Simple name tag</SelectItem>
+                  <SelectItem value="simple_name">Simple Child Label</SelectItem>
                   <SelectItem value="child_security" disabled={!isChildCheckin}>
                     Child security label {!isChildCheckin ? "(kids events only)" : ""}
                   </SelectItem>
                 </SelectContent>
               </Select>
               <div className="pt-1 text-xs text-muted-foreground">
+                {labelSettings.labelType === "simple_name_tag" && (
+                  <p>Prints only the person's name on a 2″×4″ label.</p>
+                )}
                 {labelSettings.labelType === "simple_name" && (
-                  <p>Prints the attendee name and event info on a 2″×4″ label.</p>
+                  <p>Prints the child's name, guardian, room, and allergies on a 2″×4″ label.</p>
                 )}
                 {labelSettings.labelType === "child_security" && (
                   <p>Prints child name, guardian, allergies, room, and a unique pickup security code.</p>

@@ -533,15 +533,22 @@ export default function CheckinKiosk() {
   const [checkingInGuardian, setCheckingInGuardian] = useState<string | null>(null);
   const [loadingCheckinId, setLoadingCheckinId] = useState<number | null>(null);
 
+  const stripForLabelType = (labels: LabelData[]): LabelData[] => {
+    const lt = selectedEvent?.labelType;
+    if (lt === "child_security") return labels;
+    if (lt === "simple_name_tag") return labels.map((l) => ({ ...l, labelCode: "", room: null, allergies: null, specialNeeds: null, guardianName: undefined }));
+    return labels.map((l) => ({ ...l, labelCode: "" }));
+  };
+
   const handleAutoPrint = (labels: LabelData[]) => {
     if (!printLabels || labels.length === 0) return;
-    openLabelPrint(labels);
+    openLabelPrint(stripForLabelType(labels), selectedEvent?.labelType ?? undefined);
   };
 
   const handleReprintLabel = (child: Child) => {
     const label = childToLabelData(child, org?.name ?? "Church Check-In");
     if (!label) return;
-    setReprintLabels([label]);
+    setReprintLabels(stripForLabelType([label]));
     setReprintOpen(true);
   };
 

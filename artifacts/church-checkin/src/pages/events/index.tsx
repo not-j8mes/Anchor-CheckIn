@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   useListEvents,
   useUpdateEvent,
@@ -48,6 +48,7 @@ import {
   Settings,
   Check,
   Repeat,
+  LogIn,
 } from "lucide-react";
 import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 import { useToast } from "@/hooks/use-toast";
@@ -83,11 +84,8 @@ function registrationTypeBadge(type?: string | null) {
   return null;
 }
 
-function registrationTypeStripe(type?: string | null) {
-  if (!type || type === "child_checkin") return "bg-purple-500";
-  if (type === "family_group") return "bg-teal-500";
-  if (type === "individual") return "bg-blue-500";
-  return "bg-primary";
+function registrationTypeStripe(_type?: string | null) {
+  return "event-card-accent";
 }
 
 
@@ -477,7 +475,8 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="simple_name">Simple name label</SelectItem>
+                      <SelectItem value="simple_name_tag">Simple name tag</SelectItem>
+                      <SelectItem value="simple_name">Simple Child Label</SelectItem>
                       <SelectItem value="child_security" disabled={!isChildCheckin}>
                         Child security label {!isChildCheckin ? "(kids events only)" : ""}
                       </SelectItem>
@@ -519,6 +518,8 @@ function EventCard({ event, onEdit, categories }: {
   onEdit: (e: ChurchEvent) => void;
   categories: EventCategory[];
 }) {
+  const [, navigate] = useLocation();
+  const openEvent = () => navigate(`/events/${event.id}`);
   const trackAttendance = event.trackAttendance ?? (event.registrationType === "child_checkin" || !event.registrationType);
   const checkinBadge = trackAttendance
     ? <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px]">Check-In On</Badge>
@@ -529,7 +530,15 @@ function EventCard({ event, onEdit, categories }: {
     : <Badge variant="outline" className="text-[10px] text-muted-foreground">No Form</Badge>;
 
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-all border" data-testid={`event-card-${event.id}`}>
+    <Card
+      className="overflow-hidden hover:shadow-md hover:bg-amber-50/20 transition-all border cursor-pointer"
+      data-testid={`event-card-${event.id}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`Open ${event.name}`}
+      onClick={openEvent}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openEvent(); } }}
+    >
       <CardContent className="p-0">
         <div className="flex items-stretch">
           <div className={`w-1.5 flex-shrink-0 ${registrationTypeStripe(event.registrationType)}`} />
@@ -574,19 +583,43 @@ function EventCard({ event, onEdit, categories }: {
               </div>
 
               <div className="flex items-center gap-1 flex-shrink-0">
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground h-8 w-8"
-                  onClick={() => onEdit(event)} data-testid={`button-edit-event-${event.id}`}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-foreground h-8 w-8"
+                  data-testid={`button-edit-event-${event.id}`}
+                  onClick={(e) => { e.stopPropagation(); onEdit(event); }}
+                >
                   <Pencil className="w-3.5 h-3.5" />
                 </Button>
               </div>
             </div>
 
-            <div className="mt-3 pt-3 border-t border-border">
-              <Button asChild size="sm" className="w-full sm:w-auto">
+            <div className="mt-3 pt-3 border-t border-border flex flex-wrap items-center gap-2">
+              <Button
+                asChild
+                size="sm"
+                className="gap-1.5"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <Link href={`/events/${event.id}`}>
-                  Open Event <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                  Open Event <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </Button>
+              {trackAttendance && (
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  aria-label={`Open ${event.name} Check-In Desk`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Link href={`/events/${event.id}/checkin`}>
+                    <LogIn className="w-3.5 h-3.5" /> Check-In Desk
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </div>

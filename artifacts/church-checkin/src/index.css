@@ -148,6 +148,14 @@
   }
 }
 
+/* Event card left accent tab — navy in light mode, gold in dark mode */
+.event-card-accent {
+  background-color: hsl(var(--sidebar));
+}
+.dark .event-card-accent {
+  background-color: hsl(var(--primary));
+}
+
 /* @page must be top-level — browsers ignore it inside @media print */
 @page {
   size: 90mm 62mm;

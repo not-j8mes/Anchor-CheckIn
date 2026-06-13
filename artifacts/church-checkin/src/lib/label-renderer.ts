@@ -58,13 +58,21 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
 
   const guardianDisplay = label.guardianName ? escHtml(label.guardianName) : "—";
 
-  const codeChars = label.labelCode
-    .split("")
-    .map(
-      (ch) =>
-        `<span style="font-family:'Courier New',Courier,monospace;font-size:18pt;font-weight:900;color:#000000;line-height:1;letter-spacing:0.05em;">${escHtml(ch)}</span>`
-    )
-    .join("");
+  const codeColumn = label.labelCode
+    ? (() => {
+        const codeChars = label.labelCode
+          .split("")
+          .map(
+            (ch) =>
+              `<span style="font-family:'Courier New',Courier,monospace;font-size:18pt;font-weight:900;color:#000000;line-height:1;letter-spacing:0.05em;">${escHtml(ch)}</span>`
+          )
+          .join("");
+        return `<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2.5mm 3mm 2.5mm 1mm;gap:1mm;">
+      <span style="font-size:5pt;font-weight:700;color:#000000;text-transform:uppercase;letter-spacing:0.12em;white-space:nowrap;">Pickup</span>
+      <div style="background:#ffffff;color:#000000;border:2px solid #000000;border-radius:4px;padding:1.5mm 2.5mm;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5mm;">${codeChars}</div>
+    </div>`;
+      })()
+    : "";
 
   return `
 <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;width:90mm;height:62mm;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;background:#ffffff;border:1px solid #000000;border-radius:3px;color:#000000;overflow:hidden;display:flex;flex-direction:column;">
@@ -75,7 +83,7 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
     <span style="font-size:6pt;font-weight:600;color:#000000;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr + counter)}</span>
   </div>
 
-  <!-- Middle: names left + code right -->
+  <!-- Middle: names left, code right (omitted for simple name labels) -->
   <div style="flex:1;display:flex;flex-direction:row;min-height:0;overflow:hidden;">
 
     <!-- Left: names + badges -->
@@ -86,20 +94,64 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
       ${allergyLine}
     </div>
 
-    <!-- Right: bordered pickup code box -->
-    <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2.5mm 3mm 2.5mm 1mm;gap:1mm;">
-      <span style="font-size:5pt;font-weight:700;color:#000000;text-transform:uppercase;letter-spacing:0.12em;white-space:nowrap;">Pickup</span>
-      <div style="background:#ffffff;color:#000000;border:2px solid #000000;border-radius:4px;padding:1.5mm 2.5mm;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5mm;">
-        ${codeChars}
-      </div>
-    </div>
+    ${codeColumn}
 
   </div>
 
-  <!-- Footer (full width) -->
+  ${label.guardianName ? `<!-- Footer (full width) -->
   <div style="border-top:1px solid #000000;padding:1.8mm 3.5mm;display:flex;align-items:center;gap:1.5mm;flex-shrink:0;">
     ${PERSON_ICON}
     <span style="font-size:7pt;color:#000000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><strong style="font-weight:700;color:#000000;">Parent/Guardian:</strong>&nbsp;${guardianDisplay}</span>
+  </div>` : ""}
+
+</div>`.trim();
+}
+
+/**
+ * Renders the parent/guardian pickup stub — 90mm × 62mm, page 2 of the
+ * child security label pair. The pickup code is the dominant element so
+ * the volunteer can match it quickly at checkout.
+ */
+export function renderParentPickupLabelHtml(label: LabelData): string {
+  const dateStr = format(new Date(label.checkinDate), "MMM d, h:mm a");
+  const nameParts = label.childName.trim().split(/\s+/);
+  const firstName = nameParts[0] ?? label.childName;
+  const lastName = nameParts.slice(1).join(" ");
+
+  const codeChars = label.labelCode
+    .split("")
+    .map(
+      (ch) =>
+        `<span style="font-family:'Courier New',Courier,monospace;font-size:32pt;font-weight:900;color:#000000;line-height:1;letter-spacing:0.04em;">${escHtml(ch)}</span>`
+    )
+    .join("");
+
+  return `
+<div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;width:90mm;height:62mm;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;background:#ffffff;border:1px solid #000000;border-radius:3px;color:#000000;overflow:hidden;display:flex;flex-direction:column;">
+
+  <!-- Header -->
+  <div style="padding:2mm 3.5mm;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #000000;flex-shrink:0;">
+    <span style="font-size:6.5pt;font-weight:800;color:#000000;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;">${escHtml(label.organizationName || "Church Check-In")}</span>
+    <span style="font-size:6pt;font-weight:600;color:#000000;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr)}</span>
+  </div>
+
+  <!-- Body -->
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;padding:2mm 3.5mm 2.5mm;min-height:0;overflow:hidden;">
+
+    <!-- Top: pill + child name -->
+    <div>
+      <div style="display:inline-flex;align-items:center;gap:1.2mm;font-size:5.5pt;font-weight:800;color:#000000;border:1.5px solid #000000;border-radius:9999px;padding:0.6mm 2.2mm;white-space:nowrap;margin-bottom:1.8mm;">${PERSON_ICON}&nbsp;PARENT PICKUP LABEL</div>
+      <div style="font-size:10pt;font-weight:700;color:#000000;line-height:1.25;">${escHtml(firstName)}${lastName ? ` ${escHtml(lastName)}` : ""}</div>
+    </div>
+
+    <!-- Center: large pickup code -->
+    <div style="display:flex;justify-content:center;align-items:center;">
+      <div style="display:flex;gap:1mm;">${codeChars}</div>
+    </div>
+
+    <!-- Footer: instruction -->
+    <div style="font-size:6pt;font-weight:700;color:#000000;text-transform:uppercase;letter-spacing:0.1em;">Present this label at pickup</div>
+
   </div>
 
 </div>`.trim();
@@ -110,10 +162,13 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
  *
  * Injects a #single-label-print-root div directly onto document.body (outside
  * the React #root). Print CSS hides #root entirely, so the only document content
- * is the 62mm label container — exactly one page, no popup window needed.
+ * is the label pages — exactly one page per label (two pages per child for
+ * security check-out labels: child label + parent pickup label).
  */
-export function printLabels(labels: LabelData[]): void {
+export function printLabels(labels: LabelData[], labelType?: string): void {
   if (labels.length === 0) return;
+
+  const isSecurityLabel = labelType === "child_security";
 
   let container = document.getElementById("single-label-print-root");
   if (!container) {
@@ -122,13 +177,21 @@ export function printLabels(labels: LabelData[]): void {
     document.body.appendChild(container);
   }
 
-  container.innerHTML = labels
-    .map((label, i) => {
-      const isLast = i === labels.length - 1;
-      const pb = isLast ? "" : "page-break-after:always;break-after:always;";
-      return `<div style="width:90mm;height:62mm;overflow:hidden;${pb}">${renderLabelHtml(label, i, labels.length)}</div>`;
-    })
-    .join("");
+  const pages: string[] = [];
+  labels.forEach((label, i) => {
+    pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderLabelHtml(label, i, labels.length)}</div>`);
+    if (isSecurityLabel && label.labelCode) {
+      pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderParentPickupLabelHtml(label)}</div>`);
+    }
+  });
+
+  // Remove trailing page-break from the last page to avoid a blank extra page.
+  if (pages.length > 0) {
+    pages[pages.length - 1] = pages[pages.length - 1]
+      .replace(/page-break-after:always;break-after:always;/, "");
+  }
+
+  container.innerHTML = pages.join("");
 
   // Let the browser finish layout before opening the print dialog.
   setTimeout(() => window.print(), 0);
