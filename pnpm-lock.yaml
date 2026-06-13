@@ -229,10 +229,6 @@ importers:
         version: 3.1.0
 
   artifacts/church-checkin:
-    dependencies:
-      qz-tray:
-        specifier: ^2.2.6
-        version: 2.2.6
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -2781,9 +2777,6 @@ packages:
 
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
-
-  qz-tray@2.2.6:
-    resolution: {integrity: sha512-b9w0vcjHSdKiOq1jL/KXfb3IvgaIc/BeQv9JuJ3nTEoqSUZfIGKLAyKTS+akHSXrR64R0UwEDmw20GvD2di/Pg==}
 
   range-parser@1.2.1:
     resolution: {integrity: sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg==}
@@ -5443,8 +5436,6 @@ snapshots:
   queue-microtask@1.2.3: {}
 
   quick-format-unescaped@4.0.4: {}
-
-  qz-tray@2.2.6: {}
 
   range-parser@1.2.1: {}
 
