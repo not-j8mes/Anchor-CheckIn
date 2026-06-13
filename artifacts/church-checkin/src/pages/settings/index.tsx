@@ -41,7 +41,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Printer, ExternalLink, Loader2 } from "lucide-react";
 import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 import { useDarkMode } from "@/hooks/use-dark-mode";
-import { connectQZ, listPrinters, testPrinter } from "@/lib/printing";
+import { connectQZ, disconnectQZ, getQZLastError, isQZConnected, isQZLoaded, listPrinters, printTestLabel, QZ_CONNECT_OPTIONS } from "@/lib/printing";
 
 // ─── Event Categories Card ────────────────────────────────────────────────────
 
@@ -233,39 +233,67 @@ interface PrintingCardProps {
 
 function PrintingCard({ printerName, printingMode, onPrinterNameChange, onPrintingModeChange }: PrintingCardProps) {
   const { toast } = useToast();
-  const [qzStatus, setQzStatus] = useState<"checking" | "connected" | "disconnected">("checking");
+  const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
+  const [error, setError] = useState<string | undefined>();
   const [printers, setPrinters] = useState<string[]>([]);
+  const [loadingPrinters, setLoadingPrinters] = useState(false);
   const [testing, setTesting] = useState(false);
 
-  const checkQZ = () => {
-    setQzStatus("checking");
-    connectQZ().then((ok) => {
-      setQzStatus(ok ? "connected" : "disconnected");
-      if (ok) listPrinters().then(setPrinters);
-    });
+  const protocol = typeof window !== "undefined" ? window.location.protocol : "unknown";
+  const origin = typeof window !== "undefined" ? window.location.origin : "unknown";
+  const isInIframe = typeof window !== "undefined" && window.self !== window.top;
+  const qzLoaded = isQZLoaded();
+
+  // If already connected (e.g. navigated back to settings), reflect that immediately.
+  useEffect(() => {
+    if (isQZConnected()) {
+      setStatus("connected");
+      listPrinters().then(setPrinters);
+    }
+  }, []);
+
+  const handleConnect = async () => {
+    setStatus("connecting");
+    setError(undefined);
+    const ok = await connectQZ();
+    if (ok) {
+      setStatus("connected");
+      setLoadingPrinters(true);
+      listPrinters().then((found) => {
+        setPrinters(found);
+        setLoadingPrinters(false);
+      });
+    } else {
+      setStatus("error");
+      setError(getQZLastError());
+    }
   };
 
-  useEffect(() => { checkQZ(); }, []);
+  const handleDisconnect = () => {
+    disconnectQZ();
+    setStatus("idle");
+    setPrinters([]);
+    setError(undefined);
+  };
 
-  const handleTest = async () => {
-    if (!printerName.trim()) {
-      toast({ title: "Enter a printer name first", variant: "destructive" });
+  const handleTestPrint = async () => {
+    if (!printerName) {
+      toast({ title: "Select a printer first", variant: "destructive" });
       return;
     }
     setTesting(true);
     try {
-      const result = await testPrinter(printerName.trim());
-      if (result.connected && result.printerFound) {
-        toast({ title: "QZ Tray connected · Printer found ✓" });
-      } else if (result.connected && !result.printerFound) {
-        toast({ title: "QZ Tray connected but printer not found — check the printer name" });
-      } else {
-        toast({ title: "QZ Tray not running — download it from qz.io", variant: "destructive" });
-      }
+      await printTestLabel(printerName);
+      toast({ title: "Test label sent to printer ✓" });
+    } catch (err) {
+      toast({ title: err instanceof Error ? err.message : "Print failed", variant: "destructive" });
     } finally {
       setTesting(false);
     }
   };
+
+  const hostsLabel = QZ_CONNECT_OPTIONS.host.join(", ");
+  const portsLabel = `secure: ${QZ_CONNECT_OPTIONS.port.secure.join(", ")}`;
 
   return (
     <Card className="border-card-border shadow-sm">
@@ -278,43 +306,76 @@ function PrintingCard({ printerName, printingMode, onPrinterNameChange, onPrinti
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* QZ Tray status indicator */}
-        <div className="flex items-center gap-2">
-          {qzStatus === "checking" ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-          ) : qzStatus === "connected" ? (
-            <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
-          ) : (
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
-          )}
-          <span className="text-sm text-muted-foreground">
-            {qzStatus === "checking"
-              ? "Checking QZ Tray…"
-              : qzStatus === "connected"
-              ? "QZ Tray running"
-              : "QZ Tray not detected"}
-          </span>
-          {qzStatus === "disconnected" && (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-                onClick={checkQZ}
-              >
-                Retry
-              </Button>
+
+        {/* Replit preview warning */}
+        {isInIframe && (
+          <div className="flex items-start gap-2 rounded-md border border-yellow-400/50 bg-yellow-50 dark:bg-yellow-950/20 px-3 py-2.5 text-xs text-yellow-800 dark:text-yellow-300">
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+            <span>
+              QZ Tray cannot connect inside a Replit preview frame.
+              Open the app in its own browser tab and try again.
+            </span>
+          </div>
+        )}
+
+        {/* QZ Tray connection panel */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {status === "connecting" ? (
+                <Loader2 className="w-3 h-3 animate-spin text-muted-foreground flex-shrink-0" />
+              ) : status === "connected" ? (
+                <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
+              ) : status === "error" ? (
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+              ) : (
+                <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground/30 flex-shrink-0" />
+              )}
+              <span className="text-sm text-muted-foreground">
+                {status === "idle" && "Not connected"}
+                {status === "connecting" && "Connecting…"}
+                {status === "connected" && "QZ Tray connected"}
+                {status === "error" && "Connection failed"}
+              </span>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              {status === "connected" ? (
+                <Button type="button" variant="outline" size="sm" onClick={handleDisconnect}>
+                  Disconnect
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleConnect}
+                  disabled={status === "connecting"}
+                  className="gap-1.5"
+                >
+                  {status === "connecting" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Connect to QZ Tray
+                </Button>
+              )}
               <a
                 href="https://qz.io/download"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
-                Download QZ Tray <ExternalLink className="w-3 h-3 ml-0.5" />
+                <ExternalLink className="w-3 h-3" />
               </a>
-            </>
-          )}
+            </div>
+          </div>
+
+          {/* Debug info */}
+          <div className="rounded-md bg-muted/50 border border-border px-3 py-2.5 space-y-0.5 font-mono text-xs text-muted-foreground">
+            <div>qz library loaded: <span className={qzLoaded ? "text-green-600 dark:text-green-400" : "text-red-500"}>{qzLoaded ? "yes" : "no"}</span></div>
+            <div>connection active: <span className={status === "connected" ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}>{status === "connected" ? "yes" : "no"}</span></div>
+            <div>page protocol: {protocol}</div>
+            <div>page origin: {origin}</div>
+            <div>hosts: {hostsLabel}</div>
+            <div>ports: {portsLabel}</div>
+            {error && <div className="text-destructive pt-0.5">error: {error}</div>}
+          </div>
         </div>
 
         {/* Printing mode */}
@@ -331,39 +392,46 @@ function PrintingCard({ printerName, printingMode, onPrinterNameChange, onPrinti
           </Select>
           <p className="text-xs text-muted-foreground">
             Auto mode silently prints to your label printer via QZ Tray whenever a child is checked in.
+            Manual mode opens the browser print dialog instead.
           </p>
         </div>
 
-        {/* Printer name */}
-        <div className="space-y-2">
-          <Label htmlFor="printerName">Printer</Label>
-          <div className="flex gap-2">
-            <Select
-              value={printerName}
-              onValueChange={onPrinterNameChange}
-              disabled={qzStatus !== "connected"}
-            >
-              <SelectTrigger id="printerName" className="flex-1">
-                <SelectValue placeholder={qzStatus === "connected" ? (printers.length ? "Select a printer…" : "No printers found") : "Connect QZ Tray first"} />
-              </SelectTrigger>
-              <SelectContent>
-                {printers.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleTest}
-              disabled={testing || !printerName}
-              className="flex-shrink-0 gap-1.5"
-            >
-              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-              {testing ? "Testing…" : "Test"}
-            </Button>
+        {/* Printer selection — only shown when connected */}
+        {status === "connected" && (
+          <div className="space-y-2">
+            <Label htmlFor="printerName">Printer</Label>
+            <div className="flex gap-2">
+              <Select value={printerName} onValueChange={onPrinterNameChange}>
+                <SelectTrigger id="printerName" className="flex-1">
+                  <SelectValue placeholder={
+                    loadingPrinters ? "Loading printers…"
+                    : printers.length ? "Select a printer…"
+                    : "No printers found"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {printers.map((p) => (
+                    <SelectItem key={p} value={p}>{p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleTestPrint}
+                disabled={testing || !printerName}
+                className="flex-shrink-0 gap-1.5"
+              >
+                {testing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {testing ? "Printing…" : "Print Test Label"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Must match exactly as it appears in your OS printer list.
+            </p>
           </div>
-        </div>
+        )}
+
       </CardContent>
     </Card>
   );

@@ -67,12 +67,12 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
     .split("")
     .map(
       (ch) =>
-        `<span style="font-family:'Courier New',Courier,monospace;font-size:20pt;font-weight:900;color:#fff;line-height:1;letter-spacing:0;">${escHtml(ch)}</span>`
+        `<span style="font-family:'Courier New',Courier,monospace;font-size:18pt;font-weight:900;color:#111827;line-height:1;letter-spacing:0.05em;">${escHtml(ch)}</span>`
     )
     .join("");
 
   return `
-<div style="width:90mm;height:62mm;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;background:#fff;border:1px solid #d1d5db;border-radius:3px;color:#111827;overflow:hidden;display:flex;flex-direction:column;">
+<div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;width:90mm;height:62mm;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;background:#fff;border:1px solid #d1d5db;border-radius:3px;color:#111827;overflow:hidden;display:flex;flex-direction:column;">
 
   <!-- Header (full width) -->
   <div style="padding:2mm 3.5mm;display:flex;justify-content:space-between;align-items:center;border-bottom:0.5px solid #d1d5db;flex-shrink:0;">
@@ -91,9 +91,10 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
       ${allergyLine}
     </div>
 
-    <!-- Right: dark rounded code strip, inset within middle section -->
-    <div style="flex-shrink:0;display:flex;align-items:center;padding:2.5mm 3mm 2.5mm 0;">
-      <div style="width:14mm;height:100%;background:#111827;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5mm;padding:2mm 0;box-sizing:border-box;">
+    <!-- Right: bordered pickup code box -->
+    <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2.5mm 3mm 2.5mm 1mm;gap:1mm;">
+      <span style="font-size:5pt;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.12em;white-space:nowrap;">Pickup</span>
+      <div style="background:#fff;color:#111827;border:2px solid #111827;border-radius:4px;padding:1.5mm 2.5mm;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.5mm;">
         ${codeChars}
       </div>
     </div>
@@ -118,7 +119,7 @@ export function renderLabelsDocument(labels: LabelData[]): string {
     .join("\n");
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; width: 90mm; }
+    html, body { margin: 0; padding: 0; width: 90mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @page { size: 90mm 62mm; margin: 0; }
   </style></head><body>${cards}</body></html>`;
 }

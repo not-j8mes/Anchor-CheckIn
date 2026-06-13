@@ -1,16 +1,30 @@
 // QZ Tray integration — silent label printing via local desktop app.
 // QZ Tray runs on the kiosk machine and exposes a WebSocket API that this module connects to.
-// Falls back gracefully when QZ Tray is not installed/running.
+// All QZ code runs browser-side only — never call from server/SSR context.
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — qz-tray has no official TS type declarations
 import qz from "qz-tray";
 
 let _connected = false;
+let _lastError: string | undefined;
+
+export function getQZLastError(): string | undefined {
+  return _lastError;
+}
+
+// localhost.qz.io resolves to 127.0.0.1 and QZ Tray's certificate covers it,
+// making it work from HTTPS pages without requiring the user to trust a self-signed cert.
+// Try it before bare localhost for that reason.
+export const QZ_CONNECT_OPTIONS = {
+  host: ["localhost.qz.io", "localhost"],
+  port: { secure: [8181, 8282, 8383, 8484], insecure: [8182, 8283, 8384, 8485] },
+  usingSecure: true,
+  retries: 0,
+  delay: 0,
+};
 
 function setupSecurity() {
-  // No-op certificate resolution for unsigned (development) mode.
-  // QZ Tray will show a one-time trust prompt the first time.
   qz.security.setCertificatePromise((_resolve: (v: string) => void) => {
     _resolve("");
   });
@@ -26,14 +40,18 @@ function setupSecurity() {
 export async function connectQZ(): Promise<boolean> {
   try {
     if (qz.websocket.isActive()) {
+      _lastError = undefined;
       _connected = true;
       return true;
     }
     setupSecurity();
-    await qz.websocket.connect({ retries: 1, delay: 0.5 });
+    await qz.websocket.connect(QZ_CONNECT_OPTIONS);
+    _lastError = undefined;
     _connected = true;
     return true;
-  } catch {
+  } catch (err) {
+    _lastError = err instanceof Error ? err.message : String(err);
+    console.error("[QZ Tray] Connection failed:", _lastError, "\nOptions:", QZ_CONNECT_OPTIONS);
     _connected = false;
     return false;
   }
@@ -60,12 +78,24 @@ export function isQZConnected(): boolean {
   }
 }
 
-/** Returns all printer names available on the OS. */
+/** Returns true if the qz-tray library is loaded. */
+export function isQZLoaded(): boolean {
+  try {
+    return typeof qz !== "undefined" && typeof qz.websocket !== "undefined";
+  } catch {
+    return false;
+  }
+}
+
+/** Returns all printer names available on the OS. Requires active connection. */
 export async function listPrinters(): Promise<string[]> {
   try {
-    const result = await qz.printers.find(null);
+    // No argument → query is undefined → QZ Tray returns all printers.
+    // Passing null sends {"query":null} which QZ Tray treats as a filter and returns nothing.
+    const result = await qz.printers.find();
     return Array.isArray(result) ? result : [result].filter(Boolean);
-  } catch {
+  } catch (err) {
+    console.error("[QZ Tray] listPrinters failed:", err);
     return [];
   }
 }
@@ -78,6 +108,24 @@ export async function findPrinter(printerName: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/** Prints a sample label to verify the printer is working. */
+export async function printTestLabel(printerName: string): Promise<void> {
+  const { renderLabelsDocument } = await import("./label-renderer");
+  const html = renderLabelsDocument([
+    {
+      childName: "Test Child",
+      guardianName: "Test Guardian",
+      labelCode: "TEST",
+      checkinDate: new Date().toISOString(),
+      room: "Room 101",
+      allergies: "None",
+      specialNeeds: null,
+      organizationName: "Church Check-In",
+    },
+  ]);
+  await printLabel(printerName, html);
 }
 
 /**
@@ -112,28 +160,4 @@ export async function printLabel(printerName: string, labelHtml: string): Promis
       data: labelHtml,
     },
   ]);
-}
-
-/**
- * Test the QZ Tray connection and printer availability without printing.
- */
-export async function testPrinter(printerName: string): Promise<{
-  connected: boolean;
-  printerFound: boolean;
-  error?: string;
-}> {
-  try {
-    const conn = await connectQZ();
-    if (!conn) {
-      return { connected: false, printerFound: false, error: "QZ Tray not running" };
-    }
-    const found = await findPrinter(printerName);
-    return { connected: true, printerFound: found };
-  } catch (err) {
-    return {
-      connected: false,
-      printerFound: false,
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
-  }
 }
