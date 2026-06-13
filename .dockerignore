@@ -1,0 +1,12 @@
+node_modules
+.git
+.local
+attached_assets
+artifacts/*/dist
+artifacts/*/node_modules
+lib/*/dist
+lib/*/node_modules
+scripts/node_modules
+*.log
+*.tsbuildinfo
+drizzle
