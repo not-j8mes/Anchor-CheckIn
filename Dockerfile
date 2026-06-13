@@ -1,10 +1,10 @@
 FROM node:24-slim AS builder
 
-RUN npm install -g pnpm@9.15.9
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 WORKDIR /app
 
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY package.json pnpm-workspace.yaml ./
 COPY tsconfig.json tsconfig.base.json ./
 
 COPY lib/db/package.json lib/db/
@@ -14,7 +14,7 @@ COPY lib/api-client-react/package.json lib/api-client-react/
 COPY artifacts/api-server/package.json artifacts/api-server/
 COPY artifacts/church-checkin/package.json artifacts/church-checkin/
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 COPY . .
 
