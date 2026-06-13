@@ -3,6 +3,7 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
+preDeployCommand = "pnpm --filter @workspace/db run push"
 startCommand = "node --enable-source-maps ./artifacts/api-server/dist/index.mjs"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
