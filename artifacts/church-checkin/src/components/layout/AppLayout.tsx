@@ -16,7 +16,7 @@ import {
   Settings,
   CalendarDays,
 } from "lucide-react";
-import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
+import appLogo from "@assets/image_1781393408862.png";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();

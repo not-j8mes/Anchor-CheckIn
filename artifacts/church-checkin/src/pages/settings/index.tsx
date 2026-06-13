@@ -39,7 +39,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X } from "lucide-react";
-import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
+import appLogo from "@assets/image_1781393408862.png";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 
 // ─── Event Categories Card ────────────────────────────────────────────────────
