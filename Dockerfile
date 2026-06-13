@@ -22,6 +22,8 @@ RUN PORT=3000 BASE_PATH=/ pnpm --filter @workspace/church-checkin run build
 
 RUN pnpm --filter @workspace/api-server run build
 
+RUN pnpm --filter @workspace/db run push
+
 FROM node:24-slim
 
 WORKDIR /app
