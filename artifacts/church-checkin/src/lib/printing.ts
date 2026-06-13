@@ -60,6 +60,16 @@ export function isQZConnected(): boolean {
   }
 }
 
+/** Returns all printer names available on the OS. */
+export async function listPrinters(): Promise<string[]> {
+  try {
+    const result = await qz.printers.find(null);
+    return Array.isArray(result) ? result : [result].filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 /** Returns true if the named printer is found in the OS printer list. */
 export async function findPrinter(printerName: string): Promise<boolean> {
   try {

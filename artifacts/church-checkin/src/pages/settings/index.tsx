@@ -41,7 +41,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Printer, ExternalLink, Loader2 } from "lucide-react";
 import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 import { useDarkMode } from "@/hooks/use-dark-mode";
-import { connectQZ, testPrinter } from "@/lib/printing";
+import { connectQZ, listPrinters, testPrinter } from "@/lib/printing";
 
 // ─── Event Categories Card ────────────────────────────────────────────────────
 
@@ -234,11 +234,18 @@ interface PrintingCardProps {
 function PrintingCard({ printerName, printingMode, onPrinterNameChange, onPrintingModeChange }: PrintingCardProps) {
   const { toast } = useToast();
   const [qzStatus, setQzStatus] = useState<"checking" | "connected" | "disconnected">("checking");
+  const [printers, setPrinters] = useState<string[]>([]);
   const [testing, setTesting] = useState(false);
 
-  useEffect(() => {
-    connectQZ().then((ok) => setQzStatus(ok ? "connected" : "disconnected"));
-  }, []);
+  const checkQZ = () => {
+    setQzStatus("checking");
+    connectQZ().then((ok) => {
+      setQzStatus(ok ? "connected" : "disconnected");
+      if (ok) listPrinters().then(setPrinters);
+    });
+  };
+
+  useEffect(() => { checkQZ(); }, []);
 
   const handleTest = async () => {
     if (!printerName.trim()) {
@@ -288,14 +295,25 @@ function PrintingCard({ printerName, printingMode, onPrinterNameChange, onPrinti
               : "QZ Tray not detected"}
           </span>
           {qzStatus === "disconnected" && (
-            <a
-              href="https://qz.io/download"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-1 text-xs text-primary hover:underline flex items-center gap-0.5"
-            >
-              Download QZ Tray <ExternalLink className="w-3 h-3 ml-0.5" />
-            </a>
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                onClick={checkQZ}
+              >
+                Retry
+              </Button>
+              <a
+                href="https://qz.io/download"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline flex items-center gap-0.5"
+              >
+                Download QZ Tray <ExternalLink className="w-3 h-3 ml-0.5" />
+              </a>
+            </>
           )}
         </div>
 
@@ -318,29 +336,33 @@ function PrintingCard({ printerName, printingMode, onPrinterNameChange, onPrinti
 
         {/* Printer name */}
         <div className="space-y-2">
-          <Label htmlFor="printerName">Printer Name</Label>
+          <Label htmlFor="printerName">Printer</Label>
           <div className="flex gap-2">
-            <Input
-              id="printerName"
-              placeholder="Brother QL-810W"
+            <Select
               value={printerName}
-              onChange={(e) => onPrinterNameChange(e.target.value)}
-              className="flex-1"
-            />
+              onValueChange={onPrinterNameChange}
+              disabled={qzStatus !== "connected"}
+            >
+              <SelectTrigger id="printerName" className="flex-1">
+                <SelectValue placeholder={qzStatus === "connected" ? (printers.length ? "Select a printer…" : "No printers found") : "Connect QZ Tray first"} />
+              </SelectTrigger>
+              <SelectContent>
+                {printers.map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button
               type="button"
               variant="outline"
               onClick={handleTest}
-              disabled={testing}
+              disabled={testing || !printerName}
               className="flex-shrink-0 gap-1.5"
             >
               {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-              {testing ? "Testing…" : "Test Connection"}
+              {testing ? "Testing…" : "Test"}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Must match the printer name exactly as it appears in your computer's printers list.
-          </p>
         </div>
       </CardContent>
     </Card>
