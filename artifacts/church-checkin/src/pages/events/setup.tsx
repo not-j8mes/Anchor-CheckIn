@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import anchorLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 import { Link, useLocation } from "wouter";
 import {
   useCreateEvent,
@@ -2168,7 +2169,7 @@ export default function EventSetupWizard() {
             Back to Events
           </Button>
           <div className="flex items-center gap-2 flex-1 justify-center">
-            <Church className="w-4 h-4 text-primary" />
+            <img src={anchorLogo} alt="logo" className="w-5 h-5 object-contain" />
             <span className="font-serif font-bold text-sm">New Event Setup</span>
           </div>
           <span className="text-xs text-muted-foreground w-16 text-right">
