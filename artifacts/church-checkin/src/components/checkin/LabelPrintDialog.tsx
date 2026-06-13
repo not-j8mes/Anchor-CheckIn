@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { renderLabelHtml } from "@/lib/label-renderer";
+import { renderLabelHtml, printLabels } from "@/lib/label-renderer";
 
 interface LabelPrintDialogProps {
   open: boolean;
@@ -20,47 +20,34 @@ export function LabelPrintDialog({ open, onOpenChange, labels }: LabelPrintDialo
   if (labels.length === 0) return null;
 
   return (
-    <>
-      {/* Print-only area — rendered outside dialog so window.print() captures it */}
-      <div id="print-labels" className="hidden print:block">
-        {labels.map((label, i) => (
-          <div
-            key={i}
-            className="print-label-wrapper"
-            dangerouslySetInnerHTML={{ __html: renderLabelHtml(label, i, labels.length) }}
-          />
-        ))}
-      </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle>
+            {labels.length > 1 ? `Print ${labels.length} Labels` : "Print Check-In Label"}
+          </DialogTitle>
+        </DialogHeader>
 
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-sm print:hidden" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle>
-              {labels.length > 1 ? `Print ${labels.length} Labels` : "Print Check-In Label"}
-            </DialogTitle>
-          </DialogHeader>
+        <div className="overflow-auto max-h-[70vh] space-y-4 py-2 flex flex-col items-center">
+          {labels.map((label, i) => (
+            <div
+              key={i}
+              style={{ transform: "scale(0.85)", transformOrigin: "top center" }}
+              dangerouslySetInnerHTML={{ __html: renderLabelHtml(label, i, labels.length) }}
+            />
+          ))}
+        </div>
 
-          <div className="overflow-auto max-h-[70vh] space-y-4 py-2 flex flex-col items-center">
-            {labels.map((label, i) => (
-              <div
-                key={i}
-                style={{ transform: "scale(0.85)", transformOrigin: "top center" }}
-                dangerouslySetInnerHTML={{ __html: renderLabelHtml(label, i, labels.length) }}
-              />
-            ))}
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              <X className="w-4 h-4 mr-1" /> Close
-            </Button>
-            <Button onClick={() => window.print()} data-testid="button-print-labels">
-              <Printer className="w-4 h-4 mr-2" />
-              Print {labels.length > 1 ? `All ${labels.length} Labels` : "Label"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <X className="w-4 h-4 mr-1" /> Close
+          </Button>
+          <Button onClick={() => printLabels(labels)} data-testid="button-print-labels">
+            <Printer className="w-4 h-4 mr-2" />
+            Print {labels.length > 1 ? `All ${labels.length} Labels` : "Label"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

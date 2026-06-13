@@ -149,44 +149,31 @@
 }
 
 /* @page must be top-level — browsers ignore it inside @media print */
-/* Brother QL-810W: 62mm tape cut to 90mm — landscape content layout */
 @page {
   size: 90mm 62mm;
   margin: 0;
 }
 
 @media print {
+  /* Hide the React app so it contributes zero height to the printed document.
+     With #root gone, the only content is #single-label-print-root (62mm) = 1 page. */
+  body > #root {
+    display: none !important;
+  }
+
+  /* #single-label-print-root is appended directly to body outside #root by printLabels() */
+  body > #single-label-print-root {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   html,
   body {
-    width: 90mm;
-    height: 62mm;
-    margin: 0;
-    padding: 0;
-  }
-
-  body * {
-    visibility: hidden;
-  }
-
-  #print-labels {
-    display: block !important;
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 90mm;
-  }
-
-  #print-labels,
-  #print-labels * {
-    visibility: visible !important;
-  }
-
-  .print-label-wrapper {
-    width: 90mm;
-    height: 62mm;
-    page-break-after: always;
-    box-sizing: border-box;
-    background: white;
-    color: black;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
   }
 }

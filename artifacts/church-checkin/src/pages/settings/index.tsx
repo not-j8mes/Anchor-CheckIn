@@ -38,10 +38,9 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Printer, ExternalLink, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X } from "lucide-react";
 import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 import { useDarkMode } from "@/hooks/use-dark-mode";
-import { connectQZ, disconnectQZ, getQZLastError, isQZConnected, isQZLoaded, listPrinters, printTestLabel, QZ_CONNECT_OPTIONS } from "@/lib/printing";
 
 // ─── Event Categories Card ────────────────────────────────────────────────────
 
@@ -222,221 +221,6 @@ function EventCategoriesCard() {
   );
 }
 
-// ─── Printing Card ────────────────────────────────────────────────────────────
-
-interface PrintingCardProps {
-  printerName: string;
-  printingMode: string;
-  onPrinterNameChange: (v: string) => void;
-  onPrintingModeChange: (v: string) => void;
-}
-
-function PrintingCard({ printerName, printingMode, onPrinterNameChange, onPrintingModeChange }: PrintingCardProps) {
-  const { toast } = useToast();
-  const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
-  const [error, setError] = useState<string | undefined>();
-  const [printers, setPrinters] = useState<string[]>([]);
-  const [loadingPrinters, setLoadingPrinters] = useState(false);
-  const [testing, setTesting] = useState(false);
-
-  const protocol = typeof window !== "undefined" ? window.location.protocol : "unknown";
-  const origin = typeof window !== "undefined" ? window.location.origin : "unknown";
-  const isInIframe = typeof window !== "undefined" && window.self !== window.top;
-  const qzLoaded = isQZLoaded();
-
-  // If already connected (e.g. navigated back to settings), reflect that immediately.
-  useEffect(() => {
-    if (isQZConnected()) {
-      setStatus("connected");
-      listPrinters().then(setPrinters);
-    }
-  }, []);
-
-  const handleConnect = async () => {
-    setStatus("connecting");
-    setError(undefined);
-    const ok = await connectQZ();
-    if (ok) {
-      setStatus("connected");
-      setLoadingPrinters(true);
-      listPrinters().then((found) => {
-        setPrinters(found);
-        setLoadingPrinters(false);
-      });
-    } else {
-      setStatus("error");
-      setError(getQZLastError());
-    }
-  };
-
-  const handleDisconnect = () => {
-    disconnectQZ();
-    setStatus("idle");
-    setPrinters([]);
-    setError(undefined);
-  };
-
-  const handleTestPrint = async () => {
-    if (!printerName) {
-      toast({ title: "Select a printer first", variant: "destructive" });
-      return;
-    }
-    setTesting(true);
-    try {
-      await printTestLabel(printerName);
-      toast({ title: "Test label sent to printer ✓" });
-    } catch (err) {
-      toast({ title: err instanceof Error ? err.message : "Print failed", variant: "destructive" });
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const hostsLabel = QZ_CONNECT_OPTIONS.host.join(", ");
-  const portsLabel = `secure: ${QZ_CONNECT_OPTIONS.port.secure.join(", ")}`;
-
-  return (
-    <Card className="border-card-border shadow-sm">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Printer className="w-4 h-4 text-primary" /> Printing
-        </CardTitle>
-        <CardDescription>
-          Configure label printing for the check-in kiosk.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-
-        {/* Replit preview warning */}
-        {isInIframe && (
-          <div className="flex items-start gap-2 rounded-md border border-yellow-400/50 bg-yellow-50 dark:bg-yellow-950/20 px-3 py-2.5 text-xs text-yellow-800 dark:text-yellow-300">
-            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-            <span>
-              QZ Tray cannot connect inside a Replit preview frame.
-              Open the app in its own browser tab and try again.
-            </span>
-          </div>
-        )}
-
-        {/* QZ Tray connection panel */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              {status === "connecting" ? (
-                <Loader2 className="w-3 h-3 animate-spin text-muted-foreground flex-shrink-0" />
-              ) : status === "connected" ? (
-                <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" />
-              ) : status === "error" ? (
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
-              ) : (
-                <span className="w-2.5 h-2.5 rounded-full bg-muted-foreground/30 flex-shrink-0" />
-              )}
-              <span className="text-sm text-muted-foreground">
-                {status === "idle" && "Not connected"}
-                {status === "connecting" && "Connecting…"}
-                {status === "connected" && "QZ Tray connected"}
-                {status === "error" && "Connection failed"}
-              </span>
-            </div>
-            <div className="flex gap-2 flex-shrink-0">
-              {status === "connected" ? (
-                <Button type="button" variant="outline" size="sm" onClick={handleDisconnect}>
-                  Disconnect
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleConnect}
-                  disabled={status === "connecting"}
-                  className="gap-1.5"
-                >
-                  {status === "connecting" && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Connect to QZ Tray
-                </Button>
-              )}
-              <a
-                href="https://qz.io/download"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          </div>
-
-          {/* Debug info */}
-          <div className="rounded-md bg-muted/50 border border-border px-3 py-2.5 space-y-0.5 font-mono text-xs text-muted-foreground">
-            <div>qz library loaded: <span className={qzLoaded ? "text-green-600 dark:text-green-400" : "text-red-500"}>{qzLoaded ? "yes" : "no"}</span></div>
-            <div>connection active: <span className={status === "connected" ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}>{status === "connected" ? "yes" : "no"}</span></div>
-            <div>page protocol: {protocol}</div>
-            <div>page origin: {origin}</div>
-            <div>hosts: {hostsLabel}</div>
-            <div>ports: {portsLabel}</div>
-            {error && <div className="text-destructive pt-0.5">error: {error}</div>}
-          </div>
-        </div>
-
-        {/* Printing mode */}
-        <div className="space-y-2">
-          <Label>Printing Mode</Label>
-          <Select value={printingMode} onValueChange={onPrintingModeChange}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="manual">Manual (Print Dialog)</SelectItem>
-              <SelectItem value="auto">Auto (QZ Tray)</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
-            Auto mode silently prints to your label printer via QZ Tray whenever a child is checked in.
-            Manual mode opens the browser print dialog instead.
-          </p>
-        </div>
-
-        {/* Printer selection — only shown when connected */}
-        {status === "connected" && (
-          <div className="space-y-2">
-            <Label htmlFor="printerName">Printer</Label>
-            <div className="flex gap-2">
-              <Select value={printerName} onValueChange={onPrinterNameChange}>
-                <SelectTrigger id="printerName" className="flex-1">
-                  <SelectValue placeholder={
-                    loadingPrinters ? "Loading printers…"
-                    : printers.length ? "Select a printer…"
-                    : "No printers found"
-                  } />
-                </SelectTrigger>
-                <SelectContent>
-                  {printers.map((p) => (
-                    <SelectItem key={p} value={p}>{p}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleTestPrint}
-                disabled={testing || !printerName}
-                className="flex-shrink-0 gap-1.5"
-              >
-                {testing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {testing ? "Printing…" : "Print Test Label"}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Must match exactly as it appears in your OS printer list.
-            </p>
-          </div>
-        )}
-
-      </CardContent>
-    </Card>
-  );
-}
-
 // ─── Settings page ────────────────────────────────────────────────────────────
 
 export default function Settings() {
@@ -450,8 +234,6 @@ export default function Settings() {
     address: "",
     phone: "",
     website: "",
-    printerName: "",
-    printingMode: "manual",
   });
 
   const { isDark, setIsDark } = useDarkMode();
@@ -466,8 +248,6 @@ export default function Settings() {
         address: org.address || "",
         phone: org.phone || "",
         website: org.website || "",
-        printerName: org.printerName || "",
-        printingMode: org.printingMode || "manual",
       });
     }
   }, [org]);
@@ -635,14 +415,6 @@ export default function Settings() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Printing */}
-        <PrintingCard
-          printerName={formData.printerName}
-          printingMode={formData.printingMode}
-          onPrinterNameChange={(v) => setFormData(p => ({ ...p, printerName: v }))}
-          onPrintingModeChange={(v) => setFormData(p => ({ ...p, printingMode: v }))}
-        />
 
         <div className="flex justify-end">
           <Button type="submit" disabled={updateOrg.isPending}>
