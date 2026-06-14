@@ -6,6 +6,7 @@ import {
   SidebarHeader,
   SidebarMenuItem,
   SidebarMenu,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useGetOrganization } from "@workspace/api-client-react";
@@ -93,6 +94,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Mobile-only top bar with hamburger to open sidebar */}
+        <div className="flex md:hidden sticky top-0 z-10 items-center gap-3 px-4 h-14 border-b border-border bg-background/95 backdrop-blur shrink-0">
+          <SidebarTrigger className="h-8 w-8" />
+          <span className="font-semibold text-sm">{org?.name || "Church Check-In"}</span>
+        </div>
         {children}
       </main>
     </div>
