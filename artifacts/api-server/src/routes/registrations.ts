@@ -196,6 +196,7 @@ router.post("/forms/:formId/register", async (req, res) => {
     const guardianCols: Record<string, string> = {};
     const emergencyCols: Record<string, string> = {};
     const customAnswers: { formFieldId: number; questionLabel: string; answerValue: string }[] = [];
+    let roomFromFields: string | null = null;
 
     for (const { fieldId, value } of submittedFields) {
       if (!value && value !== "false") continue; // skip empties
@@ -204,6 +205,11 @@ router.post("/forms/:formId/register", async (req, res) => {
       if (!formField) continue;
 
       if (formField.fieldKind === "system" && formField.systemKey) {
+        // room_assignment maps directly to registrations.room (not to a participant/guardian table)
+        if (formField.systemKey === "room_assignment") {
+          roomFromFields = value;
+          continue;
+        }
         const mapping = SYSTEM_KEY_MAP[formField.systemKey];
         if (mapping) {
           if (mapping.table === "participants") participantCols[mapping.column] = value;
@@ -288,7 +294,7 @@ router.post("/forms/:formId/register", async (req, res) => {
         guardianEmail: guardianCols["email"] ?? null,
         allergies:     participantCols["allergies"]    ?? null,
         specialNeeds:  participantCols["special_needs"] ?? null,
-        room:          submittedRoom,
+        room:          roomFromFields ?? submittedRoom,
       })
       .returning();
 
