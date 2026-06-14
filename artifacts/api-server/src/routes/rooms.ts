@@ -22,8 +22,7 @@ router.get("/events/:eventId/rooms", async (req, res) => {
         createdAt: roomsTable.createdAt,
         participantCount: sql<number>`(
           SELECT COUNT(*)::int FROM ${registrationsTable} r
-          INNER JOIN ${eventsTable} e ON e.form_id = r.form_id
-          WHERE e.id = ${eventId}
+          WHERE r.event_id = ${eventId}
             AND r.room = ${roomsTable.name}
         )`,
       })
@@ -116,8 +115,7 @@ router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
         createdAt: roomsTable.createdAt,
         participantCount: sql<number>`(
           SELECT COUNT(*)::int FROM ${registrationsTable} r
-          INNER JOIN ${eventsTable} e ON e.form_id = r.form_id
-          WHERE e.id = ${eventId}
+          WHERE r.event_id = ${eventId}
             AND r.room = ${roomsTable.name}
         )`,
       })
