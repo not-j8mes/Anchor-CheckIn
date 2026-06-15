@@ -28,10 +28,28 @@ Load via `NODE_OPTIONS="--require /abs/path/disable-tw-esm-hook.cjs"` in the wor
 ```js
 optimizeDeps: {
   noDiscovery: true,
-  include: [],
+  include: [
+    "react",
+    "react-dom",
+    "react-dom/client",
+    "react/jsx-runtime",
+    "react/jsx-dev-runtime",
+    "wouter",
+    "recharts",
+    "@tanstack/react-query",
+  ],
 },
 ```
-With these two settings together Vite skips spawning esbuild for dependency pre-bundling entirely.
+
+**IMPORTANT:** `noDiscovery: true` skips Vite's auto-scan of source files to discover deps, which prevents the startup esbuild crash. But you MUST manually list every CJS package (and any ESM package that imports CJS shims) in `include`. Without this list, CJS packages are served as raw ESM and fail with "does not provide an export named X".
+
+- `react`, `react-dom`, `react-dom/client`, `react/jsx-*` — all CJS in React 19
+- `recharts` — CJS (no `type: "module"`)  
+- `wouter` — ESM but its src files import `use-sync-external-store/shim/index.js` (CJS) which only works when wouter is pre-bundled by esbuild
+
+**Why `include: []` is wrong:** With `noDiscovery: true` AND an empty include list, NO packages are pre-bundled at all — CJS packages like react-dom/client fail immediately with "does not provide an export named 'createRoot'".
+
+**DO NOT add Vite resolve.aliases for `use-sync-external-store/shim`** — string aliases in Vite/esbuild do prefix matching, so `"use-sync-external-store/shim"` → alias will also mangle `"use-sync-external-store/shim/index.js"` into `<aliasPath>/index.js` which doesn't exist. Pre-bundling wouter is the correct fix.
 
 ### 3. Use .mjs config (not .ts) — prevents a third esbuild spawn
 Vite processes a `.ts` config file through esbuild. Rename `vite.config.ts` → `vite.config.mjs` so Vite loads it directly as ES module, no esbuild subprocess needed.

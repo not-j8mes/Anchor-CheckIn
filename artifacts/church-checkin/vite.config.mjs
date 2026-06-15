@@ -51,6 +51,15 @@ export default defineConfig({
   },
   optimizeDeps: {
     noDiscovery: true,
-    include: ["use-sync-external-store/shim"],
+    include: [
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "wouter",
+      "recharts",
+      "@tanstack/react-query",
+    ],
   },
 });
