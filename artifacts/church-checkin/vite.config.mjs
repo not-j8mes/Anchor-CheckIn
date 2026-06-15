@@ -51,6 +51,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     noDiscovery: true,
-    include: [],
+    include: ["use-sync-external-store/shim"],
   },
 });
