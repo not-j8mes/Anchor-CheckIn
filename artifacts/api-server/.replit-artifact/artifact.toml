@@ -10,7 +10,7 @@ name = "API Server"
 paths = ["/api"]
 
 [services.development]
-run = "bash -c 'cd /home/runner/workspace/artifacts/api-server && export NODE_ENV=development && node ./build.mjs && node --enable-source-maps ./dist/index.mjs'"
+run = "bash -c 'cd /home/runner/workspace/artifacts/api-server && NODE_ENV=development node --require ./ts-register.cjs src/index.ts'"
 
 [services.production]
 
