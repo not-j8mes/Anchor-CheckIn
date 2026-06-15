@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { eq, desc, asc, and, sql } from "drizzle-orm";
+import { eq, desc, asc, and, sql, isNotNull } from "drizzle-orm";
 import { createHash } from "crypto";
 import {
   db,
   registrationsTable,
   registrationCustomAnswersTable,
+  registrationGroupsTable,
   formFieldsTable,
   formVersionsTable,
   formVersionFieldsTable,
@@ -162,6 +163,7 @@ router.post("/forms/:formId/register", async (req, res) => {
 
   const { fields: submittedFields } = parsed.data;
   const submittedRoom = (req.body as { room?: string }).room || null;
+  const incomingGroupId = (req.body as { registrationGroupId?: number }).registrationGroupId ?? null;
 
   try {
     // ── Load form ─────────────────────────────────────────────────────────────
@@ -275,6 +277,44 @@ router.post("/forms/:formId/register", async (req, res) => {
       .filter(Boolean)
       .join(" ");
 
+    // ── Resolve registration group ────────────────────────────────────────────
+    // Priority 1: caller supplied a group ID (walk-in multi-child flow)
+    // Priority 2: look for an existing group in this event with the same guardian
+    //             phone — so public-form submissions from the same family auto-join
+    // Priority 3: create a new group
+    let registrationGroupId: number;
+    if (incomingGroupId) {
+      registrationGroupId = incomingGroupId;
+    } else {
+      const guardianPhone = guardianCols["phone"] ?? null;
+      let foundGroupId: number | null = null;
+
+      if (guardianPhone && eventId) {
+        const [existing] = await db
+          .select({ groupId: registrationsTable.registrationGroupId })
+          .from(registrationsTable)
+          .where(
+            and(
+              eq(registrationsTable.eventId, eventId),
+              eq(registrationsTable.guardianPhone, guardianPhone),
+              isNotNull(registrationsTable.registrationGroupId)
+            )
+          )
+          .limit(1);
+        foundGroupId = existing?.groupId ?? null;
+      }
+
+      if (foundGroupId) {
+        registrationGroupId = foundGroupId;
+      } else {
+        const [newGroup] = await db
+          .insert(registrationGroupsTable)
+          .values({ eventId, formId, submittedAt: new Date() })
+          .returning();
+        registrationGroupId = newGroup.id;
+      }
+    }
+
     // ── Insert registration (now includes form_version_id) ────────────────────
     const [registration] = await db
       .insert(registrationsTable)
@@ -284,6 +324,7 @@ router.post("/forms/:formId/register", async (req, res) => {
         formVersionId,
         participantId: participant.id,
         guardianId:    guardian.id,
+        registrationGroupId,
         submittedAt:   new Date(),
         // Legacy flat columns — populated from structured data for backward compat
         childFirstName:   participantCols["first_name"]  ?? "",

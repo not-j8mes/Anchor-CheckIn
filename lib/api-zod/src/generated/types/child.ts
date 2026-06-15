@@ -32,4 +32,6 @@ export interface Child {
   checkinId?: number | null;
   /** @nullable */
   activeCheckinLabelCode?: string | null;
+  /** @nullable */
+  registrationGroupId?: number | null;
 }

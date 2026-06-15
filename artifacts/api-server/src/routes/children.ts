@@ -40,6 +40,7 @@ async function buildChild(reg: typeof registrationsTable.$inferSelect) {
     isCheckedIn: active !== null,
     checkinId: active?.id ?? null,
     activeCheckinLabelCode: active?.labelCode ?? null,
+    registrationGroupId: reg.registrationGroupId ?? null,
   };
 }
 

@@ -33,5 +33,7 @@ export interface Registration {
   emergencyContactRelationship?: string | null;
   /** @nullable */
   room?: string | null;
+  /** @nullable */
+  registrationGroupId?: number | null;
   createdAt: string;
 }

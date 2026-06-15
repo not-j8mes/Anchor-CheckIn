@@ -15,7 +15,7 @@ paths = [ "/" ]
 localPort = 25969
 
 [services.development]
-run = "bash -c 'cd /home/runner/workspace/artifacts/church-checkin && ./node_modules/.bin/vite --config vite.config.ts --host 0.0.0.0'"
+run = "bash -c 'cd /home/runner/workspace/artifacts/church-checkin && NODE_OPTIONS=\"--require /home/runner/workspace/artifacts/church-checkin/disable-tw-esm-hook.cjs\" GOMAXPROCS=1 RAYON_NUM_THREADS=1 UV_THREADPOOL_SIZE=1 ./node_modules/.bin/vite --config vite.config.mjs --host 0.0.0.0'"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/church-checkin", "run", "build" ]

@@ -7,6 +7,7 @@ import {
   useDeleteCheckin,
   useListEvents,
   useSubmitRegistration,
+  useCreateRegistrationGroup,
   useGetOrganization,
   getListChildrenQueryKey,
   getGetFormBySlugQueryKey,
@@ -44,6 +45,8 @@ import {
   Trash2,
   User,
   Printer,
+  Settings,
+  List,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
@@ -64,19 +67,64 @@ function childToLabelData(child: Child, orgName: string): LabelData | null {
   };
 }
 
-function groupByFamily(children: Child[]): Array<{ guardian: string; children: Child[] }> {
-  const map = new Map<string, Child[]>();
+function getAge(dateOfBirth: string | null | undefined): number | null {
+  if (!dateOfBirth) return null;
+  const dob = new Date(dateOfBirth);
+  if (isNaN(dob.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  return age;
+}
+
+interface FamilyGroup {
+  groupId: number | null;
+  guardian: string;
+  guardianPhone: string;
+  children: Child[];
+}
+
+function groupByRegistrationGroup(children: Child[]): FamilyGroup[] {
+  const grouped = new Map<number, Child[]>();
+  const ungrouped: Child[] = [];
+
   for (const child of children) {
-    const key = child.guardianName || "Unknown Guardian";
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(child);
+    if (child.registrationGroupId != null) {
+      if (!grouped.has(child.registrationGroupId)) grouped.set(child.registrationGroupId, []);
+      grouped.get(child.registrationGroupId)!.push(child);
+    } else {
+      ungrouped.push(child);
+    }
   }
-  return Array.from(map.entries()).map(([guardian, children]) => ({ guardian, children }));
+
+  const result: FamilyGroup[] = [];
+
+  for (const [groupId, kids] of grouped.entries()) {
+    const first = kids[0]!;
+    result.push({
+      groupId,
+      guardian: first.guardianName || "Unknown Guardian",
+      guardianPhone: first.guardianPhone || "",
+      children: kids,
+    });
+  }
+
+  // Children with no group ID each appear as their own individual entry
+  for (const child of ungrouped) {
+    result.push({
+      groupId: null,
+      guardian: child.guardianName || "Unknown Guardian",
+      guardianPhone: child.guardianPhone || "",
+      children: [child],
+    });
+  }
+
+  return result;
 }
 
 interface FamilyCardProps {
-  guardian: string;
-  children: Child[];
+  group: FamilyGroup;
   onCheckinFamily: (selected: Child[]) => void;
   onCheckoutChild: (child: Child) => void;
   onUndoCheckin: (child: Child) => void;
@@ -86,8 +134,7 @@ interface FamilyCardProps {
 }
 
 function FamilyCard({
-  guardian,
-  children,
+  group,
   onCheckinFamily,
   onCheckoutChild,
   onUndoCheckin,
@@ -95,8 +142,10 @@ function FamilyCard({
   isCheckingIn,
   loadingCheckinId,
 }: FamilyCardProps) {
+  const { guardian, guardianPhone, children } = group;
   const notCheckedIn = children.filter((c) => !c.isCheckedIn);
   const alreadyCheckedIn = children.filter((c) => c.isCheckedIn);
+  const familyLastName = guardian.split(" ").slice(-1)[0];
 
   const [selected, setSelected] = useState<Set<number>>(
     new Set(notCheckedIn.map((c) => c.id))
@@ -109,63 +158,121 @@ function FamilyCard({
       return next;
     });
 
-  const toggleAll = () =>
-    setSelected(
-      selected.size === notCheckedIn.length
-        ? new Set()
-        : new Set(notCheckedIn.map((c) => c.id))
-    );
-
   const selectedChildren = notCheckedIn.filter((c) => selected.has(c.id));
 
   return (
-    <Card className="overflow-hidden border-primary/20 shadow-md" data-testid={`family-card-${guardian}`}>
-      <div className="bg-primary/5 border-b border-primary/10 px-5 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-foreground">{guardian}</span>
-          <Badge variant="secondary" className="text-xs">
-            {children.length} {children.length === 1 ? "child" : "children"}
-          </Badge>
+    <Card className="overflow-hidden border shadow-md rounded-xl" data-testid={`family-card-${group.groupId ?? guardian}`}>
+      {/* ── Family header ── */}
+      <div className="bg-primary/5 border-b border-primary/10 px-5 py-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Users className="w-4 h-4 text-primary flex-shrink-0" />
+              <span className="font-bold text-base text-foreground">{familyLastName} Family</span>
+              <Badge variant="secondary" className="text-xs">
+                {children.length} {children.length === 1 ? "child" : "children"} registered
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Guardian: {guardian}
+              {guardianPhone && <> · Phone: {guardianPhone}</>}
+            </p>
+          </div>
+          {notCheckedIn.length > 0 && (
+            <Button
+              size="sm"
+              className="flex-shrink-0 gap-1.5"
+              disabled={selectedChildren.length === 0 || isCheckingIn}
+              onClick={() => onCheckinFamily(selectedChildren)}
+              data-testid={`button-checkin-family-${guardian}`}
+            >
+              {isCheckingIn ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking in…</>
+              ) : (
+                <><CheckCheck className="w-3.5 h-3.5" /> Check In Selected ({selectedChildren.length})</>
+              )}
+            </Button>
+          )}
         </div>
-        {notCheckedIn.length > 1 && (
-          <button type="button" onClick={toggleAll} className="text-xs text-primary hover:underline font-medium">
-            {selected.size === notCheckedIn.length ? "Deselect all" : "Select all"}
-          </button>
+        {notCheckedIn.length > 0 && (
+          <p className="text-xs text-muted-foreground/70 mt-2 italic">
+            All children are selected by default for faster family check-in.
+          </p>
         )}
       </div>
 
-      <CardContent className="p-0 divide-y divide-border">
+      {/* ── Child rows ── */}
+      <div className="divide-y divide-border">
+        {notCheckedIn.map((child) => {
+          const isChecked = selected.has(child.id);
+          const age = getAge(child.dateOfBirth);
+          const hasAllergy = !!(child.allergies || child.specialNeeds || child.medicalNotes);
+          return (
+            <div
+              key={child.id}
+              className={`flex items-center gap-3 px-5 py-3.5 cursor-pointer transition-colors ${
+                isChecked ? "bg-primary/5" : "hover:bg-muted/30"
+              }`}
+              onClick={() => toggleChild(child.id)}
+              data-testid={`child-row-${child.id}`}
+            >
+              <Checkbox
+                checked={isChecked}
+                onCheckedChange={() => toggleChild(child.id)}
+                className="pointer-events-none flex-shrink-0"
+                data-testid={`checkbox-child-${child.id}`}
+              />
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm flex-shrink-0">
+                {child.firstName[0]}{child.lastName[0]}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm">{child.firstName} {child.lastName}</span>
+                  {child.room && (
+                    <Badge variant="secondary" className="text-xs font-normal">{child.room}</Badge>
+                  )}
+                  {hasAllergy && (
+                    <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50 gap-1">
+                      <AlertCircle className="w-3 h-3" /> Allergy
+                    </Badge>
+                  )}
+                </div>
+                {age !== null && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Age {age}</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
         {alreadyCheckedIn.map((child) => (
-          <div key={child.id} className="flex items-center gap-4 px-5 py-4 bg-green-50/50" data-testid={`child-row-${child.id}`}>
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center font-serif font-bold text-green-700 text-sm flex-shrink-0">
+          <div key={child.id} className="flex items-center gap-3 px-5 py-3.5 bg-green-50/60" data-testid={`child-row-${child.id}`}>
+            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center font-bold text-green-700 text-sm flex-shrink-0">
               {child.firstName[0]}{child.lastName[0]}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-semibold text-base flex items-center gap-2 flex-wrap">
-                {child.firstName} {child.lastName}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-sm">{child.firstName} {child.lastName}</span>
                 <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
+                {child.room && <Badge variant="secondary" className="text-xs font-normal">{child.room}</Badge>}
               </div>
-              <div className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap">
-                {child.room && <span>{child.room}</span>}
-                {child.activeCheckinLabelCode && (
-                  <span className="font-mono font-bold text-green-700">Code: {child.activeCheckinLabelCode}</span>
-                )}
-              </div>
+              {child.activeCheckinLabelCode && (
+                <p className="text-xs font-mono font-bold text-green-700 mt-0.5">Code: {child.activeCheckinLabelCode}</p>
+              )}
             </div>
             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
               <Button
                 variant="outline"
                 size="sm"
-                className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
+                className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1 h-7 text-xs"
                 disabled={loadingCheckinId === child.checkinId}
                 onClick={() => onCheckoutChild(child)}
                 data-testid={`button-checkout-${child.id}`}
               >
                 {loadingCheckinId === child.checkinId ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-3 h-3 animate-spin" />
                 ) : (
-                  <LogOut className="w-3.5 h-3.5" />
+                  <LogOut className="w-3 h-3" />
                 )}
                 Check Out
               </Button>
@@ -192,64 +299,140 @@ function FamilyCard({
             </div>
           </div>
         ))}
+      </div>
+    </Card>
+  );
+}
 
-        {notCheckedIn.map((child) => {
-          const isChecked = selected.has(child.id);
-          return (
-            <div
-              key={child.id}
-              className={`flex items-center gap-4 px-5 py-4 transition-colors cursor-pointer ${
-                isChecked ? "bg-primary/5" : "hover:bg-muted/30"
-              }`}
-              onClick={() => toggleChild(child.id)}
-              data-testid={`child-row-${child.id}`}
-            >
-              <Checkbox
-                checked={isChecked}
-                onCheckedChange={() => toggleChild(child.id)}
-                className="pointer-events-none"
-                data-testid={`checkbox-child-${child.id}`}
-              />
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-sm flex-shrink-0">
-                {child.firstName[0]}{child.lastName[0]}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-base">{child.firstName} {child.lastName}</div>
-                <div className="text-sm text-muted-foreground flex items-center gap-3 flex-wrap">
-                  {child.room && <span>{child.room}</span>}
-                  {(child.allergies || child.specialNeeds) && (
-                    <span className="flex items-center gap-1 text-amber-600 font-medium">
-                      <AlertCircle className="w-3.5 h-3.5" /> Medical notes
-                    </span>
-                  )}
-                </div>
-              </div>
-              {isChecked && <UserCheck className="w-4 h-4 text-primary flex-shrink-0" />}
+// ─── Individual child card (single-child groups / standard mode) ──────────────
+
+interface IndividualCardProps {
+  child: Child;
+  onCheckin: () => void;
+  onCheckout: (child: Child) => void;
+  onUndoCheckin: (child: Child) => void;
+  onReprintLabel: (child: Child) => void;
+  isCheckingIn: boolean;
+  loadingCheckinId: number | null;
+}
+
+function IndividualCard({
+  child,
+  onCheckin,
+  onCheckout,
+  onUndoCheckin,
+  onReprintLabel,
+  isCheckingIn,
+  loadingCheckinId,
+}: IndividualCardProps) {
+  const age = getAge(child.dateOfBirth);
+  const hasAllergy = !!(child.allergies || child.specialNeeds || child.medicalNotes);
+
+  if (child.isCheckedIn) {
+    return (
+      <Card className="shadow-sm" data-testid={`individual-card-${child.id}`}>
+        <CardContent className="flex items-center gap-4 px-5 py-4">
+          <div className="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center font-bold text-green-700 text-sm flex-shrink-0">
+            {child.firstName[0]}{child.lastName[0]}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-semibold text-base">{child.firstName} {child.lastName}</span>
+              <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
+              {child.room && <Badge variant="secondary" className="text-xs font-normal">{child.room}</Badge>}
+              {hasAllergy && (
+                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50 gap-1">
+                  <AlertCircle className="w-3 h-3" /> Allergy
+                </Badge>
+              )}
             </div>
-          );
-        })}
-      </CardContent>
-
-      {notCheckedIn.length > 0 && (
-        <div className="px-5 py-4 border-t border-border bg-background">
-          <Button
-            className="w-full h-12 text-base font-bold gap-2"
-            disabled={selectedChildren.length === 0 || isCheckingIn}
-            onClick={() => onCheckinFamily(selectedChildren)}
-            data-testid={`button-checkin-family-${guardian}`}
-          >
-            {isCheckingIn ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Checking in...</>
-            ) : (
-              <><CheckCheck className="w-5 h-5" />
-                Check In {selectedChildren.length > 1
-                  ? `${selectedChildren.length} Children`
-                  : selectedChildren[0]?.firstName || "Child"}
-              </>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {child.guardianName && <>Parent/Guardian: {child.guardianName}</>}
+              {child.guardianPhone && <> · {child.guardianPhone}</>}
+              {age !== null && <> · Age {age}</>}
+            </p>
+            {child.activeCheckinLabelCode && (
+              <p className="text-xs font-mono font-bold text-green-700 mt-0.5">Code: {child.activeCheckinLabelCode}</p>
             )}
-          </Button>
+          </div>
+          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
+              disabled={loadingCheckinId === child.checkinId}
+              onClick={() => onCheckout(child)}
+              data-testid={`button-checkout-${child.id}`}
+            >
+              {loadingCheckinId === child.checkinId ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <LogOut className="w-3.5 h-3.5" />
+              )}
+              Check Out
+            </Button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+                onClick={() => onUndoCheckin(child)}
+                data-testid={`button-undo-checkin-${child.id}`}
+              >
+                <Undo2 className="w-3 h-3" /> Undo check-in
+              </button>
+              {child.activeCheckinLabelCode && (
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                  onClick={() => onReprintLabel(child)}
+                  data-testid={`button-reprint-${child.id}`}
+                >
+                  <Printer className="w-3 h-3" /> Reprint
+                </button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="shadow-sm" data-testid={`individual-card-${child.id}`}>
+      <CardContent className="flex items-center gap-4 px-5 py-4">
+        <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm flex-shrink-0">
+          {child.firstName[0]}{child.lastName[0]}
         </div>
-      )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-base">{child.firstName} {child.lastName}</span>
+            {child.room && <Badge variant="secondary" className="text-xs font-normal">{child.room}</Badge>}
+            {hasAllergy && (
+              <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50 gap-1">
+                <AlertCircle className="w-3 h-3" /> Allergy
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {child.guardianName && <>Parent/Guardian: {child.guardianName}</>}
+            {child.guardianPhone && <> · {child.guardianPhone}</>}
+            {age !== null && <> · Age {age}</>}
+          </p>
+        </div>
+        <Button
+          size="sm"
+          className="flex-shrink-0 gap-1.5"
+          disabled={isCheckingIn}
+          onClick={onCheckin}
+          data-testid={`button-checkin-${child.id}`}
+        >
+          {isCheckingIn ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <><CheckCheck className="w-3.5 h-3.5" /> Check In</>
+          )}
+        </Button>
+      </CardContent>
     </Card>
   );
 }
@@ -319,6 +502,7 @@ function WalkInDialog({ open, onOpenChange, onSuccess, event }: WalkInDialogProp
 
   const submitRegistration = useSubmitRegistration();
   const batchCheckin = useBatchCheckin();
+  const createRegistrationGroup = useCreateRegistrationGroup();
 
   const reset = () => { setGuardianAnswers({}); setChildrenAnswers([{}]); };
 
@@ -327,13 +511,21 @@ function WalkInDialog({ open, onOpenChange, onSuccess, event }: WalkInDialogProp
     if (!form) return;
     setSubmitting(true);
     try {
+      // Create a shared group so all children in this walk-in appear together
+      const group = await createRegistrationGroup.mutateAsync({
+        data: { eventId: event.id, formId: form.id },
+      });
+
       const registrationIds: number[] = [];
       for (const childAnswerMap of childrenAnswers) {
         const fields = [
           ...guardianFields.map((f) => ({ fieldId: f.id, value: guardianAnswers[f.id] ?? "" })),
           ...childFields.map((f) => ({ fieldId: f.id, value: childAnswerMap[f.id] ?? "" })),
         ];
-        const reg = await submitRegistration.mutateAsync({ formId: form.id, data: { fields } });
+        const reg = await submitRegistration.mutateAsync({
+          formId: form.id,
+          data: { fields, registrationGroupId: group.id },
+        });
         registrationIds.push((reg as { id: number }).id);
       }
       const result = await batchCheckin.mutateAsync({
@@ -431,6 +623,84 @@ function WalkInDialog({ open, onOpenChange, onSuccess, event }: WalkInDialogProp
   );
 }
 
+// ─── Check-In Settings dialog ─────────────────────────────────────────────────
+
+type DisplayMode = "standard" | "family_grouping";
+
+function CheckinSettingsDialog({
+  open,
+  onOpenChange,
+  displayMode,
+  onDisplayModeChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  displayMode: DisplayMode;
+  onDisplayModeChange: (mode: DisplayMode) => void;
+}) {
+  const options: { value: DisplayMode; label: string; description: string }[] = [
+    {
+      value: "standard",
+      label: "Standard List",
+      description:
+        "Show every registrant as their own card. Best when staff check people in one at a time.",
+    },
+    {
+      value: "family_grouping",
+      label: "Family Grouping",
+      description:
+        "Group children from the same family registration into one card. Best when parents check in multiple children at once.",
+    },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-primary" />
+            Check-In Settings
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <p className="text-sm font-semibold text-foreground">Check-In List Display Mode</p>
+          <div className="space-y-3">
+            {options.map((opt) => {
+              const active = displayMode === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                    active
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                  onClick={() => onDisplayModeChange(opt.value)}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                        active ? "border-primary bg-primary" : "border-muted-foreground"
+                      }`}
+                    >
+                      {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{opt.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface EventSelectorProps {
   onSelect: (event: Event) => void;
 }
@@ -507,6 +777,8 @@ export default function CheckinKiosk() {
   const [printLabels, setPrintLabels] = useState<boolean>(() => {
     return localStorage.getItem("checkin:printLabels") !== "false";
   });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("standard");
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -514,6 +786,23 @@ export default function CheckinKiosk() {
     setPrintLabels(val);
     localStorage.setItem("checkin:printLabels", String(val));
   };
+
+  const handleDisplayModeChange = (mode: DisplayMode) => {
+    setDisplayMode(mode);
+    if (selectedEvent) {
+      localStorage.setItem(`checkin:displayMode:${selectedEvent.id}`, mode);
+    }
+  };
+
+  useEffect(() => {
+    if (!selectedEvent) return;
+    const saved = localStorage.getItem(`checkin:displayMode:${selectedEvent.id}`);
+    if (saved === "standard" || saved === "family_grouping") {
+      setDisplayMode(saved);
+    } else {
+      setDisplayMode("standard");
+    }
+  }, [selectedEvent?.id]);
 
   const childrenParams = {
     search: debouncedSearch || undefined,
@@ -574,9 +863,9 @@ export default function CheckinKiosk() {
   const refreshResults = () =>
     queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey(childrenParams) });
 
-  const handleCheckinFamily = async (familyGuardian: string, selectedChildren: Child[]) => {
+  const handleCheckinFamily = async (group: FamilyGroup, selectedChildren: Child[]) => {
     if (selectedChildren.length === 0) return;
-    setCheckingInGuardian(familyGuardian);
+    setCheckingInGuardian(group.groupId != null ? String(group.groupId) : group.guardian);
     try {
       const result = await batchCheckin.mutateAsync({
         data: {
@@ -591,7 +880,7 @@ export default function CheckinKiosk() {
       handleAutoPrint(result.labels as LabelData[]);
       toast({
         title: result.labels.length > 1
-          ? `${result.labels.length} children checked in for ${familyGuardian}`
+          ? `${result.labels.length} children checked in for ${group.guardian}`
           : `${selectedChildren[0]?.firstName} checked in!`,
       });
     } catch {
@@ -629,7 +918,17 @@ export default function CheckinKiosk() {
     }
   };
 
-  const families = children ? groupByFamily(children) : [];
+  const families: FamilyGroup[] =
+    !children
+      ? []
+      : displayMode === "family_grouping"
+      ? groupByRegistrationGroup(children)
+      : children.map((child) => ({
+          groupId: child.registrationGroupId ?? null,
+          guardian: child.guardianName || "Unknown Guardian",
+          guardianPhone: child.guardianPhone || "",
+          children: [child],
+        }));
   const showResults = debouncedSearch.length > 1;
 
   if (!selectedEvent) {
@@ -669,6 +968,16 @@ export default function CheckinKiosk() {
               aria-label="Print labels on check-in"
             />
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => setSettingsOpen(true)}
+            title="Check-In Settings"
+          >
+            <Settings className="w-4 h-4" />
+            <span className="hidden sm:inline">Settings</span>
+          </Button>
           <Button variant="outline" size="sm" className="gap-2 w-28" onClick={() => setWalkInOpen(true)}>
             <UserPlus className="w-4 h-4" /> Walk-in
           </Button>
@@ -738,24 +1047,58 @@ export default function CheckinKiosk() {
                 </Card>
               ) : (
                 <>
-                  <p className="text-sm text-muted-foreground font-medium px-1">
-                    {families.length === 1
-                      ? `1 family found · ${children?.length} ${children?.length === 1 ? "child" : "children"}`
-                      : `${families.length} families found · ${children?.length} children total`}
+                  <p className="text-sm text-muted-foreground font-medium px-1 flex items-center gap-2">
+                    <span>
+                      {children?.length === 1
+                        ? "1 child found"
+                        : `${children?.length} children found`}
+                      {displayMode === "family_grouping" &&
+                        families.filter((f) => f.children.length > 1).length > 0 && (
+                          <>
+                            {" · "}
+                            {families.filter((f) => f.children.length > 1).length}{" "}
+                            {families.filter((f) => f.children.length > 1).length === 1
+                              ? "family group"
+                              : "family groups"}
+                          </>
+                        )}
+                    </span>
+                    {displayMode === "family_grouping" && (
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        <Users className="w-3 h-3" /> Family Grouping
+                      </Badge>
+                    )}
                   </p>
-                  {families.map((family) => (
-                    <FamilyCard
-                      key={family.guardian}
-                      guardian={family.guardian}
-                      children={family.children}
-                      onCheckinFamily={(selected) => handleCheckinFamily(family.guardian, selected)}
-                      onCheckoutChild={handleCheckoutChild}
-                      onUndoCheckin={handleUndoCheckin}
-                      onReprintLabel={handleReprintLabel}
-                      isCheckingIn={checkingInGuardian === family.guardian}
-                      loadingCheckinId={loadingCheckinId}
-                    />
-                  ))}
+                  {families.map((family) => {
+                    const groupKey = family.groupId != null ? String(family.groupId) : family.guardian;
+                    if (family.children.length === 1) {
+                      const child = family.children[0]!;
+                      return (
+                        <IndividualCard
+                          key={groupKey}
+                          child={child}
+                          onCheckin={() => handleCheckinFamily(family, [child])}
+                          onCheckout={handleCheckoutChild}
+                          onUndoCheckin={handleUndoCheckin}
+                          onReprintLabel={handleReprintLabel}
+                          isCheckingIn={checkingInGuardian === groupKey}
+                          loadingCheckinId={loadingCheckinId}
+                        />
+                      );
+                    }
+                    return (
+                      <FamilyCard
+                        key={groupKey}
+                        group={family}
+                        onCheckinFamily={(selected) => handleCheckinFamily(family, selected)}
+                        onCheckoutChild={handleCheckoutChild}
+                        onUndoCheckin={handleUndoCheckin}
+                        onReprintLabel={handleReprintLabel}
+                        isCheckingIn={checkingInGuardian === groupKey}
+                        loadingCheckinId={loadingCheckinId}
+                      />
+                    );
+                  })}
                 </>
               )}
             </div>
@@ -781,6 +1124,12 @@ export default function CheckinKiosk() {
           event={selectedEvent}
         />
       )}
+      <CheckinSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        displayMode={displayMode}
+        onDisplayModeChange={handleDisplayModeChange}
+      />
     </div>
   );
 }

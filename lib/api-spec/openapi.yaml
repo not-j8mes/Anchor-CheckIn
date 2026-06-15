@@ -20,6 +20,8 @@ tags:
     description: Form fields (new architecture — system + custom fields)
   - name: registrations
     description: Form registrations/submissions
+  - name: registration_groups
+    description: Family/group registration grouping
   - name: children
     description: Child records
   - name: checkins
@@ -798,6 +800,25 @@ paths:
         "204":
           description: Deleted
 
+  /registration-groups:
+    post:
+      operationId: createRegistrationGroup
+      tags: [registration_groups]
+      summary: Create a new registration group (family session)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRegistrationGroupInput"
+      responses:
+        "201":
+          description: Created registration group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationGroup"
+
   /children:
     get:
       operationId: listChildren
@@ -1417,6 +1438,8 @@ components:
           type: ["string", "null"]
         room:
           type: ["string", "null"]
+        registrationGroupId:
+          type: ["integer", "null"]
         createdAt:
           type: string
 
@@ -1551,6 +1574,11 @@ components:
         room:
           type: string
           description: Room name chosen by the registrant (used when roomAssignmentMode is registrant_chooses)
+        registrationGroupId:
+          type: integer
+          description: >
+            Optional. Assign this registration to an existing registration group
+            (family session). If omitted, a new group is created automatically.
 
     UpdateRoomInput:
       type: object
@@ -1643,6 +1671,8 @@ components:
           type: ["integer", "null"]
         activeCheckinLabelCode:
           type: ["string", "null"]
+        registrationGroupId:
+          type: ["integer", "null"]
 
     CheckIn:
       type: object
@@ -2170,5 +2200,32 @@ components:
       required: [name]
       properties:
         name:
+          type: string
+
+    RegistrationGroup:
+      type: object
+      required: [id, createdAt]
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: ["integer", "null"]
+        formId:
+          type: ["integer", "null"]
+        groupName:
+          type: ["string", "null"]
+        submittedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    CreateRegistrationGroupInput:
+      type: object
+      properties:
+        eventId:
+          type: integer
+        formId:
+          type: integer
+        groupName:
           type: string
 

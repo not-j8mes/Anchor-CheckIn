@@ -32,6 +32,7 @@ import type {
   CreateCheckin409,
   CreateEventCategoryInput,
   CreateEventInput,
+  CreateRegistrationGroupInput,
   DashboardStats,
   DayCount,
   Event,
@@ -55,6 +56,7 @@ import type {
   QuestionInput,
   Registration,
   RegistrationDetail,
+  RegistrationGroup,
   RegistrationInput,
   RegistrationUpdateInput,
   ReorderFieldsInput,
@@ -2810,6 +2812,77 @@ export const useDeleteRoom = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteRoomMutationOptions(options));
+    }
+
+export const getCreateRegistrationGroupUrl = () => {
+
+
+
+
+  return `/api/registration-groups`
+}
+
+/**
+ * @summary Create a new registration group (family session)
+ */
+export const createRegistrationGroup = async (createRegistrationGroupInput: CreateRegistrationGroupInput, options?: RequestInit): Promise<RegistrationGroup> => {
+
+  return customFetch<RegistrationGroup>(getCreateRegistrationGroupUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      createRegistrationGroupInput,)
+  }
+);}
+
+
+
+
+export const getCreateRegistrationGroupMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRegistrationGroup>>, TError,{data: BodyType<CreateRegistrationGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRegistrationGroup>>, TError,{data: BodyType<CreateRegistrationGroupInput>}, TContext> => {
+
+const mutationKey = ['createRegistrationGroup'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRegistrationGroup>>, {data: BodyType<CreateRegistrationGroupInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createRegistrationGroup(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRegistrationGroupMutationResult = NonNullable<Awaited<ReturnType<typeof createRegistrationGroup>>>
+    export type CreateRegistrationGroupMutationBody = BodyType<CreateRegistrationGroupInput>
+    export type CreateRegistrationGroupMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new registration group (family session)
+ */
+export const useCreateRegistrationGroup = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRegistrationGroup>>, TError,{data: BodyType<CreateRegistrationGroupInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createRegistrationGroup>>,
+        TError,
+        {data: BodyType<CreateRegistrationGroupInput>},
+        TContext
+      > => {
+      return useMutation(getCreateRegistrationGroupMutationOptions(options));
     }
 
 export const getListChildrenUrl = (params?: ListChildrenParams,) => {

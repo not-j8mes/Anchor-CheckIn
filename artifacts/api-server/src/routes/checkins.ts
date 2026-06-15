@@ -1,9 +1,10 @@
 import { Router } from "express";
-import { eq, gte, desc, and, inArray, isNull } from "drizzle-orm";
+import { eq, gte, desc, and, inArray, isNull, isNotNull } from "drizzle-orm";
 import {
   db,
   checkinsTable,
   registrationsTable,
+  registrationGroupsTable,
   organizationsTable,
   formsTable,
   eventsTable,
@@ -38,7 +39,7 @@ function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
 
 // Walk-in: register a new child and immediately check them in
 router.post("/checkins/walkin", async (req, res) => {
-  const { eventId, childFirstName, childLastName, guardianName, guardianPhone } = req.body as Record<string, unknown>;
+  const { eventId, childFirstName, childLastName, guardianName, guardianPhone, registrationGroupId: incomingGroupId } = req.body as Record<string, unknown>;
   if (
     typeof eventId !== "number" ||
     typeof childFirstName !== "string" || !childFirstName.trim() ||
@@ -78,6 +79,43 @@ router.post("/checkins/walkin", async (req, res) => {
       canPickUp: true,
     });
 
+    // Resolve group ID:
+    // 1. Caller passed one (multi-child walk-in — already created a shared group)
+    // 2. Look for existing group in this event with the same guardian phone
+    // 3. Create a new group
+    let registrationGroupId: number;
+    if (typeof incomingGroupId === "number") {
+      registrationGroupId = incomingGroupId;
+    } else {
+      const phone = typeof guardianPhone === "string" ? guardianPhone.trim() : null;
+      let foundGroupId: number | null = null;
+
+      if (phone) {
+        const [existing] = await db
+          .select({ groupId: registrationsTable.registrationGroupId })
+          .from(registrationsTable)
+          .where(
+            and(
+              eq(registrationsTable.eventId, eventId),
+              eq(registrationsTable.guardianPhone, phone),
+              isNotNull(registrationsTable.registrationGroupId)
+            )
+          )
+          .limit(1);
+        foundGroupId = existing?.groupId ?? null;
+      }
+
+      if (foundGroupId) {
+        registrationGroupId = foundGroupId;
+      } else {
+        const [newGroup] = await db
+          .insert(registrationGroupsTable)
+          .values({ eventId, formId: event.formId, submittedAt: new Date() })
+          .returning();
+        registrationGroupId = newGroup.id;
+      }
+    }
+
     const [registration] = await db
       .insert(registrationsTable)
       .values({
@@ -85,6 +123,7 @@ router.post("/checkins/walkin", async (req, res) => {
         eventId,
         participantId: participant.id,
         guardianId: guardian.id,
+        registrationGroupId,
         submittedAt: new Date(),
         childFirstName,
         childLastName,
@@ -111,6 +150,7 @@ router.post("/checkins/walkin", async (req, res) => {
 
     res.status(201).json({
       checkin: serializeCheckin(checkin),
+      registrationGroupId,
       labelData: {
         childName: `${childFirstName} ${childLastName}`,
         guardianName,

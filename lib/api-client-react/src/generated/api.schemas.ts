@@ -249,6 +249,8 @@ export interface Registration {
   emergencyContactRelationship?: string | null;
   /** @nullable */
   room?: string | null;
+  /** @nullable */
+  registrationGroupId?: number | null;
   createdAt: string;
 }
 
@@ -366,6 +368,9 @@ export interface RegistrationInput {
   fields: FieldSubmission[];
   /** Room name chosen by the registrant (used when roomAssignmentMode is registrant_chooses) */
   room?: string;
+  /** Optional. Assign this registration to an existing registration group (family session). If omitted, a new group is created automatically.
+   */
+  registrationGroupId?: number;
 }
 
 export interface UpdateRoomInput {
@@ -413,6 +418,8 @@ export interface Child {
   checkinId?: number | null;
   /** @nullable */
   activeCheckinLabelCode?: string | null;
+  /** @nullable */
+  registrationGroupId?: number | null;
 }
 
 export interface CheckIn {
@@ -747,6 +754,25 @@ export interface CreateEventCategoryInput {
 
 export interface UpdateEventCategoryInput {
   name: string;
+}
+
+export interface RegistrationGroup {
+  id: number;
+  /** @nullable */
+  eventId?: number | null;
+  /** @nullable */
+  formId?: number | null;
+  /** @nullable */
+  groupName?: string | null;
+  /** @nullable */
+  submittedAt?: string | null;
+  createdAt: string;
+}
+
+export interface CreateRegistrationGroupInput {
+  eventId?: number;
+  formId?: number;
+  groupName?: string;
 }
 
 export type UpdateRegistrationCustomAnswers200 = {

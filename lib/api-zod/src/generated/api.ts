@@ -701,7 +701,8 @@ export const SubmitRegistrationBody = zod.object({
   "fieldId": zod.number().describe('The form_fields.id this answer is for.'),
   "value": zod.string().describe('The submitted value (always a string; checkboxes use \"true\"\/\"false\").')
 })).describe('One entry per form field submitted. System fields are routed to the appropriate participant\/guardian\/emergency_contact columns server-side. Custom question answers are stored in registration_custom_answers.\n'),
-  "room": zod.string().optional().describe('Room name chosen by the registrant (used when roomAssignmentMode is registrant_chooses)')
+  "room": zod.string().optional().describe('Room name chosen by the registrant (used when roomAssignmentMode is registrant_chooses)'),
+  "registrationGroupId": zod.number().optional().describe('Optional. Assign this registration to an existing registration group (family session). If omitted, a new group is created automatically.\n')
 })
 
 
@@ -729,6 +730,7 @@ export const ListRegistrationsResponseItem = zod.object({
   "emergencyContactPhone": zod.string().nullish(),
   "emergencyContactRelationship": zod.string().nullish(),
   "room": zod.string().nullish(),
+  "registrationGroupId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 export const ListRegistrationsResponse = zod.array(ListRegistrationsResponseItem)
@@ -837,6 +839,7 @@ export const UpdateRegistrationResponse = zod.object({
   "emergencyContactPhone": zod.string().nullish(),
   "emergencyContactRelationship": zod.string().nullish(),
   "room": zod.string().nullish(),
+  "registrationGroupId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -877,6 +880,7 @@ export const UpdateRegistrationRoomResponse = zod.object({
   "emergencyContactPhone": zod.string().nullish(),
   "emergencyContactRelationship": zod.string().nullish(),
   "room": zod.string().nullish(),
+  "registrationGroupId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -984,6 +988,16 @@ export const DeleteRoomParams = zod.object({
 
 
 /**
+ * @summary Create a new registration group (family session)
+ */
+export const CreateRegistrationGroupBody = zod.object({
+  "eventId": zod.number().optional(),
+  "formId": zod.number().optional(),
+  "groupName": zod.string().optional()
+})
+
+
+/**
  * @summary List all children
  */
 export const ListChildrenQueryParams = zod.object({
@@ -1007,7 +1021,8 @@ export const ListChildrenResponseItem = zod.object({
   "registrationId": zod.number().optional(),
   "isCheckedIn": zod.boolean().optional(),
   "checkinId": zod.number().nullish(),
-  "activeCheckinLabelCode": zod.string().nullish()
+  "activeCheckinLabelCode": zod.string().nullish(),
+  "registrationGroupId": zod.number().nullish()
 })
 export const ListChildrenResponse = zod.array(ListChildrenResponseItem)
 
@@ -1035,7 +1050,8 @@ export const GetChildResponse = zod.object({
   "registrationId": zod.number().optional(),
   "isCheckedIn": zod.boolean().optional(),
   "checkinId": zod.number().nullish(),
-  "activeCheckinLabelCode": zod.string().nullish()
+  "activeCheckinLabelCode": zod.string().nullish(),
+  "registrationGroupId": zod.number().nullish()
 })
 
 
@@ -1294,6 +1310,7 @@ export const GetDashboardStatsResponse = zod.object({
   "emergencyContactPhone": zod.string().nullish(),
   "emergencyContactRelationship": zod.string().nullish(),
   "room": zod.string().nullish(),
+  "registrationGroupId": zod.number().nullish(),
   "createdAt": zod.string()
 })).optional()
 })

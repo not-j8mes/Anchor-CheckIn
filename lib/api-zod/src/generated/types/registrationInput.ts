@@ -13,4 +13,7 @@ export interface RegistrationInput {
   fields: FieldSubmission[];
   /** Room name chosen by the registrant (used when roomAssignmentMode is registrant_chooses) */
   room?: string;
+  /** Optional. Assign this registration to an existing registration group (family session). If omitted, a new group is created automatically.
+   */
+  registrationGroupId?: number;
 }
