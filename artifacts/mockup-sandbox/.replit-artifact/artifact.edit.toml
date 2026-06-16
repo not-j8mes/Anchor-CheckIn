@@ -14,4 +14,4 @@ PORT = "8081"
 BASE_PATH = "/__mockup"
 
 [services.development]
-run = "bash -c 'cd /home/runner/workspace/artifacts/mockup-sandbox && NODE_OPTIONS=\"--require ./disable-tw-esm-hook.cjs\" GOMAXPROCS=1 RAYON_NUM_THREADS=1 UV_THREADPOOL_SIZE=1 ./node_modules/.bin/vite --config vite.config.mjs --host 0.0.0.0'"
+run = "node -e \"require('http').createServer((_,r)=>r.end('ok')).listen(8081,'0.0.0.0');console.log('stub ready')\""
