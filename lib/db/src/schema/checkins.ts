@@ -1,8 +1,9 @@
-import { pgTable, serial, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, timestamp, integer, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { registrationsTable } from "./registrations";
+import { registrationsTable, registrationGroupsTable } from "./registrations";
 import { eventSessionsTable } from "./event_sessions";
+import { eventsTable } from "./events";
 
 export const checkinsTable = pgTable("checkins", {
   id: serial("id").primaryKey(),
@@ -26,3 +27,26 @@ export const checkinsTable = pgTable("checkins", {
 export const insertCheckinSchema = createInsertSchema(checkinsTable).omit({ id: true, checkinAt: true });
 export type InsertCheckin = z.infer<typeof insertCheckinSchema>;
 export type Checkin = typeof checkinsTable.$inferSelect;
+
+/**
+ * Stores a persistent family pickup/security code for a (event, registration_group) pair.
+ * Used when "Keep family pickup code the same" is enabled on the Check-In Desk so that
+ * late-arriving siblings receive the same code as earlier check-ins.
+ */
+export const familyEventCodesTable = pgTable(
+  "family_event_codes",
+  {
+    id: serial("id").primaryKey(),
+    eventId: integer("event_id")
+      .notNull()
+      .references(() => eventsTable.id, { onDelete: "cascade" }),
+    registrationGroupId: integer("registration_group_id")
+      .notNull()
+      .references(() => registrationGroupsTable.id, { onDelete: "cascade" }),
+    labelCode: text("label_code").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("fec_event_group_unique").on(t.eventId, t.registrationGroupId),
+  ]
+);

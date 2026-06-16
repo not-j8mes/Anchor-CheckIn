@@ -5,6 +5,7 @@ import {
   checkinsTable,
   registrationsTable,
   registrationGroupsTable,
+  familyEventCodesTable,
   organizationsTable,
   formsTable,
   eventsTable,
@@ -26,6 +27,43 @@ function generateLabelCode(): string {
     code += chars[byte % chars.length];
   }
   return code;
+}
+
+/**
+ * When "Keep family pickup code the same" is enabled, return the existing family code
+ * for this (event, registrationGroup) pair, creating one if none exists yet.
+ * Returns null when the registration has no group or event to key on.
+ */
+async function getFamilyLabelCode(eventId: number | null | undefined, registrationGroupId: number | null | undefined): Promise<string | null> {
+  if (!eventId || !registrationGroupId) return null;
+  const [existing] = await db
+    .select({ labelCode: familyEventCodesTable.labelCode })
+    .from(familyEventCodesTable)
+    .where(
+      and(
+        eq(familyEventCodesTable.eventId, eventId),
+        eq(familyEventCodesTable.registrationGroupId, registrationGroupId)
+      )
+    )
+    .limit(1);
+  if (existing) return existing.labelCode;
+  const newCode = generateLabelCode();
+  await db
+    .insert(familyEventCodesTable)
+    .values({ eventId, registrationGroupId, labelCode: newCode })
+    .onConflictDoNothing();
+  // Re-fetch in case a concurrent insert won the race
+  const [row] = await db
+    .select({ labelCode: familyEventCodesTable.labelCode })
+    .from(familyEventCodesTable)
+    .where(
+      and(
+        eq(familyEventCodesTable.eventId, eventId),
+        eq(familyEventCodesTable.registrationGroupId, registrationGroupId)
+      )
+    )
+    .limit(1);
+  return row?.labelCode ?? newCode;
 }
 
 function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
@@ -217,13 +255,27 @@ router.post("/checkins/bulk-checkout", async (req, res) => {
 
 // Batch check-in — must be registered BEFORE /checkins/:checkinId routes
 router.post("/checkins/batch", async (req, res) => {
-  const { items } = req.body as { items: Array<{ registrationId: number; room?: string }> };
+  const { items, reuseFamilyCode } = req.body as { items: Array<{ registrationId: number; room?: string }>; reuseFamilyCode?: boolean };
   if (!Array.isArray(items) || items.length === 0) {
     res.status(400).json({ error: "items array is required" });
     return;
   }
   try {
-    const sharedLabelCode = generateLabelCode();
+    // Resolve the shared label code: look up or create a family code if reuseFamilyCode is on,
+    // otherwise generate a fresh shared code for this batch session.
+    let sharedLabelCode: string;
+    if (reuseFamilyCode && items[0]) {
+      const firstReg = await db
+        .select({ eventId: registrationsTable.eventId, registrationGroupId: registrationsTable.registrationGroupId })
+        .from(registrationsTable)
+        .where(eq(registrationsTable.id, items[0].registrationId))
+        .limit(1);
+      sharedLabelCode =
+        (await getFamilyLabelCode(firstReg[0]?.eventId, firstReg[0]?.registrationGroupId)) ??
+        generateLabelCode();
+    } else {
+      sharedLabelCode = generateLabelCode();
+    }
     const orgs = await db.select().from(organizationsTable).limit(1);
     const orgName = orgs[0]?.name ?? "Church";
 
@@ -327,7 +379,7 @@ router.post("/checkins", async (req, res) => {
     return;
   }
   try {
-    const { registrationId, room, sessionId } = parsed.data;
+    const { registrationId, room, sessionId, reuseFamilyCode } = parsed.data;
 
     // Prevent duplicate active check-ins for the same registration
     const [activeCheckin] = await db
@@ -350,7 +402,9 @@ router.post("/checkins", async (req, res) => {
       return;
     }
     const r = reg[0];
-    const labelCode = generateLabelCode();
+    const labelCode = reuseFamilyCode
+      ? (await getFamilyLabelCode(r.eventId, r.registrationGroupId)) ?? generateLabelCode()
+      : generateLabelCode();
     const [checkin] = await db
       .insert(checkinsTable)
       .values({

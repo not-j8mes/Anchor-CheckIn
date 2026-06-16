@@ -9,4 +9,5 @@ import type { BatchCheckinInputItemsItem } from './batchCheckinInputItemsItem';
 
 export interface BatchCheckinInput {
   items: BatchCheckinInputItemsItem[];
+  reuseFamilyCode?: boolean;
 }

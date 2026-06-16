@@ -1719,6 +1719,8 @@ components:
           type: string
         sessionId:
           type: integer
+        reuseFamilyCode:
+          type: boolean
 
     CheckoutInput:
       type: object
@@ -1797,6 +1799,8 @@ components:
                 type: integer
               room:
                 type: string
+        reuseFamilyCode:
+          type: boolean
 
     BatchCheckinResult:
       type: object

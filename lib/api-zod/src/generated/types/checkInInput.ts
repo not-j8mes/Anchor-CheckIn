@@ -10,4 +10,5 @@ export interface CheckInInput {
   registrationId: number;
   room?: string;
   sessionId?: number;
+  reuseFamilyCode?: boolean;
 }

@@ -450,6 +450,7 @@ export interface CheckInInput {
   registrationId: number;
   room?: string;
   sessionId?: number;
+  reuseFamilyCode?: boolean;
 }
 
 export interface CheckoutInput {
@@ -496,6 +497,7 @@ export type BatchCheckinInputItemsItem = {
 
 export interface BatchCheckinInput {
   items: BatchCheckinInputItemsItem[];
+  reuseFamilyCode?: boolean;
 }
 
 export interface BatchCheckinResult {

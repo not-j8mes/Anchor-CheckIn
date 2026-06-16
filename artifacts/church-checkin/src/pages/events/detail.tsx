@@ -94,7 +94,6 @@ import {
   Settings,
   Tag,
   ChevronRight,
-  ChevronUp,
   User,
   Repeat,
   MoreHorizontal,
@@ -2300,11 +2299,17 @@ function CheckinDeskSettingsDialog({
   onOpenChange,
   displayMode,
   onDisplayModeChange,
+  familyCodeEnabled,
+  onFamilyCodeEnabledChange,
+  showFamilyCodeSetting,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   displayMode: DeskDisplayMode;
   onDisplayModeChange: (mode: DeskDisplayMode) => void;
+  familyCodeEnabled: boolean;
+  onFamilyCodeEnabledChange: (v: boolean) => void;
+  showFamilyCodeSetting: boolean;
 }) {
   const options: { value: DeskDisplayMode; label: string; description: string }[] = [
     {
@@ -2317,7 +2322,7 @@ function CheckinDeskSettingsDialog({
       value: "family_grouping",
       label: "Family Grouping",
       description:
-        "Group children from the same family registration into one card. Best when parents check in multiple children at once.",
+        "Group children from the same family registration inside a shared section. Best when parents check in multiple children at once.",
     },
   ];
 
@@ -2330,37 +2335,69 @@ function CheckinDeskSettingsDialog({
             Check-In Settings
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-2">
-          <p className="text-sm font-semibold text-foreground">Check-In List Display Mode</p>
+        <div className="space-y-6 py-2">
+          {/* Display mode */}
           <div className="space-y-3">
-            {options.map((opt) => {
-              const active = displayMode === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                    active ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
-                  }`}
-                  onClick={() => onDisplayModeChange(opt.value)}
-                >
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                        active ? "border-primary bg-primary" : "border-muted-foreground"
-                      }`}
-                    >
-                      {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+            <p className="text-sm font-semibold text-foreground">Check-In List Display Mode</p>
+            <div className="space-y-3">
+              {options.map((opt) => {
+                const active = displayMode === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      active ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                    }`}
+                    onClick={() => onDisplayModeChange(opt.value)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+                          active ? "border-primary bg-primary" : "border-muted-foreground"
+                        }`}
+                      >
+                        {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{opt.label}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-sm">{opt.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Family pickup code setting — only shown for child security events */}
+          {showFamilyCodeSetting && (
+            <>
+              <div className="border-t border-border" />
+              <div className="space-y-3">
+                <p className="text-sm font-semibold text-foreground">Security Pickup Codes</p>
+                <div className="flex items-start justify-between gap-4 p-4 rounded-lg border border-border">
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <Label htmlFor="family-code-toggle" className="text-sm font-medium cursor-pointer">
+                      Keep family pickup code the same
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Use one pickup/security code for the entire family during this event, even if siblings are checked in at different times.
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 italic">
+                      Recommended when parents may drop off siblings at different times.
+                    </p>
+                  </div>
+                  <Switch
+                    id="family-code-toggle"
+                    checked={familyCodeEnabled}
+                    onCheckedChange={onFamilyCodeEnabledChange}
+                    className="shrink-0 mt-0.5"
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -2411,7 +2448,6 @@ function FamilyGroupDeskCard({
   const notCheckedIn = items.filter((p) => p.status === "not_checked_in");
   const checkedIn = items.filter((p) => p.status === "checked_in");
 
-  const [expanded, setExpanded] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(
     new Set(notCheckedIn.map((p) => p.reg.id))
   );
@@ -2424,113 +2460,49 @@ function FamilyGroupDeskCard({
     });
 
   const selectedRegs = notCheckedIn.filter((p) => selected.has(p.reg.id)).map((p) => p.reg);
-
   const familyLastName = guardian.split(" ").slice(-1)[0];
+  const childCount = items.length;
+  const allCheckedIn = notCheckedIn.length === 0 && checkedIn.length > 0;
 
-  const statusSummary =
-    notCheckedIn.length === 0
-      ? checkedIn.length === items.length
-        ? "All checked in"
-        : `${checkedIn.length} checked in · ${items.length - checkedIn.length} checked out`
-      : checkedIn.length > 0
-      ? `${checkedIn.length} checked in · ${notCheckedIn.length} not checked in`
-      : `${notCheckedIn.length} not checked in`;
-
-  const childNamePreview = items
-    .slice(0, 4)
-    .map((p) => `${p.reg.childFirstName} ${p.reg.childLastName}`)
-    .join(", ") + (items.length > 4 ? ` +${items.length - 4} more` : "");
-
-  // ── Collapsed ───────────────────────────────────────────────────────────────
-  if (!expanded) {
-    return (
-      <Card className="transition-colors border-primary/15">
-        <CardContent className="px-4 py-4 flex items-start gap-4">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Users className="w-5 h-5 text-primary" />
-          </div>
-
-          <div className="flex-1 min-w-0 space-y-0.5">
-            <div className="flex items-center flex-wrap gap-2">
-              <span className="font-semibold text-base leading-tight">{familyLastName} Family</span>
-              <Badge variant="secondary" className="text-[10px] h-5">{items.length} children</Badge>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Guardian: {guardian}{guardianPhone && <> · {guardianPhone}</>}
-            </div>
-            <div className="text-xs text-muted-foreground truncate">{childNamePreview}</div>
-            <div className="text-xs text-muted-foreground">{statusSummary}</div>
-          </div>
-
-          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-            {notCheckedIn.length > 0 ? (
-              <Button
-                className="gap-2 h-9 px-4 font-semibold text-sm"
-                disabled={isGroupCheckinLoading}
-                onClick={() => onCheckinSelected(notCheckedIn.map((p) => p.reg))}
-              >
-                {isGroupCheckinLoading
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <LogIn className="w-3.5 h-3.5" />}
-                Check In Family
-              </Button>
-            ) : (
-              <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">All Checked In</Badge>
-            )}
-            <button
-              type="button"
-              className="text-xs text-primary hover:underline flex items-center gap-0.5 font-medium"
-              onClick={() => setExpanded(true)}
-            >
-              View children <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // ── Expanded ─────────────────────────────────────────────────────────────────
   return (
-    <Card className="overflow-hidden border-primary/20 shadow-md">
-      {/* Expanded header */}
-      <div className="bg-primary/5 border-b border-primary/10 px-4 py-2.5 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <Users className="w-4 h-4 text-primary flex-shrink-0" />
-          <span className="font-semibold text-sm">{familyLastName} Family</span>
-          <span className="text-xs text-muted-foreground">
-            {guardian}{guardianPhone && <> · {guardianPhone}</>}
-          </span>
-          <Badge variant="secondary" className="text-xs">{items.length} children</Badge>
-        </div>
-        <div className="flex items-center gap-3">
-          {notCheckedIn.length > 1 && (
-            <button
-              type="button"
-              className="text-xs text-primary hover:underline font-medium"
-              onClick={() =>
-                setSelected(
-                  selected.size === notCheckedIn.length
-                    ? new Set()
-                    : new Set(notCheckedIn.map((p) => p.reg.id))
-                )
-              }
+    <div className="rounded-xl border-2 border-slate-300 dark:border-slate-600 shadow-sm overflow-hidden">
+      {/* Family header */}
+      <div className="px-4 pt-2 pb-2.5 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-100 dark:border-blue-900/40">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+            <Users className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
+            <span className="font-semibold text-sm">{familyLastName} Family</span>
+            <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+              {childCount} {childCount === 1 ? "child" : "children"}
+            </Badge>
+          </div>
+          {notCheckedIn.length > 0 ? (
+            <Button
+              size="sm"
+              className="gap-1.5 h-7 px-3 text-xs font-semibold shrink-0"
+              disabled={selectedRegs.length === 0 || isGroupCheckinLoading}
+              onClick={() => onCheckinSelected(selectedRegs)}
             >
-              {selected.size === notCheckedIn.length ? "Deselect all" : "Select all"}
-            </button>
-          )}
-          <button
-            type="button"
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5"
-            onClick={() => setExpanded(false)}
-          >
-            Collapse <ChevronUp className="w-3 h-3" />
-          </button>
+              {isGroupCheckinLoading
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <LogIn className="w-3 h-3" />}
+              {selectedRegs.length === 0
+                ? "Select Children"
+                : selectedRegs.length === notCheckedIn.length
+                  ? "Check In Family"
+                  : `Check In Selected (${selectedRegs.length})`}
+            </Button>
+          ) : allCheckedIn ? (
+            <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px] shrink-0">All Checked In</Badge>
+          ) : null}
+        </div>
+        <div className="text-xs text-muted-foreground mt-1">
+          Guardian: {guardian}{guardianPhone && <> · {guardianPhone}</>}
         </div>
       </div>
 
-      {/* Child rows */}
-      <CardContent className="p-0 divide-y divide-border">
+      {/* Individual child cards — same visual style as standalone registrant cards */}
+      <div className="p-3 space-y-2 bg-muted/20">
         {items.map(({ reg, checkin, status }) => {
           const acting = loadingId === reg.id;
           const isNotIn = status === "not_checked_in";
@@ -2538,119 +2510,144 @@ function FamilyGroupDeskCard({
             status === "checked_in" ? "bg-green-100 text-green-800" :
             status === "checked_out" ? "bg-amber-100 text-amber-800" :
             "bg-primary/10 text-primary";
+          const cardCls =
+            status === "checked_in" ? "border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-950/20" :
+            status === "checked_out" ? "border-amber-200 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/20" :
+            "";
 
           return (
-            <div
+            <Card
               key={reg.id}
-              className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
-                isNotIn && selected.has(reg.id) ? "bg-primary/5" : "hover:bg-muted/30"
-              }`}
+              className={`transition-colors cursor-pointer ${cardCls}`}
               onClick={() => isNotIn ? toggleChild(reg.id) : onOpenDetail(reg.id)}
             >
-              {isNotIn ? (
-                <Checkbox
-                  checked={selected.has(reg.id)}
-                  onCheckedChange={() => toggleChild(reg.id)}
-                  className="pointer-events-none flex-shrink-0"
-                />
-              ) : (
-                <div className="w-4 h-4 flex-shrink-0" />
-              )}
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-serif font-bold text-xs flex-shrink-0 ${avatarCls}`}>
-                {reg.childFirstName[0]}{reg.childLastName[0]}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center flex-wrap gap-1.5">
-                  <span className="font-medium text-sm">{reg.childFirstName} {reg.childLastName}</span>
-                  {reg.room && <Badge className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50 rounded-full">{reg.room}</Badge>}
-                  {reg.allergies && <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">Allergy</Badge>}
-                  {reg.specialNeeds && <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">Medical</Badge>}
-                  {status === "checked_in" && <Badge className="text-[10px] h-5 bg-green-100 text-green-800 border-green-200 rounded-full">✓ In</Badge>}
-                  {status === "checked_out" && <Badge className="text-[10px] h-5 bg-amber-100 text-amber-800 border-amber-200 rounded-full">Out</Badge>}
+              <CardContent className="px-4 py-4 flex items-start gap-3">
+                {/* Avatar — same size and style as standalone cards */}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5 ${avatarCls}`}>
+                  {reg.childFirstName[0]}{reg.childLastName[0]}
                 </div>
-                {status === "checked_in" && checkin && labelType === "child_security" && checkin.labelCode && (
-                  <span className="font-mono text-[10px] text-muted-foreground">Code: {checkin.labelCode}</span>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                {status === "checked_in" && checkin && (
-                  <>
-                    {requireCheckout && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1 h-7 text-xs border-amber-300 text-amber-800 hover:bg-amber-50"
-                        disabled={acting}
-                        onClick={() => onCheckout(reg, checkin)}
-                      >
-                        {acting ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogOut className="w-3 h-3" />}
-                        Out
-                      </Button>
+
+                {/* Info — same layout as standalone cards */}
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center flex-wrap gap-2">
+                    <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
+                    {reg.room && (
+                      <Badge className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50 rounded-full font-medium">{reg.room}</Badge>
                     )}
-                    <button
-                      type="button"
-                      className="text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-0.5"
-                      onClick={() => onUndoCheckin(checkin.id, reg.id)}
-                    >
-                      <Undo2 className="w-2.5 h-2.5" /> Undo
-                    </button>
-                    <button
-                      type="button"
-                      className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-0.5"
-                      onClick={() => onReprint(reg, checkin)}
-                    >
-                      <Printer className="w-2.5 h-2.5" /> Reprint
-                    </button>
-                  </>
-                )}
-                {status === "checked_out" && checkin && (
-                  <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1 text-xs h-7"
-                      disabled={acting}
-                      onClick={() => onIndividualCheckin(reg)}
-                    >
-                      {acting ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <LogIn className="w-2.5 h-2.5" />}
-                      Re-check In
-                    </Button>
-                    <button
-                      type="button"
-                      className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-0.5"
-                      onClick={() => onUndoCheckout(checkin.id, reg.id)}
-                    >
-                      <Undo2 className="w-2.5 h-2.5" /> Undo Checkout
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
+                    {reg.allergies && (
+                      <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">Allergy</Badge>
+                    )}
+                    {reg.specialNeeds && (
+                      <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">Medical</Badge>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-xs">
+                    {status === "not_checked_in" && (
+                      <span className="text-muted-foreground">
+                        Registered {format(new Date(reg.createdAt), "MMM d")}
+                      </span>
+                    )}
+                    {status === "checked_in" && checkin && (
+                      <div className="space-y-1.5">
+                        <span className="text-green-700 font-medium flex items-center gap-1.5">
+                          <LogIn className="w-3 h-3" />
+                          Checked in {format(new Date(checkin.checkinAt), "h:mm a")}
+                        </span>
+                        {labelType === "child_security" && checkin.labelCode && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground font-medium">Pickup Code</span>
+                            <span className="font-mono font-bold tracking-widest text-sm bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-1 rounded-md">
+                              {checkin.labelCode}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {status === "checked_out" && checkin && (
+                      <span className="text-amber-700 font-medium flex items-center gap-1.5">
+                        <LogOut className="w-3 h-3" />
+                        Out {checkin.checkoutAt ? format(new Date(checkin.checkoutAt), "h:mm a") : ""}
+                        {checkin.labelCode && (
+                          <span className="font-mono text-muted-foreground ml-1">{checkin.labelCode}</span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions — checkbox on right for eligible children; secondary actions for checked-in/out */}
+                <div className="flex flex-col items-end gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {isNotIn && (
+                    acting
+                      ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground mt-3" />
+                      : <Checkbox
+                          checked={selected.has(reg.id)}
+                          onCheckedChange={() => toggleChild(reg.id)}
+                          className="mt-3"
+                        />
+                  )}
+                  {status === "checked_in" && checkin && (
+                    <>
+                      {requireCheckout ? (
+                        <Button
+                          variant="outline"
+                          className="gap-2 h-11 px-5 font-semibold min-w-[108px] border-amber-300 text-amber-800 hover:bg-amber-50 hover:border-amber-400"
+                          disabled={acting}
+                          onClick={() => onCheckout(reg, checkin)}
+                        >
+                          {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+                          Check Out
+                        </Button>
+                      ) : (
+                        <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
+                      )}
+                      <button
+                        type="button"
+                        className="text-[11px] text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+                        disabled={acting}
+                        onClick={() => onUndoCheckin(checkin.id, reg.id)}
+                      >
+                        <Undo2 className="w-3 h-3" /> Undo
+                      </button>
+                      <button
+                        type="button"
+                        className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                        onClick={() => onReprint(reg, checkin)}
+                      >
+                        <Printer className="w-3 h-3" /> Reprint
+                      </button>
+                    </>
+                  )}
+                  {status === "checked_out" && checkin && (
+                    <>
+                      <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Checked Out</Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-xs h-7 min-w-[96px]"
+                        disabled={acting}
+                        onClick={() => onIndividualCheckin(reg)}
+                      >
+                        {acting ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogIn className="w-3 h-3" />}
+                        Check In Again
+                      </Button>
+                      <button
+                        type="button"
+                        className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+                        disabled={acting}
+                        onClick={() => onUndoCheckout(checkin.id, reg.id)}
+                      >
+                        <Undo2 className="w-3 h-3" /> Undo Checkout
+                      </button>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           );
         })}
-      </CardContent>
-
-      {/* Check In Selected footer — only when there are unchecked children */}
-      {notCheckedIn.length > 0 && (
-        <div className="px-4 py-3 border-t border-border bg-background">
-          <Button
-            className="w-full gap-2 font-semibold"
-            disabled={selectedRegs.length === 0 || isGroupCheckinLoading}
-            onClick={() => onCheckinSelected(selectedRegs)}
-          >
-            {isGroupCheckinLoading ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Checking in...</>
-            ) : (
-              <><LogIn className="w-4 h-4" />
-                {selectedRegs.length === notCheckedIn.length
-                  ? "Check In All"
-                  : `Check In Selected (${selectedRegs.length})`}
-              </>
-            )}
-          </Button>
-        </div>
-      )}
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -2751,7 +2748,11 @@ function CheckInDeskContent({
   const [pendingPrintLabel, setPendingPrintLabel] = useState<LabelData | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [displayMode, setDisplayMode] = useState<DeskDisplayMode>("standard");
+  const [familyCodeEnabled, setFamilyCodeEnabled] = useState(false);
   const [batchLoadingGroupId, setBatchLoadingGroupId] = useState<string | null>(null);
+
+  // Family code setting is only relevant when printing child-security labels
+  const showFamilyCodeSetting = isChildEvent && labelType === "child_security";
 
   // Dialog state
   const [pendingCheckinReg, setPendingCheckinReg] = useState<Registration | null>(null);
@@ -2761,12 +2762,27 @@ function CheckInDeskContent({
   useEffect(() => {
     const saved = localStorage.getItem(`checkin:displayMode:${eventId}`);
     if (saved === "standard" || saved === "family_grouping") setDisplayMode(saved);
-    else setDisplayMode("standard");
-  }, [eventId]);
+    else setDisplayMode(isChildEvent ? "family_grouping" : "standard");
+  }, [eventId, isChildEvent]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(`checkin:familyCode:${eventId}`);
+    if (saved === "on" || saved === "off") {
+      setFamilyCodeEnabled(saved === "on");
+    } else {
+      // Default ON for child security events
+      setFamilyCodeEnabled(showFamilyCodeSetting);
+    }
+  }, [eventId, showFamilyCodeSetting]);
 
   const handleDisplayModeChange = (mode: DeskDisplayMode) => {
     setDisplayMode(mode);
     localStorage.setItem(`checkin:displayMode:${eventId}`, mode);
+  };
+
+  const handleFamilyCodeEnabledChange = (v: boolean) => {
+    setFamilyCodeEnabled(v);
+    localStorage.setItem(`checkin:familyCode:${eventId}`, v ? "on" : "off");
   };
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
@@ -2838,7 +2854,13 @@ function CheckInDeskContent({
 
   const doCheckin = (reg: Registration) => {
     setLoadingId(reg.id);
-    createCheckin.mutate({ data: { registrationId: reg.id, sessionId: selectedSessionId ?? undefined } });
+    createCheckin.mutate({
+      data: {
+        registrationId: reg.id,
+        sessionId: selectedSessionId ?? undefined,
+        reuseFamilyCode: familyCodeEnabled || undefined,
+      },
+    });
   };
 
   const handleCheckinClick = (reg: Registration) => {
@@ -2850,7 +2872,10 @@ function CheckInDeskContent({
     setBatchLoadingGroupId(groupKey);
     try {
       const result = await batchCheckin.mutateAsync({
-        data: { items: regs.map((r) => ({ registrationId: r.id, room: r.room ?? undefined })) },
+        data: {
+          items: regs.map((r) => ({ registrationId: r.id, room: r.room ?? undefined })),
+          reuseFamilyCode: familyCodeEnabled || undefined,
+        },
       });
       invalidate();
       if (printLabels && result.labels?.length) {
@@ -2922,6 +2947,25 @@ function CheckInDeskContent({
       (checkin?.labelCode ?? "").toLowerCase().includes(q)
     );
   }, [participants, filter, search]);
+
+  // In family grouping mode with an active search: expand results to include all
+  // siblings from the same group so the whole family rectangle appears together.
+  const filteredForGrouping = useMemo(() => {
+    if (!search.trim() || !isChildEvent) return filtered;
+    const matchingGroupIds = new Set<number>();
+    for (const p of filtered) {
+      if (p.reg.registrationGroupId != null) matchingGroupIds.add(p.reg.registrationGroupId);
+    }
+    if (matchingGroupIds.size === 0) return filtered;
+    const statusPool = filter === "all" ? participants : participants.filter((p) => p.status === filter);
+    const directMatchIds = new Set(filtered.map((p) => p.reg.id));
+    const expanded = statusPool.filter(
+      (p) =>
+        directMatchIds.has(p.reg.id) ||
+        (p.reg.registrationGroupId != null && matchingGroupIds.has(p.reg.registrationGroupId))
+    );
+    return expanded;
+  }, [filtered, search, isChildEvent, filter, participants]);
 
   const isLoading = regsLoading || checkinsLoading;
 
@@ -3117,8 +3161,109 @@ function CheckInDeskContent({
         </Card>
       ) : displayMode === "family_grouping" && isChildEvent ? (
         <div className="space-y-3">
-          {groupForDesk(filtered as DeskParticipant[]).map((group) => {
+          {groupForDesk(filteredForGrouping as DeskParticipant[]).map((group) => {
             const groupKey = group.groupId != null ? String(group.groupId) : `ungrouped-${group.items[0]!.reg.id}`;
+
+            // Single-registrant groups render as standard individual cards (no family rectangle)
+            if (group.items.length < 2) {
+              const { reg, checkin, status } = group.items[0]!;
+              const acting = loadingId === reg.id;
+              const avatarCls =
+                status === "checked_in" ? "bg-green-100 text-green-800" :
+                status === "checked_out" ? "bg-amber-100 text-amber-800" :
+                "bg-primary/10 text-primary";
+              const cardCls =
+                status === "checked_in" ? "border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-950/20" :
+                status === "checked_out" ? "border-amber-200 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/20" :
+                "";
+              return (
+                <div key={groupKey} className="px-3">
+                <Card
+                  className={`transition-colors cursor-pointer ${cardCls}`}
+                  onClick={() => setSelectedRegId(reg.id)}
+                >
+                  <CardContent className="px-4 py-4 flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5 ${avatarCls}`}>
+                      {reg.childFirstName[0]}{reg.childLastName[0]}
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center flex-wrap gap-2">
+                        <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
+                        {reg.room && <Badge className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-50 rounded-full font-medium">{reg.room}</Badge>}
+                        {reg.allergies && <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">Allergy</Badge>}
+                        {reg.specialNeeds && <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">Medical</Badge>}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+                        <span><span className="font-medium text-foreground/80">Parent/Guardian:</span> {reg.guardianName || "—"}{reg.guardianPhone && <> · {reg.guardianPhone}</>}</span>
+                      </div>
+                      {status === "checked_in" && checkin && (
+                        <div className="space-y-1.5 text-xs">
+                          <span className="text-green-700 font-medium flex items-center gap-1.5">
+                            <LogIn className="w-3 h-3" />
+                            Checked in {format(new Date(checkin.checkinAt), "h:mm a")}
+                          </span>
+                          {labelType === "child_security" && checkin.labelCode && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground font-medium">Pickup Code</span>
+                              <span className="font-mono font-bold tracking-widest text-sm bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-1 rounded-md">
+                                {checkin.labelCode}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {status === "checked_out" && checkin && (
+                        <span className="text-xs text-amber-700 font-medium flex items-center gap-1.5">
+                          <LogOut className="w-3 h-3" />
+                          Out {checkin.checkoutAt ? format(new Date(checkin.checkoutAt), "h:mm a") : ""}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {status === "not_checked_in" && (
+                        <Button className="gap-2 h-11 px-5 font-semibold min-w-[108px]" disabled={acting} onClick={() => handleCheckinClick(reg)}>
+                          {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+                          Check In
+                        </Button>
+                      )}
+                      {status === "checked_in" && checkin && (
+                        <>
+                          {requireCheckout ? (
+                            <Button variant="outline" className="gap-2 h-11 px-5 font-semibold min-w-[108px] border-amber-300 text-amber-800 hover:bg-amber-50 hover:border-amber-400" disabled={acting} onClick={() => setPendingCheckout({ reg, checkin })}>
+                              {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+                              Check Out
+                            </Button>
+                          ) : (
+                            <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
+                          )}
+                          <button type="button" className="text-[11px] text-muted-foreground hover:text-destructive flex items-center gap-1" disabled={acting} onClick={() => { setLoadingId(reg.id); deleteCheckinMutation.mutate({ checkinId: checkin.id }); }}>
+                            <Undo2 className="w-3 h-3" /> Undo
+                          </button>
+                          <button type="button" className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1" onClick={() => { const d: LabelData = { childName: `${reg.childFirstName} ${reg.childLastName}`, guardianName: reg.guardianName ?? "", labelCode: checkin.labelCode, checkinDate: checkin.checkinAt, room: reg.room ?? null, allergies: reg.allergies ?? null, specialNeeds: reg.specialNeeds ?? null }; printLabelDirectly([d], labelType); }}>
+                            <Printer className="w-3 h-3" /> Reprint
+                          </button>
+                        </>
+                      )}
+                      {status === "checked_out" && checkin && (
+                        <>
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Checked Out</Badge>
+                          <Button size="sm" variant="outline" className="gap-1 text-xs h-7 min-w-[96px]" disabled={acting} onClick={() => handleCheckinClick(reg)}>
+                            {acting ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogIn className="w-3 h-3" />}
+                            Check In Again
+                          </Button>
+                          <button type="button" className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1" disabled={acting} onClick={() => { setLoadingId(reg.id); undoCheckoutMutation.mutate({ checkinId: checkin.id }); }}>
+                            <Undo2 className="w-3 h-3" /> Undo Checkout
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+                </div>
+              );
+            }
+
+            // Multi-child groups render inside a family rectangle
             return (
               <FamilyGroupDeskCard
                 key={groupKey}
@@ -3448,6 +3593,9 @@ function CheckInDeskContent({
         onOpenChange={setSettingsOpen}
         displayMode={displayMode}
         onDisplayModeChange={handleDisplayModeChange}
+        familyCodeEnabled={familyCodeEnabled}
+        onFamilyCodeEnabledChange={handleFamilyCodeEnabledChange}
+        showFamilyCodeSetting={showFamilyCodeSetting}
       />
     </div>
   );

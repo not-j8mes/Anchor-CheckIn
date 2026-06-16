@@ -1094,7 +1094,8 @@ export const BatchCheckinBody = zod.object({
   "items": zod.array(zod.object({
   "registrationId": zod.number(),
   "room": zod.string().optional()
-}))
+})),
+  "reuseFamilyCode": zod.boolean().optional()
 })
 
 
@@ -1132,7 +1133,8 @@ export const ListCheckinsResponse = zod.array(ListCheckinsResponseItem)
 export const CreateCheckinBody = zod.object({
   "registrationId": zod.number(),
   "room": zod.string().optional(),
-  "sessionId": zod.number().optional()
+  "sessionId": zod.number().optional(),
+  "reuseFamilyCode": zod.boolean().optional()
 })
 
 
