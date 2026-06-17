@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, organizationsTable } from "@workspace/db";
+import { db, DEFAULT_ORGANIZATION_NAME, organizationsTable } from "@workspace/db";
 import { UpdateOrganizationBody } from "@workspace/api-zod";
 
 const router = Router();
@@ -8,7 +8,7 @@ const router = Router();
 async function ensureOrg() {
   const existing = await db.select().from(organizationsTable).limit(1);
   if (existing.length === 0) {
-    await db.insert(organizationsTable).values({ name: "My Church" });
+    await db.insert(organizationsTable).values({ name: DEFAULT_ORGANIZATION_NAME });
   }
   return db.select().from(organizationsTable).limit(1).then((r) => r[0]);
 }

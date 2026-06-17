@@ -66,6 +66,8 @@ import {
   subMonths,
 } from "date-fns";
 
+const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
+
 function categoryLabel(type: string, categories: EventCategory[]) {
   return categories.find((c) => c.slug === type)?.name ?? type;
 }
@@ -778,7 +780,7 @@ export default function EventSelectionScreen() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-foreground min-w-0 shrink-0">
             <img src={appLogo} alt="logo" className="w-6 h-6 object-contain shrink-0" />
-            <span className="font-serif font-bold text-base whitespace-nowrap">{org?.name || "Anchor Events"}</span>
+            <span className="font-serif font-bold text-base whitespace-nowrap">{org?.name || DEFAULT_ORGANIZATION_NAME}</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">

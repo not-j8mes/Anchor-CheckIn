@@ -45,6 +45,8 @@ import { AlertTriangle, ArrowLeft, Database, Moon, Sun, Trash2, Tag, Plus, Penci
 import appLogo from "@assets/image_1781393408862.png";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 
+const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
+
 // ─── Event Categories Card ────────────────────────────────────────────────────
 
 function EventCategoriesCard() {
@@ -307,7 +309,7 @@ export default function Settings() {
           <div className="max-w-3xl mx-auto px-6 h-14 flex items-center gap-4">
             <div className="flex items-center gap-2 text-foreground">
               <img src={appLogo} alt="logo" className="w-6 h-6 object-contain" />
-              <span className="font-serif font-bold text-base">Church Check-In</span>
+              <span className="font-serif font-bold text-base">{DEFAULT_ORGANIZATION_NAME}</span>
             </div>
           </div>
         </header>
@@ -328,7 +330,7 @@ export default function Settings() {
         <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-foreground">
             <img src={appLogo} alt="logo" className="w-6 h-6 object-contain" />
-            <span className="font-serif font-bold text-base">Church Check-In</span>
+            <span className="font-serif font-bold text-base">{DEFAULT_ORGANIZATION_NAME}</span>
           </div>
           <Button asChild variant="ghost" size="sm">
             <Link href="/events">
@@ -431,13 +433,12 @@ export default function Settings() {
               </div>
             </div>
           </CardContent>
+          <CardFooter className="justify-end border-t border-border pt-4">
+            <Button type="submit" disabled={updateOrg.isPending}>
+              {updateOrg.isPending ? "Saving..." : "Save Branding"}
+            </Button>
+          </CardFooter>
         </Card>
-
-        <div className="flex justify-end">
-          <Button type="submit" disabled={updateOrg.isPending}>
-            {updateOrg.isPending ? "Saving..." : "Save Settings"}
-          </Button>
-        </div>
       </form>
 
       {/* Event Categories */}

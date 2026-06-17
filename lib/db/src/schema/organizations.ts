@@ -2,9 +2,11 @@ import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
+export const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
+
 export const organizationsTable = pgTable("organizations", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull().default("My Church"),
+  name: text("name").notNull().default(DEFAULT_ORGANIZATION_NAME),
   logoUrl: text("logo_url"),
   headerText: text("header_text"),
   address: text("address"),

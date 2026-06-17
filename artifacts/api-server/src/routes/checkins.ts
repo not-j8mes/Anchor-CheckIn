@@ -6,6 +6,7 @@ import {
   registrationsTable,
   registrationGroupsTable,
   familyEventCodesTable,
+  DEFAULT_ORGANIZATION_NAME,
   organizationsTable,
   formsTable,
   eventsTable,
@@ -201,7 +202,7 @@ router.post("/checkins/walkin", async (req, res) => {
 
     const labelCode = generateLabelCode();
     const orgs = await db.select().from(organizationsTable).limit(1);
-    const orgName = orgs[0]?.name ?? "Church";
+    const orgName = orgs[0]?.name ?? DEFAULT_ORGANIZATION_NAME;
 
     const [checkin] = await db
       .insert(checkinsTable)
@@ -311,7 +312,7 @@ router.post("/checkins/batch", async (req, res) => {
       sharedLabelCode = generateLabelCode();
     }
     const orgs = await db.select().from(organizationsTable).limit(1);
-    const orgName = orgs[0]?.name ?? "Church";
+    const orgName = orgs[0]?.name ?? DEFAULT_ORGANIZATION_NAME;
 
     const checkins: ReturnType<typeof serializeCheckin>[] = [];
     const labels: object[] = [];
@@ -485,7 +486,7 @@ router.post("/checkins", async (req, res) => {
     }
 
     const orgs = await db.select().from(organizationsTable).limit(1);
-    const orgName = orgs[0]?.name ?? "Church";
+    const orgName = orgs[0]?.name ?? DEFAULT_ORGANIZATION_NAME;
 
     const labelData = {
       childName: `${r.childFirstName} ${r.childLastName}`,

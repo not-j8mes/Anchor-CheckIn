@@ -1,6 +1,8 @@
 import { format } from "date-fns";
 import type { LabelData } from "@workspace/api-client-react";
 
+const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
+
 // ---------------------------------------------------------------------------
 // Name-sizing helpers
 // ---------------------------------------------------------------------------
@@ -79,7 +81,7 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
 
   <!-- Header (full width) -->
   <div style="padding:2mm 3.5mm;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #000000;flex-shrink:0;">
-    <span style="font-size:6.5pt;font-weight:800;color:#000000;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;">${escHtml(label.organizationName || "Church Check-In")}</span>
+    <span style="font-size:6.5pt;font-weight:800;color:#000000;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;">${escHtml(label.organizationName || DEFAULT_ORGANIZATION_NAME)}</span>
     <span style="font-size:6pt;font-weight:600;color:#000000;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr + counter)}</span>
   </div>
 
@@ -131,7 +133,7 @@ export function renderParentPickupLabelHtml(label: LabelData): string {
 
   <!-- Header -->
   <div style="padding:2mm 3.5mm;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #000000;flex-shrink:0;">
-    <span style="font-size:6.5pt;font-weight:800;color:#000000;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;">${escHtml(label.organizationName || "Church Check-In")}</span>
+    <span style="font-size:6.5pt;font-weight:800;color:#000000;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;">${escHtml(label.organizationName || DEFAULT_ORGANIZATION_NAME)}</span>
     <span style="font-size:6pt;font-weight:600;color:#000000;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr)}</span>
   </div>
 

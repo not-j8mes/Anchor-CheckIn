@@ -36,6 +36,13 @@
       "when": 1781712000000,
       "tag": "0004_active_checkin_uniqueness",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781713000000,
+      "tag": "0005_anchor_events_default_org",
+      "breakpoints": true
     }
   ]
 }
