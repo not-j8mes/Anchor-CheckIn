@@ -3001,10 +3001,10 @@ function FamilyGroupDeskCard({
                   ? <Loader2 className="w-3 h-3 animate-spin" />
                   : <LogIn className="w-3 h-3" />}
                 {selectedRegs.length === 0
-                  ? "No Children Selected"
+                  ? "No children selected"
                   : selectedRegs.length === 1
-                    ? "Check In 1 Child"
-                    : `Check In ${selectedRegs.length} Children`}
+                    ? "Check in 1 child"
+                    : `Check in ${selectedRegs.length} children`}
               </Button>
             )}
             {showBatchCheckout ? (
@@ -3664,6 +3664,11 @@ function CheckInDeskContent({
                 <span className="w-1.5 h-1.5 rounded-full bg-[#4A7DFF]" />
                 Upcoming
               </span>
+            ) : selectedSessionDate && selectedSessionDate < today ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+                Past session
+              </span>
             ) : null}
           </div>
           {/* Utility controls: top-right of the page */}
@@ -3793,28 +3798,6 @@ function CheckInDeskContent({
         </div>
       )}
 
-      {/* Search + Add Registrant */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
-          <Input
-            className="pl-11 h-12 text-base"
-            placeholder={
-              isChildEvent
-                ? "Search child, guardian, phone, room, or pickup code…"
-                : "Search participant, contact, phone, or room…"
-            }
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        {isChildEvent && (
-          <Button className="shrink-0 gap-2 h-12 px-5 text-base font-semibold" onClick={() => setAddRegOpen(true)}>
-            <Plus className="w-5 h-5" /> Add Registrant
-          </Button>
-        )}
-      </div>
-
       {/* Filter pills */}
       <div className="flex flex-wrap gap-2">
         {(["all", "not_checked_in", "checked_in", "checked_out"] as DeskFilter[]).map((f) => {
@@ -3841,6 +3824,42 @@ function CheckInDeskContent({
         })}
       </div>
 
+      {/* Registrants section */}
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-base font-semibold">Registrants</h2>
+          <p className="text-sm text-muted-foreground">
+            {counts.all} registered{displayMode === "family_grouping" ? " · Family grouping on" : ""}
+          </p>
+        </div>
+
+        {/* Search + Add Registrant */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
+            <Input
+              className="pl-11 h-12 text-base"
+              placeholder={
+                isChildEvent
+                  ? "Search child, guardian, phone, room, or pickup code…"
+                  : "Search participant, contact, phone, or room…"
+              }
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          {isChildEvent && (
+            <Button className="shrink-0 gap-2 h-12 px-5 text-base font-semibold" onClick={() => setAddRegOpen(true)}>
+              <Plus className="w-5 h-5" /> Add Registrant
+            </Button>
+          )}
+        </div>
+
+        {displayMode === "family_grouping" && isChildEvent && (
+          <p className="text-xs text-muted-foreground">Click a child card to include/exclude from family check-in. Use the pencil icon to edit details.</p>
+        )}
+      </div>
+
       {/* Participant cards */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
@@ -3861,7 +3880,6 @@ function CheckInDeskContent({
         </Card>
       ) : displayMode === "family_grouping" && isChildEvent ? (
         <div className="space-y-4">
-          <p className="px-1 text-xs text-muted-foreground">Click a child card to include/exclude from family check-in. Use the pencil icon to edit details.</p>
           {groupForDesk(filteredForGrouping as DeskParticipant[]).map((group) => {
             const groupKey = group.groupId != null ? String(group.groupId) : `ungrouped-${group.items[0]!.reg.id}`;
 
