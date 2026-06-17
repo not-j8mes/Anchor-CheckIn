@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq, desc, asc, and, sql, isNotNull } from "drizzle-orm";
+import { eq, desc, asc, and, sql, isNotNull, inArray } from "drizzle-orm";
 import { createHash } from "crypto";
 import {
   db,
@@ -31,7 +31,7 @@ const router = Router();
 // ─── System field → DB column mapping ────────────────────────────────────────
 // Mirrors the dbColumn values in artifacts/church-checkin/src/lib/systemFields.ts.
 
-type FieldTable = "participants" | "guardians" | "emergency_contacts";
+type FieldTable = "participants" | "guardians" | "emergency_contacts" | "registrations";
 
 const SYSTEM_KEY_MAP: Record<string, { table: FieldTable; column: string }> = {
   // Child check-in fields
@@ -48,6 +48,11 @@ const SYSTEM_KEY_MAP: Record<string, { table: FieldTable; column: string }> = {
   guardian_last_name:              { table: "guardians",          column: "last_name"     },
   guardian_email:                  { table: "guardians",          column: "email"         },
   guardian_phone:                  { table: "guardians",          column: "phone"         },
+  secondary_guardian_first_name:    { table: "registrations",      column: "secondary_guardian_first_name" },
+  secondary_guardian_last_name:     { table: "registrations",      column: "secondary_guardian_last_name"  },
+  secondary_guardian_phone:         { table: "registrations",      column: "secondary_guardian_phone"      },
+  secondary_guardian_email:         { table: "registrations",      column: "secondary_guardian_email"      },
+  secondary_guardian_relationship:  { table: "registrations",      column: "secondary_guardian_relationship" },
   emergency_contact_name:          { table: "emergency_contacts", column: "name"          },
   emergency_contact_phone:         { table: "emergency_contacts", column: "phone"         },
   emergency_contact_relationship:  { table: "emergency_contacts", column: "relationship"  },
@@ -189,6 +194,29 @@ router.post("/forms/:formId/register", async (req, res) => {
       .orderBy(asc(formFieldsTable.sortOrder));
 
     const fieldById = new Map(formFields.map((f) => [f.id, f]));
+    const valueByFieldId = new Map<number, string>();
+
+    for (const { fieldId, value } of submittedFields) {
+      const formField = fieldById.get(fieldId);
+      if (!formField) {
+        res.status(400).json({ error: "Invalid input", details: `Field ${fieldId} does not belong to this form` });
+        return;
+      }
+      valueByFieldId.set(fieldId, value);
+    }
+
+    const missingRequiredFields = formFields
+      .filter((field) => field.required)
+      .filter((field) => !(valueByFieldId.get(field.id) ?? "").trim())
+      .map((field) => ({ fieldId: field.id, label: field.label }));
+
+    if (missingRequiredFields.length > 0) {
+      res.status(400).json({
+        error: "Missing required fields",
+        details: missingRequiredFields,
+      });
+      return;
+    }
 
     // ── Snapshot: find or create a form version for this field configuration ──
     const formVersionId = await getOrCreateFormVersion(formId, form, formFields);
@@ -197,6 +225,7 @@ router.post("/forms/:formId/register", async (req, res) => {
     const participantCols: Record<string, string> = {};
     const guardianCols: Record<string, string> = {};
     const emergencyCols: Record<string, string> = {};
+    const registrationCols: Record<string, string> = {};
     const customAnswers: { formFieldId: number; questionLabel: string; answerValue: string }[] = [];
     let roomFromFields: string | null = null;
 
@@ -217,6 +246,7 @@ router.post("/forms/:formId/register", async (req, res) => {
           if (mapping.table === "participants") participantCols[mapping.column] = value;
           else if (mapping.table === "guardians") guardianCols[mapping.column] = value;
           else if (mapping.table === "emergency_contacts") emergencyCols[mapping.column] = value;
+          else if (mapping.table === "registrations") registrationCols[mapping.column] = value;
         } else {
           // System key with no structured column — save as custom answer so data isn't lost
           customAnswers.push({ formFieldId: fieldId, questionLabel: formField.label, answerValue: value });
@@ -333,6 +363,11 @@ router.post("/forms/:formId/register", async (req, res) => {
         guardianName:  legacyGuardianName  || "",
         guardianPhone: guardianCols["phone"] ?? "",
         guardianEmail: guardianCols["email"] ?? null,
+        secondaryGuardianFirstName: registrationCols["secondary_guardian_first_name"] ?? null,
+        secondaryGuardianLastName: registrationCols["secondary_guardian_last_name"] ?? null,
+        secondaryGuardianPhone: registrationCols["secondary_guardian_phone"] ?? null,
+        secondaryGuardianEmail: registrationCols["secondary_guardian_email"] ?? null,
+        secondaryGuardianRelationship: registrationCols["secondary_guardian_relationship"] ?? null,
         allergies:     participantCols["allergies"]    ?? null,
         specialNeeds:  participantCols["special_needs"] ?? null,
         room:          roomFromFields ?? submittedRoom,
@@ -380,6 +415,11 @@ router.get("/forms/:formId/registrations", async (req, res) => {
         guardianName: registrationsTable.guardianName,
         guardianPhone: registrationsTable.guardianPhone,
         guardianEmail: registrationsTable.guardianEmail,
+        secondaryGuardianFirstName: registrationsTable.secondaryGuardianFirstName,
+        secondaryGuardianLastName: registrationsTable.secondaryGuardianLastName,
+        secondaryGuardianPhone: registrationsTable.secondaryGuardianPhone,
+        secondaryGuardianEmail: registrationsTable.secondaryGuardianEmail,
+        secondaryGuardianRelationship: registrationsTable.secondaryGuardianRelationship,
         allergies: registrationsTable.allergies,
         medicalNotes: registrationsTable.medicalNotes,
         specialNeeds: registrationsTable.specialNeeds,
@@ -432,6 +472,11 @@ router.get("/forms/:formId/registrations", async (req, res) => {
         guardianName,
         guardianPhone,
         guardianEmail,
+        secondaryGuardianFirstName: row.secondaryGuardianFirstName,
+        secondaryGuardianLastName: row.secondaryGuardianLastName,
+        secondaryGuardianPhone: row.secondaryGuardianPhone,
+        secondaryGuardianEmail: row.secondaryGuardianEmail,
+        secondaryGuardianRelationship: row.secondaryGuardianRelationship,
         allergies: row.allergies,
         medicalNotes: row.medicalNotes,
         specialNeeds: row.specialNeeds,
@@ -447,6 +492,126 @@ router.get("/forms/:formId/registrations", async (req, res) => {
     res.json(registrations);
   } catch (err) {
     req.log.error({ err }, "Failed to list registrations");
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ─── PUT /registration-families ──────────────────────────────────────────────
+
+router.put("/registration-families", async (req, res) => {
+  const {
+    registrationIds,
+    guardianFirstName,
+    guardianLastName,
+    guardianPhone,
+    guardianEmail,
+    secondaryGuardianFirstName,
+    secondaryGuardianLastName,
+    secondaryGuardianPhone,
+    secondaryGuardianEmail,
+    secondaryGuardianRelationship,
+    emergencyContactName,
+    emergencyContactPhone,
+    emergencyContactRelationship,
+  } = req.body as {
+    registrationIds?: number[];
+    guardianFirstName?: string;
+    guardianLastName?: string;
+    guardianPhone?: string;
+    guardianEmail?: string;
+    secondaryGuardianFirstName?: string;
+    secondaryGuardianLastName?: string;
+    secondaryGuardianPhone?: string;
+    secondaryGuardianEmail?: string;
+    secondaryGuardianRelationship?: string;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+    emergencyContactRelationship?: string;
+  };
+
+  const ids = Array.isArray(registrationIds)
+    ? registrationIds.filter((id) => Number.isInteger(id) && id > 0)
+    : [];
+
+  if (ids.length === 0) {
+    res.status(400).json({ error: "registrationIds array required" });
+    return;
+  }
+
+  const guardianName = [guardianFirstName, guardianLastName].filter(Boolean).join(" ");
+
+  try {
+    const regs = await db
+      .select()
+      .from(registrationsTable)
+      .where(inArray(registrationsTable.id, ids));
+
+    if (regs.length === 0) {
+      res.status(404).json({ error: "No matching registrations found" });
+      return;
+    }
+
+    await db
+      .update(registrationsTable)
+      .set({
+        guardianName,
+        guardianPhone: guardianPhone ?? "",
+        guardianEmail: guardianEmail || null,
+        secondaryGuardianFirstName: secondaryGuardianFirstName || null,
+        secondaryGuardianLastName: secondaryGuardianLastName || null,
+        secondaryGuardianPhone: secondaryGuardianPhone || null,
+        secondaryGuardianEmail: secondaryGuardianEmail || null,
+        secondaryGuardianRelationship: secondaryGuardianRelationship || null,
+        emergencyContactName: emergencyContactName || null,
+        emergencyContactPhone: emergencyContactPhone || null,
+        emergencyContactRelationship: emergencyContactRelationship || null,
+      })
+      .where(inArray(registrationsTable.id, regs.map((reg) => reg.id)));
+
+    const guardianIds = [...new Set(regs.map((reg) => reg.guardianId).filter((id): id is number => id != null))];
+    if (guardianIds.length > 0) {
+      await db
+        .update(guardiansTable)
+        .set({
+          firstName: guardianFirstName ?? "",
+          lastName: guardianLastName ?? "",
+          phone: guardianPhone || null,
+          email: guardianEmail || null,
+        })
+        .where(inArray(guardiansTable.id, guardianIds));
+    }
+
+    for (const reg of regs) {
+      if (!reg.participantId) continue;
+
+      const [existing] = await db
+        .select()
+        .from(emergencyContactsTable)
+        .where(eq(emergencyContactsTable.participantId, reg.participantId))
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(emergencyContactsTable)
+          .set({
+            name: emergencyContactName || existing.name,
+            phone: emergencyContactPhone || existing.phone,
+            relationship: emergencyContactRelationship || null,
+          })
+          .where(eq(emergencyContactsTable.id, existing.id));
+      } else if (emergencyContactName && emergencyContactPhone) {
+        await db.insert(emergencyContactsTable).values({
+          participantId: reg.participantId,
+          name: emergencyContactName,
+          phone: emergencyContactPhone,
+          relationship: emergencyContactRelationship || null,
+        });
+      }
+    }
+
+    res.json({ updated: regs.length });
+  } catch (err) {
+    req.log.error({ err }, "Failed to update registration family");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -579,6 +744,7 @@ router.put("/registrations/:registrationId", async (req, res) => {
   const {
     childFirstName, childLastName, childDateOfBirth,
     guardianFirstName, guardianLastName, guardianPhone, guardianEmail,
+    secondaryGuardianFirstName, secondaryGuardianLastName, secondaryGuardianPhone, secondaryGuardianEmail, secondaryGuardianRelationship,
     allergies, medicalNotes, specialNeeds,
     emergencyContactName, emergencyContactPhone, emergencyContactRelationship,
     room,
@@ -604,6 +770,11 @@ router.put("/registrations/:registrationId", async (req, res) => {
         ...(guardianName && { guardianName }),
         ...(guardianPhone !== undefined && { guardianPhone }),
         ...(guardianEmail !== undefined && { guardianEmail: guardianEmail || null }),
+        ...(secondaryGuardianFirstName !== undefined && { secondaryGuardianFirstName: secondaryGuardianFirstName || null }),
+        ...(secondaryGuardianLastName !== undefined && { secondaryGuardianLastName: secondaryGuardianLastName || null }),
+        ...(secondaryGuardianPhone !== undefined && { secondaryGuardianPhone: secondaryGuardianPhone || null }),
+        ...(secondaryGuardianEmail !== undefined && { secondaryGuardianEmail: secondaryGuardianEmail || null }),
+        ...(secondaryGuardianRelationship !== undefined && { secondaryGuardianRelationship: secondaryGuardianRelationship || null }),
         ...(allergies !== undefined && { allergies: allergies || null }),
         ...(medicalNotes !== undefined && { medicalNotes: medicalNotes || null }),
         ...(specialNeeds !== undefined && { specialNeeds: specialNeeds || null }),

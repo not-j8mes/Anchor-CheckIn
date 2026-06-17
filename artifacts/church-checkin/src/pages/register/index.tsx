@@ -177,6 +177,7 @@ export default function PublicRegistrationForm() {
               formFields={formFields}
               rooms={rooms}
               isChildCheckin={isChildCheckin}
+              allowAdditionalPeople={form.allowAdditionalPeople}
               guardianAnswers={guardianAnswers}
               childrenAnswers={childrenAnswers}
               emergencyAnswers={emergencyAnswers}

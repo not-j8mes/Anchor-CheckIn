@@ -34,7 +34,15 @@ function generateLabelCode(): string {
  * for this (event, registrationGroup) pair, creating one if none exists yet.
  * Returns null when the registration has no group or event to key on.
  */
-async function getFamilyLabelCode(eventId: number | null | undefined, registrationGroupId: number | null | undefined): Promise<string | null> {
+function sessionCondition(sessionId: number | null | undefined) {
+  return sessionId == null ? isNull(checkinsTable.sessionId) : eq(checkinsTable.sessionId, sessionId);
+}
+
+async function getFamilyLabelCode(
+  eventId: number | null | undefined,
+  registrationGroupId: number | null | undefined,
+  sessionId: number | null | undefined
+): Promise<string | null> {
   if (!eventId || !registrationGroupId) return null;
   const [existing] = await db
     .select({ labelCode: familyEventCodesTable.labelCode })
@@ -42,6 +50,7 @@ async function getFamilyLabelCode(eventId: number | null | undefined, registrati
     .where(
       and(
         eq(familyEventCodesTable.eventId, eventId),
+        sessionId == null ? isNull(familyEventCodesTable.sessionId) : eq(familyEventCodesTable.sessionId, sessionId),
         eq(familyEventCodesTable.registrationGroupId, registrationGroupId)
       )
     )
@@ -50,7 +59,7 @@ async function getFamilyLabelCode(eventId: number | null | undefined, registrati
   const newCode = generateLabelCode();
   await db
     .insert(familyEventCodesTable)
-    .values({ eventId, registrationGroupId, labelCode: newCode })
+    .values({ eventId, sessionId: sessionId ?? null, registrationGroupId, labelCode: newCode })
     .onConflictDoNothing();
   // Re-fetch in case a concurrent insert won the race
   const [row] = await db
@@ -59,6 +68,7 @@ async function getFamilyLabelCode(eventId: number | null | undefined, registrati
     .where(
       and(
         eq(familyEventCodesTable.eventId, eventId),
+        sessionId == null ? isNull(familyEventCodesTable.sessionId) : eq(familyEventCodesTable.sessionId, sessionId),
         eq(familyEventCodesTable.registrationGroupId, registrationGroupId)
       )
     )
@@ -77,7 +87,7 @@ function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
 
 // Walk-in: register a new child and immediately check them in
 router.post("/checkins/walkin", async (req, res) => {
-  const { eventId, childFirstName, childLastName, guardianName, guardianPhone, registrationGroupId: incomingGroupId } = req.body as Record<string, unknown>;
+  const { eventId, childFirstName, childLastName, guardianName, guardianPhone, sessionId, registrationGroupId: incomingGroupId } = req.body as Record<string, unknown>;
   if (
     typeof eventId !== "number" ||
     typeof childFirstName !== "string" || !childFirstName.trim() ||
@@ -178,6 +188,7 @@ router.post("/checkins/walkin", async (req, res) => {
       .insert(checkinsTable)
       .values({
         registrationId: registration.id,
+        sessionId: typeof sessionId === "number" ? sessionId : null,
         childFirstName,
         childLastName,
         guardianName,
@@ -208,8 +219,8 @@ router.post("/checkins/walkin", async (req, res) => {
 
 // Bulk checkout — must be registered BEFORE /checkins/:checkinId routes
 router.post("/checkins/bulk-checkout", async (req, res) => {
-  const { eventId, reason, note, checkoutAt } = (req.body ?? {}) as {
-    eventId?: number; reason?: string; note?: string; checkoutAt?: string;
+  const { eventId, sessionId, reason, note, checkoutAt } = (req.body ?? {}) as {
+    eventId?: number; sessionId?: number; reason?: string; note?: string; checkoutAt?: string;
   };
   if (!eventId || !reason) {
     res.status(400).json({ error: "eventId and reason are required" });
@@ -229,7 +240,11 @@ router.post("/checkins/bulk-checkout", async (req, res) => {
     const active = await db
       .select({ id: checkinsTable.id })
       .from(checkinsTable)
-      .where(and(inArray(checkinsTable.registrationId, regIds), isNull(checkinsTable.checkoutAt)));
+      .where(and(
+        inArray(checkinsTable.registrationId, regIds),
+        sessionId == null ? undefined : eq(checkinsTable.sessionId, sessionId),
+        isNull(checkinsTable.checkoutAt)
+      ));
 
     if (active.length === 0) { res.json({ count: 0, checkins: [] }); return; }
 
@@ -255,7 +270,7 @@ router.post("/checkins/bulk-checkout", async (req, res) => {
 
 // Batch check-in — must be registered BEFORE /checkins/:checkinId routes
 router.post("/checkins/batch", async (req, res) => {
-  const { items, reuseFamilyCode } = req.body as { items: Array<{ registrationId: number; room?: string }>; reuseFamilyCode?: boolean };
+  const { items, sessionId, reuseFamilyCode } = req.body as { items: Array<{ registrationId: number; room?: string }>; sessionId?: number; reuseFamilyCode?: boolean };
   if (!Array.isArray(items) || items.length === 0) {
     res.status(400).json({ error: "items array is required" });
     return;
@@ -271,7 +286,7 @@ router.post("/checkins/batch", async (req, res) => {
         .where(eq(registrationsTable.id, items[0].registrationId))
         .limit(1);
       sharedLabelCode =
-        (await getFamilyLabelCode(firstReg[0]?.eventId, firstReg[0]?.registrationGroupId)) ??
+        (await getFamilyLabelCode(firstReg[0]?.eventId, firstReg[0]?.registrationGroupId, sessionId)) ??
         generateLabelCode();
     } else {
       sharedLabelCode = generateLabelCode();
@@ -281,6 +296,7 @@ router.post("/checkins/batch", async (req, res) => {
 
     const checkins: ReturnType<typeof serializeCheckin>[] = [];
     const labels: object[] = [];
+    const skipped: { registrationId: number; reason: string; checkinId?: number }[] = [];
 
     for (const item of items) {
       const reg = await db
@@ -291,10 +307,21 @@ router.post("/checkins/batch", async (req, res) => {
       if (!reg[0]) continue;
       const r = reg[0];
 
+      const [activeCheckin] = await db
+        .select({ id: checkinsTable.id })
+        .from(checkinsTable)
+        .where(and(eq(checkinsTable.registrationId, item.registrationId), sessionCondition(sessionId), isNull(checkinsTable.checkoutAt)))
+        .limit(1);
+      if (activeCheckin) {
+        skipped.push({ registrationId: item.registrationId, reason: "Already checked in", checkinId: activeCheckin.id });
+        continue;
+      }
+
       const [checkin] = await db
         .insert(checkinsTable)
         .values({
           registrationId: item.registrationId,
+          sessionId: sessionId ?? null,
           childFirstName: r.childFirstName,
           childLastName: r.childLastName,
           guardianName: r.guardianName,
@@ -317,7 +344,7 @@ router.post("/checkins/batch", async (req, res) => {
       });
     }
 
-    res.status(201).json({ checkins, labels });
+    res.status(201).json({ checkins, labels, skipped });
   } catch (err) {
     req.log.error({ err }, "Failed to batch check-in");
     res.status(500).json({ error: "Internal server error" });
@@ -385,7 +412,7 @@ router.post("/checkins", async (req, res) => {
     const [activeCheckin] = await db
       .select()
       .from(checkinsTable)
-      .where(and(eq(checkinsTable.registrationId, registrationId), isNull(checkinsTable.checkoutAt)))
+      .where(and(eq(checkinsTable.registrationId, registrationId), sessionCondition(sessionId), isNull(checkinsTable.checkoutAt)))
       .limit(1);
     if (activeCheckin) {
       res.status(409).json({ error: "Already checked in", checkinId: activeCheckin.id });
@@ -403,7 +430,7 @@ router.post("/checkins", async (req, res) => {
     }
     const r = reg[0];
     const labelCode = reuseFamilyCode
-      ? (await getFamilyLabelCode(r.eventId, r.registrationGroupId)) ?? generateLabelCode()
+      ? (await getFamilyLabelCode(r.eventId, r.registrationGroupId, sessionId)) ?? generateLabelCode()
       : generateLabelCode();
     const [checkin] = await db
       .insert(checkinsTable)

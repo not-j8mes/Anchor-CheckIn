@@ -21,13 +21,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox as UiCheckbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox as UiCheckbox } from "@/components/ui/checkbox";
 import {
   Search,
   AlertCircle,
@@ -47,11 +46,14 @@ import {
   Printer,
   Settings,
   List,
+  Check,
+  Pencil,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
 import { printLabels as openLabelPrint } from "@/lib/label-renderer";
 import { Switch } from "@/components/ui/switch";
+import { cn } from "@/lib/utils";
 
 function childToLabelData(child: Child, orgName: string): LabelData | null {
   if (!child.activeCheckinLabelCode) return null;
@@ -122,6 +124,206 @@ function groupByRegistrationGroup(children: Child[]): FamilyGroup[] {
 
   return result;
 }
+
+// ─── Unified child card ───────────────────────────────────────────────────────
+
+interface ChildCardProps {
+  child: Child;
+  /** "standalone" shows a Check In button; "grouped" shows a circular selection indicator */
+  variant: "standalone" | "grouped";
+  isSelected?: boolean;
+  onToggle?: () => void;
+  onCheckin?: () => void;
+  onCheckout: (child: Child) => void;
+  onUndoCheckin: (child: Child) => void;
+  onReprintLabel: (child: Child) => void;
+  onEditChild?: (child: Child) => void;
+  isCheckingIn?: boolean;
+  loadingCheckinId: number | null;
+}
+
+function ChildCard({
+  child,
+  variant,
+  isSelected,
+  onToggle,
+  onCheckin,
+  onCheckout,
+  onUndoCheckin,
+  onReprintLabel,
+  onEditChild,
+  isCheckingIn,
+  loadingCheckinId,
+}: ChildCardProps) {
+  const age = getAge(child.dateOfBirth);
+  const hasAllergy = !!(child.allergies || child.specialNeeds || child.medicalNotes);
+  const childName = `${child.firstName} ${child.lastName}`;
+  const isGrouped = variant === "grouped";
+
+  const rightAction = child.isCheckedIn ? (
+    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+      <Button
+        variant="outline"
+        size="sm"
+        className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
+        disabled={loadingCheckinId === child.checkinId}
+        onClick={(e) => { e.stopPropagation(); onCheckout(child); }}
+        data-testid={`button-checkout-${child.id}`}
+      >
+        {loadingCheckinId === child.checkinId
+          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          : <LogOut className="w-3.5 h-3.5" />}
+        Check Out
+      </Button>
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
+          onClick={(e) => { e.stopPropagation(); onUndoCheckin(child); }}
+          data-testid={`button-undo-checkin-${child.id}`}
+        >
+          <Undo2 className="w-3 h-3" /> Undo check-in
+        </button>
+        {child.activeCheckinLabelCode && (
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
+            onClick={(e) => { e.stopPropagation(); onReprintLabel(child); }}
+            data-testid={`button-reprint-${child.id}`}
+          >
+            <Printer className="w-3 h-3" /> Reprint
+          </button>
+        )}
+      </div>
+    </div>
+  ) : isGrouped ? (
+    <div className="flex items-center gap-2.5 flex-shrink-0">
+      {onEditChild && (
+        <button
+          type="button"
+          className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+          onClick={(e) => { e.stopPropagation(); onEditChild(child); }}
+          aria-label={`Edit ${childName}`}
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
+      )}
+      <button
+        type="button"
+        className={cn(
+          "w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+          isSelected
+            ? "border-primary bg-primary shadow-sm hover:bg-[hsl(38_90%_44%)] hover:shadow-md hover:-translate-y-px active:translate-y-0 active:shadow-sm"
+            : "border-muted-foreground/30 bg-background hover:border-primary/60"
+        )}
+        aria-pressed={isSelected}
+        aria-label={isSelected
+          ? `Exclude ${childName} from family check-in`
+          : `Include ${childName} in family check-in`}
+        onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
+        data-testid={`checkbox-child-${child.id}`}
+      >
+        {isSelected && <Check className="w-3 h-3 text-white stroke-[2.75]" />}
+      </button>
+    </div>
+  ) : (
+    <div className="flex items-center gap-2.5 flex-shrink-0">
+      <button
+        type="button"
+        className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+        onClick={() => onEditChild?.(child)}
+        aria-label={`Edit ${childName}`}
+      >
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+      <Button
+        size="sm"
+        className="gap-1.5"
+        disabled={isCheckingIn}
+        onClick={onCheckin}
+        data-testid={`button-checkin-${child.id}`}
+      >
+        {isCheckingIn
+          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          : <><CheckCheck className="w-3.5 h-3.5" /> Check In</>}
+      </Button>
+    </div>
+  );
+
+  const innerContent = (
+    <div className="flex items-center gap-4 px-5 py-4">
+      <div className={cn(
+        "w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0",
+        child.isCheckedIn ? "bg-green-100 text-green-700" : "bg-primary/10 text-primary"
+      )}>
+        {child.firstName[0]}{child.lastName[0]}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-semibold text-base">{childName}</span>
+          {child.isCheckedIn && (
+            <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
+          )}
+          {child.room && <Badge variant="secondary" className="text-xs font-normal">{child.room}</Badge>}
+          {hasAllergy && (
+            <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50 gap-1">
+              <AlertCircle className="w-3 h-3" /> Allergy
+            </Badge>
+          )}
+        </div>
+        {child.isCheckedIn ? (
+          child.activeCheckinLabelCode && (
+            <p className="text-xs font-mono font-bold text-green-700 mt-0.5">Code: {child.activeCheckinLabelCode}</p>
+          )
+        ) : isGrouped ? (
+          age !== null && <p className="text-sm text-muted-foreground mt-0.5">Age {age}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {child.guardianName && <>Parent/Guardian: {child.guardianName}</>}
+            {child.guardianPhone && <> · {child.guardianPhone}</>}
+            {age !== null && <> · Age {age}</>}
+          </p>
+        )}
+      </div>
+      {rightAction}
+    </div>
+  );
+
+  if (isGrouped) {
+    if (child.isCheckedIn) {
+      return (
+        <div
+          className="border border-green-200/70 bg-green-50/60 rounded-xl shadow-sm"
+          data-testid={`child-row-${child.id}`}
+        >
+          {innerContent}
+        </div>
+      );
+    }
+    return (
+      <div
+        className={cn(
+          "rounded-xl border shadow-sm cursor-pointer select-none transition-all duration-150",
+          isSelected
+            ? "bg-amber-50/60 border-orange-200"
+            : "bg-card border-border hover:border-muted-foreground/30 hover:bg-muted/10"
+        )}
+        onClick={onToggle}
+        data-testid={`child-row-${child.id}`}
+      >
+        {innerContent}
+      </div>
+    );
+  }
+
+  return (
+    <Card className="shadow-sm rounded-xl" data-testid={`individual-card-${child.id}`}>
+      {innerContent}
+    </Card>
+  );
+}
+
+// ─── Family card (multi-child groups) ────────────────────────────────────────
 
 interface FamilyCardProps {
   group: FamilyGroup;
@@ -201,103 +403,31 @@ function FamilyCard({
         )}
       </div>
 
-      {/* ── Child rows ── */}
-      <div className="divide-y divide-border">
-        {notCheckedIn.map((child) => {
-          const isChecked = selected.has(child.id);
-          const age = getAge(child.dateOfBirth);
-          const hasAllergy = !!(child.allergies || child.specialNeeds || child.medicalNotes);
-          return (
-            <div
-              key={child.id}
-              className={`flex items-center gap-3 px-5 py-3.5 cursor-pointer transition-colors ${
-                isChecked ? "bg-primary/5" : "hover:bg-muted/30"
-              }`}
-              onClick={() => toggleChild(child.id)}
-              data-testid={`child-row-${child.id}`}
-            >
-              <Checkbox
-                checked={isChecked}
-                onCheckedChange={() => toggleChild(child.id)}
-                className="pointer-events-none flex-shrink-0"
-                data-testid={`checkbox-child-${child.id}`}
-              />
-              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm flex-shrink-0">
-                {child.firstName[0]}{child.lastName[0]}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-sm">{child.firstName} {child.lastName}</span>
-                  {child.room && (
-                    <Badge variant="secondary" className="text-xs font-normal">{child.room}</Badge>
-                  )}
-                  {hasAllergy && (
-                    <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50 gap-1">
-                      <AlertCircle className="w-3 h-3" /> Allergy
-                    </Badge>
-                  )}
-                </div>
-                {age !== null && (
-                  <p className="text-xs text-muted-foreground mt-0.5">Age {age}</p>
-                )}
-              </div>
-            </div>
-          );
-        })}
-
+      {/* ── Child cards ── */}
+      <div className="space-y-3 p-4">
+        {notCheckedIn.map((child) => (
+          <ChildCard
+            key={child.id}
+            child={child}
+            variant="grouped"
+            isSelected={selected.has(child.id)}
+            onToggle={() => toggleChild(child.id)}
+            onCheckout={onCheckoutChild}
+            onUndoCheckin={onUndoCheckin}
+            onReprintLabel={onReprintLabel}
+            loadingCheckinId={loadingCheckinId}
+          />
+        ))}
         {alreadyCheckedIn.map((child) => (
-          <div key={child.id} className="flex items-center gap-3 px-5 py-3.5 bg-green-50/60" data-testid={`child-row-${child.id}`}>
-            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center font-bold text-green-700 text-sm flex-shrink-0">
-              {child.firstName[0]}{child.lastName[0]}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-sm">{child.firstName} {child.lastName}</span>
-                <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
-                {child.room && <Badge variant="secondary" className="text-xs font-normal">{child.room}</Badge>}
-              </div>
-              {child.activeCheckinLabelCode && (
-                <p className="text-xs font-mono font-bold text-green-700 mt-0.5">Code: {child.activeCheckinLabelCode}</p>
-              )}
-            </div>
-            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1 h-7 text-xs"
-                disabled={loadingCheckinId === child.checkinId}
-                onClick={() => onCheckoutChild(child)}
-                data-testid={`button-checkout-${child.id}`}
-              >
-                {loadingCheckinId === child.checkinId ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <LogOut className="w-3 h-3" />
-                )}
-                Check Out
-              </Button>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
-                  onClick={() => onUndoCheckin(child)}
-                  data-testid={`button-undo-checkin-${child.id}`}
-                >
-                  <Undo2 className="w-3 h-3" /> Undo check-in
-                </button>
-                {child.activeCheckinLabelCode && (
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
-                    onClick={() => onReprintLabel(child)}
-                    data-testid={`button-reprint-${child.id}`}
-                  >
-                    <Printer className="w-3 h-3" /> Reprint
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <ChildCard
+            key={child.id}
+            child={child}
+            variant="grouped"
+            onCheckout={onCheckoutChild}
+            onUndoCheckin={onUndoCheckin}
+            onReprintLabel={onReprintLabel}
+            loadingCheckinId={loadingCheckinId}
+          />
         ))}
       </div>
     </Card>
@@ -325,115 +455,17 @@ function IndividualCard({
   isCheckingIn,
   loadingCheckinId,
 }: IndividualCardProps) {
-  const age = getAge(child.dateOfBirth);
-  const hasAllergy = !!(child.allergies || child.specialNeeds || child.medicalNotes);
-
-  if (child.isCheckedIn) {
-    return (
-      <Card className="shadow-sm" data-testid={`individual-card-${child.id}`}>
-        <CardContent className="flex items-center gap-4 px-5 py-4">
-          <div className="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center font-bold text-green-700 text-sm flex-shrink-0">
-            {child.firstName[0]}{child.lastName[0]}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-base">{child.firstName} {child.lastName}</span>
-              <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
-              {child.room && <Badge variant="secondary" className="text-xs font-normal">{child.room}</Badge>}
-              {hasAllergy && (
-                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50 gap-1">
-                  <AlertCircle className="w-3 h-3" /> Allergy
-                </Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {child.guardianName && <>Parent/Guardian: {child.guardianName}</>}
-              {child.guardianPhone && <> · {child.guardianPhone}</>}
-              {age !== null && <> · Age {age}</>}
-            </p>
-            {child.activeCheckinLabelCode && (
-              <p className="text-xs font-mono font-bold text-green-700 mt-0.5">Code: {child.activeCheckinLabelCode}</p>
-            )}
-          </div>
-          <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-muted-foreground hover:text-destructive hover:border-destructive gap-1"
-              disabled={loadingCheckinId === child.checkinId}
-              onClick={() => onCheckout(child)}
-              data-testid={`button-checkout-${child.id}`}
-            >
-              {loadingCheckinId === child.checkinId ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <LogOut className="w-3.5 h-3.5" />
-              )}
-              Check Out
-            </Button>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1 transition-colors"
-                onClick={() => onUndoCheckin(child)}
-                data-testid={`button-undo-checkin-${child.id}`}
-              >
-                <Undo2 className="w-3 h-3" /> Undo check-in
-              </button>
-              {child.activeCheckinLabelCode && (
-                <button
-                  type="button"
-                  className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
-                  onClick={() => onReprintLabel(child)}
-                  data-testid={`button-reprint-${child.id}`}
-                >
-                  <Printer className="w-3 h-3" /> Reprint
-                </button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card className="shadow-sm" data-testid={`individual-card-${child.id}`}>
-      <CardContent className="flex items-center gap-4 px-5 py-4">
-        <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm flex-shrink-0">
-          {child.firstName[0]}{child.lastName[0]}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-base">{child.firstName} {child.lastName}</span>
-            {child.room && <Badge variant="secondary" className="text-xs font-normal">{child.room}</Badge>}
-            {hasAllergy && (
-              <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50 gap-1">
-                <AlertCircle className="w-3 h-3" /> Allergy
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {child.guardianName && <>Parent/Guardian: {child.guardianName}</>}
-            {child.guardianPhone && <> · {child.guardianPhone}</>}
-            {age !== null && <> · Age {age}</>}
-          </p>
-        </div>
-        <Button
-          size="sm"
-          className="flex-shrink-0 gap-1.5"
-          disabled={isCheckingIn}
-          onClick={onCheckin}
-          data-testid={`button-checkin-${child.id}`}
-        >
-          {isCheckingIn ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <><CheckCheck className="w-3.5 h-3.5" /> Check In</>
-          )}
-        </Button>
-      </CardContent>
-    </Card>
+    <ChildCard
+      child={child}
+      variant="standalone"
+      onCheckin={onCheckin}
+      onCheckout={onCheckout}
+      onUndoCheckin={onUndoCheckin}
+      onReprintLabel={onReprintLabel}
+      isCheckingIn={isCheckingIn}
+      loadingCheckinId={loadingCheckinId}
+    />
   );
 }
 

@@ -181,6 +181,25 @@ paths:
                 items:
                   $ref: "#/components/schemas/EventSession"
 
+  /events/{eventId}/sessions/today:
+    post:
+      operationId: createTodayEventSession
+      tags: [events]
+      summary: Create or return today's session for an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Today's event session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventSession"
+
   /events/{eventId}:
     get:
       operationId: getEvent
@@ -655,6 +674,25 @@ paths:
         "204":
           description: Deleted
 
+  /registration-families:
+    put:
+      operationId: updateRegistrationFamily
+      tags: [registrations]
+      summary: Update shared family and guardian details for a set of registrations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrationFamilyUpdateInput"
+      responses:
+        "200":
+          description: Updated family details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationFamilyUpdateResult"
+
   /registrations/{registrationId}/room:
     patch:
       operationId: updateRegistrationRoom
@@ -1114,6 +1152,19 @@ paths:
         "204":
           description: All data deleted
 
+  /admin/seed-test-data:
+    post:
+      operationId: seedTestData
+      tags: [admin]
+      summary: Create 3 demo events (child check-in, family/group, individual) with rooms and sample registrants
+      responses:
+        "201":
+          description: Test data created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeedTestDataResult"
+
   /stats/dashboard:
     get:
       operationId: getDashboardStats
@@ -1424,6 +1475,16 @@ components:
           type: string
         guardianEmail:
           type: ["string", "null"]
+        secondaryGuardianFirstName:
+          type: ["string", "null"]
+        secondaryGuardianLastName:
+          type: ["string", "null"]
+        secondaryGuardianPhone:
+          type: ["string", "null"]
+        secondaryGuardianEmail:
+          type: ["string", "null"]
+        secondaryGuardianRelationship:
+          type: ["string", "null"]
         allergies:
           type: ["string", "null"]
         medicalNotes:
@@ -1464,6 +1525,16 @@ components:
         guardianPhone:
           type: string
         guardianEmail:
+          type: ["string", "null"]
+        secondaryGuardianFirstName:
+          type: ["string", "null"]
+        secondaryGuardianLastName:
+          type: ["string", "null"]
+        secondaryGuardianPhone:
+          type: ["string", "null"]
+        secondaryGuardianEmail:
+          type: ["string", "null"]
+        secondaryGuardianRelationship:
           type: ["string", "null"]
         allergies:
           type: ["string", "null"]
@@ -1799,6 +1870,8 @@ components:
                 type: integer
               room:
                 type: string
+        sessionId:
+          type: integer
         reuseFamilyCode:
           type: boolean
 
@@ -1814,12 +1887,26 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LabelData"
+        skipped:
+          type: array
+          items:
+            type: object
+            required: [registrationId, reason]
+            properties:
+              registrationId:
+                type: integer
+              reason:
+                type: string
+              checkinId:
+                type: integer
 
     BulkCheckoutInput:
       type: object
       required: [eventId, reason]
       properties:
         eventId:
+          type: integer
+        sessionId:
           type: integer
         reason:
           type: string
@@ -2124,6 +2211,16 @@ components:
           type: string
         guardianEmail:
           type: string
+        secondaryGuardianFirstName:
+          type: string
+        secondaryGuardianLastName:
+          type: string
+        secondaryGuardianPhone:
+          type: string
+        secondaryGuardianEmail:
+          type: string
+        secondaryGuardianRelationship:
+          type: string
         allergies:
           type: string
         medicalNotes:
@@ -2138,6 +2235,46 @@ components:
           type: string
         room:
           type: string
+
+    RegistrationFamilyUpdateInput:
+      type: object
+      required: [registrationIds]
+      properties:
+        registrationIds:
+          type: array
+          items:
+            type: integer
+        guardianFirstName:
+          type: string
+        guardianLastName:
+          type: string
+        guardianPhone:
+          type: string
+        guardianEmail:
+          type: string
+        secondaryGuardianFirstName:
+          type: string
+        secondaryGuardianLastName:
+          type: string
+        secondaryGuardianPhone:
+          type: string
+        secondaryGuardianEmail:
+          type: string
+        secondaryGuardianRelationship:
+          type: string
+        emergencyContactName:
+          type: string
+        emergencyContactPhone:
+          type: string
+        emergencyContactRelationship:
+          type: string
+
+    RegistrationFamilyUpdateResult:
+      type: object
+      required: [updated]
+      properties:
+        updated:
+          type: integer
 
     UpdateEventInput:
       type: object
@@ -2206,6 +2343,15 @@ components:
         name:
           type: string
 
+    SeedTestDataResult:
+      type: object
+      required: [eventsCreated, registrationsCreated]
+      properties:
+        eventsCreated:
+          type: integer
+        registrationsCreated:
+          type: integer
+
     RegistrationGroup:
       type: object
       required: [id, createdAt]
@@ -2232,4 +2378,3 @@ components:
           type: integer
         groupName:
           type: string
-

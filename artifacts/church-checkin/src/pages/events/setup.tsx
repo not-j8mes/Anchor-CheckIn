@@ -1106,7 +1106,7 @@ function Step3({
                     <Select value={state.labelType} onValueChange={(v) => update("labelType", v)}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="simple_name_tag">Simple name tag</SelectItem>
+                        <SelectItem value="simple_name_tag">Simple Name Tag</SelectItem>
                         <SelectItem value="simple_name">Simple Child Label</SelectItem>
                         <SelectItem value="child_security" disabled={state.registrationType !== "child_checkin"}>
                           Child security label{state.registrationType !== "child_checkin" ? " (kids events only)" : ""}
@@ -1891,7 +1891,7 @@ function Step5({
           {state.trackAttendance && (
             <ReviewRow
               label="Print Labels"
-              value={state.printLabels ? (state.labelType === "child_security" ? "Child security label" : state.labelType === "simple_name_tag" ? "Simple name tag" : "Simple Child Label") : "No"}
+              value={state.printLabels ? (state.labelType === "child_security" ? "Child security label" : state.labelType === "simple_name_tag" ? "Simple Name Tag" : "Simple Child Label") : "No"}
             />
           )}
         </div>

@@ -40,6 +40,9 @@ export const familyEventCodesTable = pgTable(
     eventId: integer("event_id")
       .notNull()
       .references(() => eventsTable.id, { onDelete: "cascade" }),
+    sessionId: integer("session_id").references(() => eventSessionsTable.id, {
+      onDelete: "cascade",
+    }),
     registrationGroupId: integer("registration_group_id")
       .notNull()
       .references(() => registrationGroupsTable.id, { onDelete: "cascade" }),
@@ -47,6 +50,6 @@ export const familyEventCodesTable = pgTable(
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("fec_event_group_unique").on(t.eventId, t.registrationGroupId),
+    uniqueIndex("fec_event_session_group_unique").on(t.eventId, t.sessionId, t.registrationGroupId),
   ]
 );

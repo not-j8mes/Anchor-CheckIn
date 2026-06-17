@@ -6,10 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface RegistrationUpdateInput {
-  childFirstName?: string;
-  childLastName?: string;
-  childDateOfBirth?: string;
+export interface RegistrationFamilyUpdateInput {
+  registrationIds: number[];
   guardianFirstName?: string;
   guardianLastName?: string;
   guardianPhone?: string;
@@ -19,11 +17,7 @@ export interface RegistrationUpdateInput {
   secondaryGuardianPhone?: string;
   secondaryGuardianEmail?: string;
   secondaryGuardianRelationship?: string;
-  allergies?: string;
-  medicalNotes?: string;
-  specialNeeds?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   emergencyContactRelationship?: string;
-  room?: string;
 }

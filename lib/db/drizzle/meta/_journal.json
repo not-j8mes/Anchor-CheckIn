@@ -8,6 +8,27 @@
       "when": 1781105140904,
       "tag": "0000_loud_black_cat",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781632614244,
+      "tag": "0001_careful_giant_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781710000000,
+      "tag": "0002_optional_secondary_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781711000000,
+      "tag": "0003_session_scoped_family_codes",
+      "breakpoints": true
     }
   ]
 }

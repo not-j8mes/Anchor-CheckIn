@@ -476,7 +476,7 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="simple_name_tag">Simple name tag</SelectItem>
+                      <SelectItem value="simple_name_tag">Simple Name Tag</SelectItem>
                       <SelectItem value="simple_name">Simple Child Label</SelectItem>
                       <SelectItem value="child_security" disabled={!isChildCheckin}>
                         Child security label {!isChildCheckin ? "(kids events only)" : ""}
@@ -754,9 +754,9 @@ export default function EventSelectionScreen() {
   const [search, setSearch] = useState("");
 
   const sorted = [...(events ?? [])].sort((a, b) => {
-    const aT = a.startDate ? new Date(a.startDate + "T00:00:00").getTime() : -Infinity;
-    const bT = b.startDate ? new Date(b.startDate + "T00:00:00").getTime() : -Infinity;
-    return bT - aT;
+    const aT = a.startDate ? new Date(a.startDate + "T00:00:00").getTime() : Infinity;
+    const bT = b.startDate ? new Date(b.startDate + "T00:00:00").getTime() : Infinity;
+    return aT - bT;
   });
 
   const filtered = search.trim()

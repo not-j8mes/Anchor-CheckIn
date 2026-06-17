@@ -4,11 +4,14 @@ import {
   useGetOrganization,
   useUpdateOrganization,
   useResetAllData,
+  useSeedTestData,
   useListEventCategories,
   useCreateEventCategory,
   useUpdateEventCategory,
   useDeleteEventCategory,
   getGetOrganizationQueryKey,
+  getListEventsQueryKey,
+  getGetDashboardStatsQueryKey,
   getListEventCategoriesQueryKey,
   type EventCategory,
 } from "@workspace/api-client-react";
@@ -38,7 +41,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Database, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X } from "lucide-react";
 import appLogo from "@assets/image_1781393408862.png";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 
@@ -274,6 +277,20 @@ export default function Settings() {
     }
   });
 
+  const seedTestData = useSeedTestData({
+    mutation: {
+      onSuccess: (result) => {
+        queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardStatsQueryKey() });
+        toast({
+          title: "Test data added",
+          description: `${result.eventsCreated} events and ${result.registrationsCreated} registrations were created.`,
+        });
+      },
+      onError: () => toast({ title: "Failed to add test data", variant: "destructive" }),
+    }
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateOrg.mutate({ data: formData });
@@ -425,6 +442,37 @@ export default function Settings() {
 
       {/* Event Categories */}
       <EventCategoriesCard />
+
+      <Card className="border-card-border shadow-sm">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Database className="w-5 h-5 text-primary" />
+            <CardTitle>Test Data</CardTitle>
+          </div>
+          <CardDescription>
+            Create demo events and registrations for trying out check-in, rooms, labels, and family registrations.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-muted/30 p-4">
+            <div>
+              <p className="font-medium text-sm">Add Test Data</p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Adds one child check-in event, one family/group event, and one individual event dated for next week.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="flex-shrink-0 gap-1.5"
+              onClick={() => seedTestData.mutate()}
+              disabled={seedTestData.isPending}
+            >
+              <Database className="w-4 h-4" />
+              {seedTestData.isPending ? "Adding..." : "Add Test Data"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Danger Zone */}
       <Card className="border-destructive/40 shadow-sm">

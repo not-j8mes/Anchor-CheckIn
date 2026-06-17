@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq, sql, desc, inArray, asc } from "drizzle-orm";
 import { db, eventsTable, formsTable, questionsTable, formFieldsTable, registrationsTable, checkinsTable, registrationCustomAnswersTable, eventSessionsTable } from "@workspace/db";
 import { randomBytes } from "crypto";
-import { createEventSessions } from "./event-sessions";
+import { createEventSessions, ensureEventDateSessions } from "./event-sessions";
 
 const router = Router();
 
@@ -69,6 +69,113 @@ function getFormTemplate(registrationType?: string | null) {
   if (registrationType === "family_group") return TEMPLATE_FAMILY_GROUP;
   if (registrationType === "individual") return TEMPLATE_INDIVIDUAL;
   return TEMPLATE_CHILD_CHECKIN; // child_checkin or no type
+}
+
+interface CreateEventWithFormInput {
+  name: string;
+  description?: string | null;
+  eventType: string;
+  registrationType?: string | null;
+  scheduleType?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  repeatFrequency?: string | null;
+  repeatDayOfWeek?: number | null;
+  formTitle: string;
+  formDescription?: string | null;
+  addDefaultQuestions?: boolean;
+  trackAttendance?: boolean;
+  requireCheckout?: boolean;
+  printLabels?: boolean;
+  labelType?: string | null;
+  roomAssignmentMode?: string | null;
+}
+
+/**
+ * Creates a form (+ legacy questions / form_fields template) and its linked event row.
+ * Shared by POST /events and the admin test-data seeder so both stay in sync.
+ */
+export async function createEventWithForm(input: CreateEventWithFormInput) {
+  const {
+    name, description, eventType, registrationType, formTitle, formDescription,
+    addDefaultQuestions, startDate, endDate, startTime, endTime,
+    repeatFrequency, repeatDayOfWeek, trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode,
+  } = input;
+
+  const resolvedScheduleType = input.scheduleType || "one_time";
+
+  // Smart defaults based on registration type when caller doesn't specify
+  const isChildCheckin = !registrationType || registrationType === "child_checkin";
+  const resolvedTrackAttendance = trackAttendance !== undefined ? trackAttendance : isChildCheckin;
+  const resolvedRequireCheckout = requireCheckout !== undefined ? requireCheckout : isChildCheckin;
+  const resolvedPrintLabels = printLabels !== undefined ? printLabels : isChildCheckin;
+  const resolvedLabelType = labelType || (resolvedRequireCheckout ? "child_security" : "simple_name");
+
+  const embedSlug = randomBytes(6).toString("hex");
+  const [form] = await db
+    .insert(formsTable)
+    .values({
+      title: formTitle,
+      description: formDescription || null,
+      isActive: true,
+      isPublic: true,
+      allowAdditionalPeople: registrationType === "family_group",
+      embedSlug,
+    })
+    .returning();
+
+  if (addDefaultQuestions !== false) {
+    // Legacy questions table (backward compat — only seed for child_checkin / no type)
+    if (!registrationType || registrationType === "child_checkin") {
+      await db.insert(questionsTable).values(
+        DEFAULT_QUESTIONS.map((q) => ({ ...q, formId: form.id, options: null }))
+      );
+    }
+    // New form_fields table — use the right template for the registration type
+    const template = getFormTemplate(registrationType);
+    await db.insert(formFieldsTable).values(
+      template.map((f) => ({ ...f, formId: form.id }))
+    );
+  }
+
+  const [event] = await db
+    .insert(eventsTable)
+    .values({
+      name,
+      description: description || null,
+      eventType,
+      registrationType: registrationType || null,
+      scheduleType: resolvedScheduleType,
+      startDate: startDate || null,
+      endDate: endDate || null,
+      startTime: startTime || null,
+      endTime: endTime || null,
+      repeatFrequency: repeatFrequency || null,
+      repeatDayOfWeek: repeatDayOfWeek !== undefined ? repeatDayOfWeek : null,
+      status: computeStatus(startDate || null, endDate || null),
+      formId: form.id,
+      trackAttendance: resolvedTrackAttendance,
+      requireCheckout: resolvedRequireCheckout,
+      printLabels: resolvedPrintLabels,
+      labelType: resolvedLabelType,
+      roomAssignmentMode: roomAssignmentMode || null,
+    })
+    .returning();
+
+  // Generate sessions for repeating events
+  if (resolvedScheduleType === "repeating" && startDate && endDate && repeatDayOfWeek !== undefined && repeatDayOfWeek !== null) {
+    await createEventSessions(event.id, startDate, endDate, repeatDayOfWeek, startTime || null, endTime || null);
+  }
+  await ensureEventDateSessions(event.id);
+
+  const [questions, formFields] = await Promise.all([
+    db.select().from(questionsTable).where(eq(questionsTable.formId, form.id)).orderBy(asc(questionsTable.order)),
+    db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, form.id)).orderBy(asc(formFieldsTable.sortOrder)),
+  ]);
+
+  return { event, form, questions, formFields };
 }
 
 function computeStatus(startDate: string | null, endDate: string | null): string {
@@ -144,76 +251,12 @@ router.post("/events", async (req, res) => {
     return;
   }
 
-  const resolvedScheduleType = scheduleType || "one_time";
-
-  // Smart defaults based on registration type when caller doesn't specify
-  const isChildCheckin = !registrationType || registrationType === "child_checkin";
-  const resolvedTrackAttendance = trackAttendance !== undefined ? trackAttendance : isChildCheckin;
-  const resolvedRequireCheckout = requireCheckout !== undefined ? requireCheckout : isChildCheckin;
-  const resolvedPrintLabels = printLabels !== undefined ? printLabels : isChildCheckin;
-  const resolvedLabelType = labelType || (resolvedRequireCheckout ? "child_security" : "simple_name");
-
   try {
-    const embedSlug = randomBytes(6).toString("hex");
-    const [form] = await db
-      .insert(formsTable)
-      .values({
-        title: formTitle,
-        description: formDescription || null,
-        isActive: true,
-        isPublic: true,
-        allowAdditionalPeople: registrationType === "family_group",
-        embedSlug,
-      })
-      .returning();
-
-    if (addDefaultQuestions !== false) {
-      // Legacy questions table (backward compat — only seed for child_checkin / no type)
-      if (!registrationType || registrationType === "child_checkin") {
-        await db.insert(questionsTable).values(
-          DEFAULT_QUESTIONS.map((q) => ({ ...q, formId: form.id, options: null }))
-        );
-      }
-      // New form_fields table — use the right template for the registration type
-      const template = getFormTemplate(registrationType);
-      await db.insert(formFieldsTable).values(
-        template.map((f) => ({ ...f, formId: form.id }))
-      );
-    }
-
-    const [event] = await db
-      .insert(eventsTable)
-      .values({
-        name,
-        description: description || null,
-        eventType,
-        registrationType: registrationType || null,
-        scheduleType: resolvedScheduleType,
-        startDate: startDate || null,
-        endDate: endDate || null,
-        startTime: startTime || null,
-        endTime: endTime || null,
-        repeatFrequency: repeatFrequency || null,
-        repeatDayOfWeek: repeatDayOfWeek !== undefined ? repeatDayOfWeek : null,
-        status: computeStatus(startDate || null, endDate || null),
-        formId: form.id,
-        trackAttendance: resolvedTrackAttendance,
-        requireCheckout: resolvedRequireCheckout,
-        printLabels: resolvedPrintLabels,
-        labelType: resolvedLabelType,
-        roomAssignmentMode: roomAssignmentMode || null,
-      })
-      .returning();
-
-    // Generate sessions for repeating events
-    if (resolvedScheduleType === "repeating" && startDate && endDate && repeatDayOfWeek !== undefined && repeatDayOfWeek !== null) {
-      await createEventSessions(event.id, startDate, endDate, repeatDayOfWeek, startTime || null, endTime || null);
-    }
-
-    const [questions, formFields] = await Promise.all([
-      db.select().from(questionsTable).where(eq(questionsTable.formId, form.id)).orderBy(asc(questionsTable.order)),
-      db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, form.id)).orderBy(asc(formFieldsTable.sortOrder)),
-    ]);
+    const { event, form, questions, formFields } = await createEventWithForm({
+      name, description, eventType, registrationType, scheduleType, startDate, endDate, startTime, endTime,
+      repeatFrequency, repeatDayOfWeek, formTitle, formDescription, addDefaultQuestions,
+      trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode,
+    });
 
     const row = await buildEventRow(event);
 
@@ -334,6 +377,11 @@ router.get("/events/:eventId/registrations/export", async (req, res) => {
         guardianName: reg.guardianName,
         guardianPhone: reg.guardianPhone,
         guardianEmail: reg.guardianEmail ?? "",
+        secondaryGuardianFirstName: reg.secondaryGuardianFirstName ?? "",
+        secondaryGuardianLastName: reg.secondaryGuardianLastName ?? "",
+        secondaryGuardianPhone: reg.secondaryGuardianPhone ?? "",
+        secondaryGuardianEmail: reg.secondaryGuardianEmail ?? "",
+        secondaryGuardianRelationship: reg.secondaryGuardianRelationship ?? "",
         allergies: reg.allergies ?? "",
         specialNeeds: reg.specialNeeds ?? "",
         room: reg.room ?? "",
@@ -419,6 +467,7 @@ router.put("/events/:eventId", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
+    await ensureEventDateSessions(eventId);
     res.json(await buildEventRow(updated));
   } catch (err) {
     req.log.error({ err }, "Failed to update event");

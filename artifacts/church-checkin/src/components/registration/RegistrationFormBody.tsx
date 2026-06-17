@@ -24,7 +24,7 @@ export function getFieldSection(field: FormField): FieldSection {
     const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
     if (def?.category === "guardian") return "guardian_info";
     if (def?.category === "emergency_safety") return "emergency_contact";
-    if (def?.category === "participant" || def?.category === "rooms") return "child_info";
+    if (def?.category === "participant" || def?.category === "individual" || def?.category === "rooms") return "child_info";
     return "additional_questions";
   }
   return (field.sectionKey as FieldSection) ?? "additional_questions";
@@ -138,6 +138,7 @@ export interface RegistrationFormBodyProps {
   formFields: FormField[];
   rooms: Room[];
   isChildCheckin: boolean;
+  allowAdditionalPeople?: boolean;
   guardianAnswers: Record<number, string>;
   childrenAnswers: Record<number, string>[];
   emergencyAnswers: Record<number, string>;
@@ -154,6 +155,7 @@ export function RegistrationFormBody({
   formFields,
   rooms,
   isChildCheckin,
+  allowAdditionalPeople = false,
   guardianAnswers,
   childrenAnswers,
   emergencyAnswers,
@@ -249,16 +251,18 @@ export function RegistrationFormBody({
         </Card>
       ))}
 
-      {/* Add another child */}
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full border-dashed h-12 text-base font-medium"
-        onClick={onAddChild}
-      >
-        <Plus className="w-4 h-4 mr-2" />
-        {isChildCheckin ? "Add Another Child" : "Add Another Person"}
-      </Button>
+      {/* Add another child/person */}
+      {(isChildCheckin || allowAdditionalPeople) && (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full border-dashed h-12 text-base font-medium"
+          onClick={onAddChild}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          {isChildCheckin ? "Add Another Child" : "Add Another Person"}
+        </Button>
+      )}
 
       {/* Emergency Contact — shown once, not per-child */}
       {emergencyFields.length > 0 && (
@@ -286,8 +290,8 @@ export function RegistrationFormBody({
         </Card>
       )}
 
-      {/* Additional Questions — shown once, not per-child */}
-      {isChildCheckin && additionalFields.length > 0 && (
+      {/* Additional Questions — shown once, not per-child/person */}
+      {additionalFields.length > 0 && (
         <Card className="shadow-sm overflow-hidden">
           <div className="bg-muted/60 border-b border-border px-6 py-4 flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-muted-foreground" />

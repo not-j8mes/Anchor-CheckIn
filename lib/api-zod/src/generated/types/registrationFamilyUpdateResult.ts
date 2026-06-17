@@ -6,6 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type UpdateRegistrationCustomAnswers200 = {
-  updated?: number;
-};
+export interface RegistrationFamilyUpdateResult {
+  updated: number;
+}
