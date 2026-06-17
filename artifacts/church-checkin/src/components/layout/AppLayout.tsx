@@ -12,8 +12,6 @@ import {
 import { useGetOrganization } from "@workspace/api-client-react";
 import {
   LayoutDashboard,
-  Users,
-  CheckSquare,
   Settings,
   CalendarDays,
 } from "lucide-react";
@@ -27,7 +25,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const navigation = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Events", href: "/events", icon: CalendarDays },
-    { name: "Check-In Kiosk", href: "/checkin", icon: CheckSquare },
   ];
 
   return (

@@ -15,6 +15,7 @@ import {
 } from "@workspace/db";
 import { CreateCheckinBody, CheckoutChildParams } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
+import { isPgUniqueViolation } from "../lib/httpGuards";
 
 const router = Router();
 
@@ -83,6 +84,24 @@ function serializeCheckin(c: typeof checkinsTable.$inferSelect) {
     checkinAt: c.checkinAt.toISOString(),
     checkoutAt: c.checkoutAt?.toISOString() ?? null,
   };
+}
+
+async function findActiveCheckin(
+  registrationId: number,
+  sessionId: number | null | undefined,
+) {
+  const [activeCheckin] = await db
+    .select({ id: checkinsTable.id })
+    .from(checkinsTable)
+    .where(
+      and(
+        eq(checkinsTable.registrationId, registrationId),
+        sessionCondition(sessionId),
+        isNull(checkinsTable.checkoutAt),
+      ),
+    )
+    .limit(1);
+  return activeCheckin;
 }
 
 // Walk-in: register a new child and immediately check them in
@@ -307,29 +326,39 @@ router.post("/checkins/batch", async (req, res) => {
       if (!reg[0]) continue;
       const r = reg[0];
 
-      const [activeCheckin] = await db
-        .select({ id: checkinsTable.id })
-        .from(checkinsTable)
-        .where(and(eq(checkinsTable.registrationId, item.registrationId), sessionCondition(sessionId), isNull(checkinsTable.checkoutAt)))
-        .limit(1);
+      const activeCheckin = await findActiveCheckin(item.registrationId, sessionId);
       if (activeCheckin) {
         skipped.push({ registrationId: item.registrationId, reason: "Already checked in", checkinId: activeCheckin.id });
         continue;
       }
 
-      const [checkin] = await db
-        .insert(checkinsTable)
-        .values({
-          registrationId: item.registrationId,
-          sessionId: sessionId ?? null,
-          childFirstName: r.childFirstName,
-          childLastName: r.childLastName,
-          guardianName: r.guardianName,
-          room: item.room ?? r.room ?? null,
-          labelCode: sharedLabelCode,
-          labelPrinted: false,
-        })
-        .returning();
+      let checkin: typeof checkinsTable.$inferSelect;
+      try {
+        [checkin] = await db
+          .insert(checkinsTable)
+          .values({
+            registrationId: item.registrationId,
+            sessionId: sessionId ?? null,
+            childFirstName: r.childFirstName,
+            childLastName: r.childLastName,
+            guardianName: r.guardianName,
+            room: item.room ?? r.room ?? null,
+            labelCode: sharedLabelCode,
+            labelPrinted: false,
+          })
+          .returning();
+      } catch (err) {
+        if (isPgUniqueViolation(err)) {
+          const concurrentActiveCheckin = await findActiveCheckin(item.registrationId, sessionId);
+          skipped.push({
+            registrationId: item.registrationId,
+            reason: "Already checked in",
+            checkinId: concurrentActiveCheckin?.id,
+          });
+          continue;
+        }
+        throw err;
+      }
 
       checkins.push(serializeCheckin(checkin));
       labels.push({
@@ -409,11 +438,7 @@ router.post("/checkins", async (req, res) => {
     const { registrationId, room, sessionId, reuseFamilyCode } = parsed.data;
 
     // Prevent duplicate active check-ins for the same registration
-    const [activeCheckin] = await db
-      .select()
-      .from(checkinsTable)
-      .where(and(eq(checkinsTable.registrationId, registrationId), sessionCondition(sessionId), isNull(checkinsTable.checkoutAt)))
-      .limit(1);
+    const activeCheckin = await findActiveCheckin(registrationId, sessionId);
     if (activeCheckin) {
       res.status(409).json({ error: "Already checked in", checkinId: activeCheckin.id });
       return;
@@ -432,19 +457,32 @@ router.post("/checkins", async (req, res) => {
     const labelCode = reuseFamilyCode
       ? (await getFamilyLabelCode(r.eventId, r.registrationGroupId, sessionId)) ?? generateLabelCode()
       : generateLabelCode();
-    const [checkin] = await db
-      .insert(checkinsTable)
-      .values({
-        registrationId,
-        sessionId: sessionId ?? null,
-        childFirstName: r.childFirstName,
-        childLastName: r.childLastName,
-        guardianName: r.guardianName,
-        room: room ?? r.room ?? null,
-        labelCode,
-        labelPrinted: false,
-      })
-      .returning();
+    let checkin: typeof checkinsTable.$inferSelect;
+    try {
+      [checkin] = await db
+        .insert(checkinsTable)
+        .values({
+          registrationId,
+          sessionId: sessionId ?? null,
+          childFirstName: r.childFirstName,
+          childLastName: r.childLastName,
+          guardianName: r.guardianName,
+          room: room ?? r.room ?? null,
+          labelCode,
+          labelPrinted: false,
+        })
+        .returning();
+    } catch (err) {
+      if (isPgUniqueViolation(err)) {
+        const concurrentActiveCheckin = await findActiveCheckin(registrationId, sessionId);
+        res.status(409).json({
+          error: "Already checked in",
+          checkinId: concurrentActiveCheckin?.id,
+        });
+        return;
+      }
+      throw err;
+    }
 
     const orgs = await db.select().from(organizationsTable).limit(1);
     const orgName = orgs[0]?.name ?? "Church";

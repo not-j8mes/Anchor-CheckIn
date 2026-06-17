@@ -13,6 +13,7 @@ import {
   emergencyContactsTable,
 } from "@workspace/db";
 import { createEventWithForm } from "./events";
+import { hasAdminAccess } from "../lib/httpGuards";
 import {
   randomKidFirstName,
   randomAdultFirstName,
@@ -28,6 +29,14 @@ import {
 } from "../lib/testData";
 
 const router = Router();
+
+router.use((req, res, next) => {
+  if (hasAdminAccess(req)) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: "Admin access required" });
+});
 
 router.delete("/admin/reset", async (req, res) => {
   try {

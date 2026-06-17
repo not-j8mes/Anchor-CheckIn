@@ -4,8 +4,11 @@ import pinoHttp from "pino-http";
 import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { isOriginAllowed, parseAllowedOrigins } from "./lib/httpGuards";
 
 const app: Express = express();
+const allowedOrigins = parseAllowedOrigins(process.env["CORS_ORIGIN"]);
+const jsonBodyLimit = process.env["JSON_BODY_LIMIT"] || "1mb";
 
 app.use(
   pinoHttp({
@@ -26,9 +29,19 @@ app.use(
     },
   }),
 );
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (isOriginAllowed(origin, allowedOrigins)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error("Origin is not allowed by CORS"));
+    },
+  }),
+);
+app.use(express.json({ limit: jsonBodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }));
 
 app.use("/api", router);
 

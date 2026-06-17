@@ -11,7 +11,6 @@ import EventSelectionScreen from "@/pages/events";
 import EventWorkspace from "@/pages/events/detail";
 import EventSetupWizard from "@/pages/events/setup";
 import PublicRegistrationForm from "@/pages/register";
-import CheckinKiosk from "@/pages/checkin";
 import SettingsPage from "@/pages/settings";
 
 const queryClient = new QueryClient();
@@ -31,9 +30,6 @@ function Router() {
     <Switch>
       {/* Public routes — no layout */}
       <Route path="/register/:embedSlug" component={PublicRegistrationForm} />
-
-      {/* Standalone kiosk mode */}
-      <Route path="/checkin" component={CheckinKiosk} />
 
       {/* New event setup wizard — must be before /:id routes */}
       <Route path="/events/new" component={EventSetupWizard} />

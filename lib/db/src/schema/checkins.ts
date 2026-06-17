@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { pgTable, serial, text, boolean, timestamp, integer, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -5,24 +6,35 @@ import { registrationsTable, registrationGroupsTable } from "./registrations";
 import { eventSessionsTable } from "./event_sessions";
 import { eventsTable } from "./events";
 
-export const checkinsTable = pgTable("checkins", {
-  id: serial("id").primaryKey(),
-  registrationId: integer("registration_id").notNull().references(() => registrationsTable.id, { onDelete: "cascade" }),
-  sessionId: integer("session_id").references(() => eventSessionsTable.id, { onDelete: "set null" }),
-  childFirstName: text("child_first_name").notNull(),
-  childLastName: text("child_last_name").notNull(),
-  guardianName: text("guardian_name").notNull(),
-  checkinAt: timestamp("checkin_at").notNull().defaultNow(),
-  checkoutAt: timestamp("checkout_at"),
-  room: text("room"),
-  labelCode: text("label_code").notNull(),
-  labelPrinted: boolean("label_printed").notNull().default(false),
-  pickupPersonName: text("pickup_person_name"),
-  notes: text("notes"),
-  checkoutMethod: text("checkout_method"),
-  checkoutReason: text("checkout_reason"),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+export const checkinsTable = pgTable(
+  "checkins",
+  {
+    id: serial("id").primaryKey(),
+    registrationId: integer("registration_id").notNull().references(() => registrationsTable.id, { onDelete: "cascade" }),
+    sessionId: integer("session_id").references(() => eventSessionsTable.id, { onDelete: "set null" }),
+    childFirstName: text("child_first_name").notNull(),
+    childLastName: text("child_last_name").notNull(),
+    guardianName: text("guardian_name").notNull(),
+    checkinAt: timestamp("checkin_at").notNull().defaultNow(),
+    checkoutAt: timestamp("checkout_at"),
+    room: text("room"),
+    labelCode: text("label_code").notNull(),
+    labelPrinted: boolean("label_printed").notNull().default(false),
+    pickupPersonName: text("pickup_person_name"),
+    notes: text("notes"),
+    checkoutMethod: text("checkout_method"),
+    checkoutReason: text("checkout_reason"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("checkins_active_registration_session_unique")
+      .on(t.registrationId, t.sessionId)
+      .where(sql`${t.checkoutAt} IS NULL AND ${t.sessionId} IS NOT NULL`),
+    uniqueIndex("checkins_active_registration_no_session_unique")
+      .on(t.registrationId)
+      .where(sql`${t.checkoutAt} IS NULL AND ${t.sessionId} IS NULL`),
+  ],
+);
 
 export const insertCheckinSchema = createInsertSchema(checkinsTable).omit({ id: true, checkinAt: true });
 export type InsertCheckin = z.infer<typeof insertCheckinSchema>;
