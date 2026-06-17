@@ -8,6 +8,7 @@ import {
   useCreateFormField,
   useListEventCategories,
   useCreateEventCategory,
+  useGetOrganization,
   getListEventsQueryKey,
   getListEventCategoriesQueryKey,
 } from "@workspace/api-client-react";
@@ -1937,6 +1938,8 @@ export default function EventSetupWizard() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: org } = useGetOrganization();
+  const brandLogo = org?.logoUrl || anchorLogo;
   const createEvent = useCreateEvent();
   const createRoom = useCreateRoom();
   const createFormField = useCreateFormField();
@@ -2169,7 +2172,7 @@ export default function EventSetupWizard() {
             Back to Events
           </Button>
           <div className="flex items-center gap-2 flex-1 justify-center">
-            <img src={anchorLogo} alt="logo" className="w-5 h-5 object-contain" />
+            <img src={brandLogo} alt="Organization logo" className="w-5 h-5 object-contain" />
             <span className="font-serif font-bold text-sm">New Event Setup</span>
           </div>
           <span className="text-xs text-muted-foreground w-16 text-right">

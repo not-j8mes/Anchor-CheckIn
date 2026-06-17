@@ -23,6 +23,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: org } = useGetOrganization();
   const { setOpenMobile } = useSidebar();
+  const brandLogo = org?.logoUrl || appLogo;
+  const brandName = org?.name || DEFAULT_ORGANIZATION_NAME;
 
   const navigation = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -33,9 +35,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen w-full bg-background">
       <Sidebar>
         <SidebarHeader className="p-4 flex flex-row items-center gap-2 text-sidebar-primary">
-          <img src={appLogo} alt="logo" className="w-8 h-8 object-contain" />
+          <img src={brandLogo} alt={`${brandName} logo`} className="w-8 h-8 object-contain" />
           <span className="font-serif font-bold text-lg text-sidebar-foreground">
-            {org?.name || DEFAULT_ORGANIZATION_NAME}
+            {brandName}
           </span>
         </SidebarHeader>
         <SidebarContent className="px-2 mt-4">
@@ -96,7 +98,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile-only top bar with hamburger to open sidebar */}
         <div className="flex md:hidden sticky top-0 z-10 items-center gap-3 px-4 h-14 border-b border-border bg-background/95 backdrop-blur shrink-0">
           <SidebarTrigger className="h-8 w-8" />
-          <span className="font-semibold text-sm">{org?.name || DEFAULT_ORGANIZATION_NAME}</span>
+          <span className="font-semibold text-sm">{brandName}</span>
         </div>
         {children}
       </main>

@@ -772,6 +772,8 @@ export default function EventSelectionScreen() {
   const visible = viewMode === "list"
     ? filtered.filter((e) => showPast || !isPast(e))
     : filtered;
+  const brandLogo = org?.logoUrl || appLogo;
+  const brandName = org?.name || DEFAULT_ORGANIZATION_NAME;
 
   return (
     <div className="min-h-screen bg-background">
@@ -779,8 +781,8 @@ export default function EventSelectionScreen() {
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-foreground min-w-0 shrink-0">
-            <img src={appLogo} alt="logo" className="w-6 h-6 object-contain shrink-0" />
-            <span className="font-serif font-bold text-base whitespace-nowrap">{org?.name || DEFAULT_ORGANIZATION_NAME}</span>
+            <img src={brandLogo} alt={`${brandName} logo`} className="w-6 h-6 object-contain shrink-0" />
+            <span className="font-serif font-bold text-base whitespace-nowrap">{brandName}</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
