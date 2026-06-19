@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { db, registrationsTable, checkinsTable } from "@workspace/db";
 import { GetChildParams } from "@workspace/api-zod";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
@@ -49,10 +50,15 @@ router.get("/children", async (req, res) => {
   const eventIdStr = req.query.eventId as string | undefined;
   const eventId = eventIdStr ? parseInt(eventIdStr, 10) : undefined;
   try {
+    const auth = requireAuthContext(req);
     const regs = await db
       .select()
       .from(registrationsTable)
-      .where(eventId !== undefined ? eq(registrationsTable.eventId, eventId) : undefined)
+      .where(
+        eventId !== undefined
+          ? and(eq(registrationsTable.organizationId, auth.organizationId), eq(registrationsTable.eventId, eventId))
+          : eq(registrationsTable.organizationId, auth.organizationId),
+      )
       .orderBy(desc(registrationsTable.createdAt));
 
     const children = await Promise.all(regs.map(buildChild));
@@ -81,10 +87,11 @@ router.get("/children/:childId", async (req, res) => {
   const { childId: childIdStr } = GetChildParams.parse(req.params);
   const childId = Number(childIdStr);
   try {
+    const auth = requireAuthContext(req);
     const reg = await db
       .select()
       .from(registrationsTable)
-      .where(eq(registrationsTable.id, childId))
+      .where(and(eq(registrationsTable.id, childId), eq(registrationsTable.organizationId, auth.organizationId)))
       .limit(1);
     if (!reg[0]) {
       res.status(404).json({ error: "Not found" });

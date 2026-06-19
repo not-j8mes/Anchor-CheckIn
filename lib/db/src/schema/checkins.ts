@@ -5,11 +5,15 @@ import { z } from "zod/v4";
 import { registrationsTable, registrationGroupsTable } from "./registrations";
 import { eventSessionsTable } from "./event_sessions";
 import { eventsTable } from "./events";
+import { organizationsTable } from "./organizations";
 
 export const checkinsTable = pgTable(
   "checkins",
   {
     id: serial("id").primaryKey(),
+    organizationId: integer("organization_id").references(() => organizationsTable.id, {
+      onDelete: "cascade",
+    }),
     registrationId: integer("registration_id").notNull().references(() => registrationsTable.id, { onDelete: "cascade" }),
     sessionId: integer("session_id").references(() => eventSessionsTable.id, { onDelete: "set null" }),
     childFirstName: text("child_first_name").notNull(),
@@ -49,6 +53,9 @@ export const familyEventCodesTable = pgTable(
   "family_event_codes",
   {
     id: serial("id").primaryKey(),
+    organizationId: integer("organization_id").references(() => organizationsTable.id, {
+      onDelete: "cascade",
+    }),
     eventId: integer("event_id")
       .notNull()
       .references(() => eventsTable.id, { onDelete: "cascade" }),

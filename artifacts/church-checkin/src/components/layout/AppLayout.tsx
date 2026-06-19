@@ -14,14 +14,17 @@ import {
   LayoutDashboard,
   Settings,
   CalendarDays,
+  LogOut,
 } from "lucide-react";
 import appLogo from "@assets/image_1781393408862.png";
+import { useAuth } from "@/lib/auth";
 
 const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: org } = useGetOrganization();
+  const { user, logout } = useAuth();
   const { setOpenMobile } = useSidebar();
   const brandLogo = org?.logoUrl || appLogo;
   const brandName = org?.name || DEFAULT_ORGANIZATION_NAME;
@@ -30,6 +33,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
     { name: "Events", href: "/events", icon: CalendarDays },
   ];
+
+  async function handleLogout() {
+    await logout();
+    window.location.href = "/login";
+  }
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -71,6 +79,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarContent>
         <SidebarFooter className="p-4">
           <SidebarMenu>
+            {user && (
+              <SidebarMenuItem className="mb-2 px-3 py-2 rounded-md border border-sidebar-border bg-sidebar-accent/20">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  {user.firstName} {user.lastName}
+                </p>
+                <p className="text-xs text-sidebar-foreground/60 truncate">{user.email}</p>
+              </SidebarMenuItem>
+            )}
             <SidebarMenuItem>
               <Link
                 href="/settings"
@@ -90,6 +106,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 />
                 <span>Settings</span>
               </Link>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <button
+                type="button"
+                className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full text-sidebar-foreground hover:bg-sidebar-accent/50"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-5 h-5 text-sidebar-foreground/70" />
+                <span>Logout</span>
+              </button>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>

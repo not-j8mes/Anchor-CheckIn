@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, eventCategoriesTable, eventsTable } from "@workspace/db";
 import { randomBytes } from "crypto";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
@@ -9,15 +10,16 @@ const DEFAULT_SLUG = "general";
 const DEFAULT_NAME = "General / Other";
 
 /** Seed the default category if it doesn't exist yet. */
-async function ensureDefault() {
+async function ensureDefault(organizationId: number) {
   const existing = await db
     .select()
     .from(eventCategoriesTable)
-    .where(eq(eventCategoriesTable.slug, DEFAULT_SLUG))
+    .where(and(eq(eventCategoriesTable.organizationId, organizationId), eq(eventCategoriesTable.isDefault, true)))
     .limit(1);
   if (existing.length === 0) {
     await db.insert(eventCategoriesTable).values({
-      slug: DEFAULT_SLUG,
+      organizationId,
+      slug: `${DEFAULT_SLUG}_${organizationId}`,
       name: DEFAULT_NAME,
       isDefault: true,
     });
@@ -26,10 +28,12 @@ async function ensureDefault() {
 
 router.get("/event-categories", async (req, res) => {
   try {
-    await ensureDefault();
+    const auth = requireAuthContext(req);
+    await ensureDefault(auth.organizationId);
     const categories = await db
       .select()
       .from(eventCategoriesTable)
+      .where(eq(eventCategoriesTable.organizationId, auth.organizationId))
       .orderBy(eventCategoriesTable.name);
     res.json(categories);
   } catch (err) {
@@ -47,11 +51,12 @@ router.post("/event-categories", async (req, res) => {
   const trimmedName = name.trim();
 
   try {
-    await ensureDefault();
+    const auth = requireAuthContext(req);
+    await ensureDefault(auth.organizationId);
     const slug = `cat_${randomBytes(4).toString("hex")}`;
     const [category] = await db
       .insert(eventCategoriesTable)
-      .values({ slug, name: trimmedName, isDefault: false })
+      .values({ organizationId: auth.organizationId, slug, name: trimmedName, isDefault: false })
       .returning();
     res.status(201).json(category);
   } catch (err: unknown) {
@@ -74,10 +79,11 @@ router.patch("/event-categories/:categoryId", async (req, res) => {
   const trimmedName = name.trim();
 
   try {
+    const auth = requireAuthContext(req);
     const [existing] = await db
       .select()
       .from(eventCategoriesTable)
-      .where(eq(eventCategoriesTable.id, categoryId))
+      .where(and(eq(eventCategoriesTable.id, categoryId), eq(eventCategoriesTable.organizationId, auth.organizationId)))
       .limit(1);
     if (!existing) {
       res.status(404).json({ error: "Category not found" });
@@ -87,7 +93,7 @@ router.patch("/event-categories/:categoryId", async (req, res) => {
     const [updated] = await db
       .update(eventCategoriesTable)
       .set({ name: trimmedName })
-      .where(eq(eventCategoriesTable.id, categoryId))
+      .where(and(eq(eventCategoriesTable.id, categoryId), eq(eventCategoriesTable.organizationId, auth.organizationId)))
       .returning();
     res.json(updated);
   } catch (err: unknown) {
@@ -103,10 +109,11 @@ router.patch("/event-categories/:categoryId", async (req, res) => {
 router.delete("/event-categories/:categoryId", async (req, res) => {
   const categoryId = parseInt(req.params.categoryId, 10);
   try {
+    const auth = requireAuthContext(req);
     const [existing] = await db
       .select()
       .from(eventCategoriesTable)
-      .where(eq(eventCategoriesTable.id, categoryId))
+      .where(and(eq(eventCategoriesTable.id, categoryId), eq(eventCategoriesTable.organizationId, auth.organizationId)))
       .limit(1);
     if (!existing) {
       res.status(404).json({ error: "Category not found" });
@@ -121,11 +128,11 @@ router.delete("/event-categories/:categoryId", async (req, res) => {
     await db
       .update(eventsTable)
       .set({ eventType: DEFAULT_SLUG })
-      .where(eq(eventsTable.eventType, existing.slug));
+      .where(and(eq(eventsTable.eventType, existing.slug), eq(eventsTable.organizationId, auth.organizationId)));
 
     await db
       .delete(eventCategoriesTable)
-      .where(eq(eventCategoriesTable.id, categoryId));
+      .where(and(eq(eventCategoriesTable.id, categoryId), eq(eventCategoriesTable.organizationId, auth.organizationId)));
 
     res.status(204).send();
   } catch (err) {

@@ -1,8 +1,9 @@
 import { Router } from "express";
-import { eq, sql, desc, inArray, asc } from "drizzle-orm";
+import { and, eq, sql, desc, inArray, asc } from "drizzle-orm";
 import { db, eventsTable, formsTable, questionsTable, formFieldsTable, registrationsTable, checkinsTable, registrationCustomAnswersTable, eventSessionsTable } from "@workspace/db";
 import { randomBytes } from "crypto";
 import { createEventSessions, ensureEventDateSessions } from "./event-sessions";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
@@ -72,6 +73,7 @@ function getFormTemplate(registrationType?: string | null) {
 }
 
 interface CreateEventWithFormInput {
+  organizationId: number;
   name: string;
   description?: string | null;
   eventType: string;
@@ -103,6 +105,7 @@ export async function createEventWithForm(input: CreateEventWithFormInput) {
     addDefaultQuestions, startDate, endDate, startTime, endTime,
     repeatFrequency, repeatDayOfWeek, trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode,
   } = input;
+  const { organizationId } = input;
 
   const resolvedScheduleType = input.scheduleType || "one_time";
 
@@ -118,6 +121,7 @@ export async function createEventWithForm(input: CreateEventWithFormInput) {
     .insert(formsTable)
     .values({
       title: formTitle,
+      organizationId,
       description: formDescription || null,
       isActive: true,
       isPublic: true,
@@ -130,13 +134,13 @@ export async function createEventWithForm(input: CreateEventWithFormInput) {
     // Legacy questions table (backward compat — only seed for child_checkin / no type)
     if (!registrationType || registrationType === "child_checkin") {
       await db.insert(questionsTable).values(
-        DEFAULT_QUESTIONS.map((q) => ({ ...q, formId: form.id, options: null }))
+        DEFAULT_QUESTIONS.map((q) => ({ ...q, formId: form.id, organizationId, options: null }))
       );
     }
     // New form_fields table — use the right template for the registration type
     const template = getFormTemplate(registrationType);
     await db.insert(formFieldsTable).values(
-      template.map((f) => ({ ...f, formId: form.id }))
+      template.map((f) => ({ ...f, formId: form.id, organizationId }))
     );
   }
 
@@ -144,6 +148,7 @@ export async function createEventWithForm(input: CreateEventWithFormInput) {
     .insert(eventsTable)
     .values({
       name,
+      organizationId,
       description: description || null,
       eventType,
       registrationType: registrationType || null,
@@ -166,7 +171,7 @@ export async function createEventWithForm(input: CreateEventWithFormInput) {
 
   // Generate sessions for repeating events
   if (resolvedScheduleType === "repeating" && startDate && endDate && repeatDayOfWeek !== undefined && repeatDayOfWeek !== null) {
-    await createEventSessions(event.id, startDate, endDate, repeatDayOfWeek, startTime || null, endTime || null);
+    await createEventSessions(event.id, organizationId, startDate, endDate, repeatDayOfWeek, startTime || null, endTime || null);
   }
   await ensureEventDateSessions(event.id);
 
@@ -233,8 +238,13 @@ async function buildEventRow(event: typeof eventsTable.$inferSelect) {
 }
 
 router.get("/events", async (req, res) => {
+  const auth = requireAuthContext(req);
   try {
-    const events = await db.select().from(eventsTable).orderBy(sql`start_date DESC NULLS LAST, created_at DESC`);
+    const events = await db
+      .select()
+      .from(eventsTable)
+      .where(eq(eventsTable.organizationId, auth.organizationId))
+      .orderBy(sql`start_date DESC NULLS LAST, created_at DESC`);
     const rows = await Promise.all(events.map(buildEventRow));
     res.json(rows);
   } catch (err) {
@@ -244,6 +254,7 @@ router.get("/events", async (req, res) => {
 });
 
 router.post("/events", async (req, res) => {
+  const auth = requireAuthContext(req);
   const { name, description, eventType, registrationType, scheduleType, startDate, endDate, startTime, endTime, repeatFrequency, repeatDayOfWeek, formTitle, formDescription, addDefaultQuestions, trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode } = req.body;
 
   if (!name || !eventType || !formTitle) {
@@ -254,6 +265,7 @@ router.post("/events", async (req, res) => {
   try {
     const { event, form, questions, formFields } = await createEventWithForm({
       name, description, eventType, registrationType, scheduleType, startDate, endDate, startTime, endTime,
+      organizationId: auth.organizationId,
       repeatFrequency, repeatDayOfWeek, formTitle, formDescription, addDefaultQuestions,
       trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode,
     });
@@ -274,7 +286,8 @@ router.get("/events/:eventId/checkins", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   if (isNaN(eventId)) { res.status(400).json({ error: "Invalid eventId" }); return; }
   try {
-    const event = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    const auth = requireAuthContext(req);
+    const event = await db.select().from(eventsTable).where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId))).limit(1);
     if (!event[0]) { res.status(404).json({ error: "Not found" }); return; }
     if (!event[0].formId) { res.json([]); return; }
 
@@ -306,10 +319,11 @@ router.get("/events/:eventId/registrations/export", async (req, res) => {
   if (isNaN(eventId)) { res.status(400).json({ error: "Invalid eventId" }); return; }
 
   try {
+    const auth = requireAuthContext(req);
     const [event] = await db
       .select()
       .from(eventsTable)
-      .where(eq(eventsTable.id, eventId))
+      .where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)))
       .limit(1);
 
     if (!event) { res.status(404).json({ error: "Event not found" }); return; }
@@ -406,7 +420,12 @@ router.get("/events/:eventId", async (req, res) => {
     return;
   }
   try {
-    const event = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    const auth = requireAuthContext(req);
+    const event = await db
+      .select()
+      .from(eventsTable)
+      .where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)))
+      .limit(1);
     if (!event[0]) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -440,6 +459,7 @@ router.put("/events/:eventId", async (req, res) => {
   }
   const { name, description, eventType, registrationType, scheduleType, startDate, endDate, startTime, endTime, repeatFrequency, repeatDayOfWeek, trackAttendance, requireCheckout, printLabels, labelType, roomAssignmentMode } = req.body;
   try {
+    const auth = requireAuthContext(req);
     const [updated] = await db
       .update(eventsTable)
       .set({
@@ -460,7 +480,7 @@ router.put("/events/:eventId", async (req, res) => {
         ...(labelType !== undefined && { labelType }),
         ...(roomAssignmentMode !== undefined && { roomAssignmentMode }),
       })
-      .where(eq(eventsTable.id, eventId))
+      .where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)))
       .returning();
 
     if (!updated) {
@@ -482,16 +502,21 @@ router.delete("/events/:eventId", async (req, res) => {
     return;
   }
   try {
+    const auth = requireAuthContext(req);
     // Get the linked formId before deleting the event
-    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    const [event] = await db
+      .select()
+      .from(eventsTable)
+      .where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)))
+      .limit(1);
     const formId = event?.formId ?? null;
 
     // Delete the event first (removes FK reference to form)
-    await db.delete(eventsTable).where(eq(eventsTable.id, eventId));
+    await db.delete(eventsTable).where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)));
 
     // Then delete the linked form — cascades to questions, registrations, answers, check-ins
     if (formId) {
-      await db.delete(formsTable).where(eq(formsTable.id, formId));
+      await db.delete(formsTable).where(and(eq(formsTable.id, formId), eq(formsTable.organizationId, auth.organizationId)));
     }
 
     res.status(204).send();

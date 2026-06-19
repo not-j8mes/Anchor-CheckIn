@@ -2,6 +2,7 @@ import { pgTable, serial, text, boolean, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { formsTable } from "./forms";
+import { organizationsTable } from "./organizations";
 
 /**
  * form_fields — the new field model that supports both system fields (which map
@@ -21,6 +22,9 @@ import { formsTable } from "./forms";
  */
 export const formFieldsTable = pgTable("form_fields", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   formId: integer("form_id")
     .notNull()
     .references(() => formsTable.id, { onDelete: "cascade" }),

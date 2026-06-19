@@ -1,14 +1,20 @@
 import { Router } from "express";
-import { eq, sql, desc, asc } from "drizzle-orm";
-import { db, formsTable, questionsTable, formFieldsTable, registrationsTable, eventsTable } from "@workspace/db";
+import { and, eq, sql, desc, asc } from "drizzle-orm";
+import { db, formsTable, questionsTable, formFieldsTable, registrationsTable, eventsTable, organizationsTable } from "@workspace/db";
 import { CreateFormBody, UpdateFormBody, GetFormParams, UpdateFormParams, DeleteFormParams } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
 router.get("/forms", async (req, res) => {
   try {
-    const forms = await db.select().from(formsTable).orderBy(desc(formsTable.createdAt));
+    const auth = requireAuthContext(req);
+    const forms = await db
+      .select()
+      .from(formsTable)
+      .where(eq(formsTable.organizationId, auth.organizationId))
+      .orderBy(desc(formsTable.createdAt));
     const withCounts = await Promise.all(
       forms.map(async (form) => {
         const [{ count }] = await db
@@ -32,10 +38,11 @@ router.post("/forms", async (req, res) => {
     return;
   }
   try {
+    const auth = requireAuthContext(req);
     const embedSlug = randomBytes(6).toString("hex");
     const [form] = await db
       .insert(formsTable)
-      .values({ ...parsed.data, embedSlug })
+      .values({ ...parsed.data, organizationId: auth.organizationId, embedSlug })
       .returning();
     res.status(201).json({ ...form, submissionCount: 0 });
   } catch (err) {
@@ -52,16 +59,19 @@ router.get("/forms/by-slug/:embedSlug", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const [questions, formFields, [{ count }], linkedEvent] = await Promise.all([
+    const [questions, formFields, [{ count }], linkedEvent, organization] = await Promise.all([
       db.select().from(questionsTable).where(eq(questionsTable.formId, form[0].id)).orderBy(asc(questionsTable.order)),
       db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, form[0].id)).orderBy(asc(formFieldsTable.sortOrder)),
       db.select({ count: sql<number>`count(*)::int` }).from(registrationsTable).where(eq(registrationsTable.formId, form[0].id)),
       db.select({ registrationType: eventsTable.registrationType, eventId: eventsTable.id, roomAssignmentMode: eventsTable.roomAssignmentMode }).from(eventsTable).where(eq(eventsTable.formId, form[0].id)).limit(1),
+      form[0].organizationId
+        ? db.select().from(organizationsTable).where(eq(organizationsTable.id, form[0].organizationId)).limit(1)
+        : Promise.resolve([]),
     ]);
     const registrationType = linkedEvent[0]?.registrationType ?? null;
     const eventId = linkedEvent[0]?.eventId ?? null;
     const roomAssignmentMode = linkedEvent[0]?.roomAssignmentMode ?? null;
-    res.json({ ...form[0], submissionCount: count, questions, formFields, registrationType, eventId, roomAssignmentMode });
+    res.json({ ...form[0], submissionCount: count, questions, formFields, registrationType, eventId, roomAssignmentMode, organization: organization[0] ?? null });
   } catch (err) {
     req.log.error({ err }, "Failed to get form by slug");
     res.status(500).json({ error: "Internal server error" });
@@ -72,7 +82,12 @@ router.get("/forms/:formId", async (req, res) => {
   const { formId: formIdStr } = GetFormParams.parse(req.params);
   const formId = Number(formIdStr);
   try {
-    const form = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    const auth = requireAuthContext(req);
+    const form = await db
+      .select()
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), eq(formsTable.organizationId, auth.organizationId)))
+      .limit(1);
     if (!form[0]) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -101,10 +116,11 @@ router.put("/forms/:formId", async (req, res) => {
     return;
   }
   try {
+    const auth = requireAuthContext(req);
     const [updated] = await db
       .update(formsTable)
       .set(parsed.data)
-      .where(eq(formsTable.id, formId))
+      .where(and(eq(formsTable.id, formId), eq(formsTable.organizationId, auth.organizationId)))
       .returning();
     if (!updated) {
       res.status(404).json({ error: "Not found" });
@@ -121,7 +137,10 @@ router.delete("/forms/:formId", async (req, res) => {
   const { formId: formIdStr } = DeleteFormParams.parse(req.params);
   const formId = Number(formIdStr);
   try {
-    await db.delete(formsTable).where(eq(formsTable.id, formId));
+    const auth = requireAuthContext(req);
+    await db
+      .delete(formsTable)
+      .where(and(eq(formsTable.id, formId), eq(formsTable.organizationId, auth.organizationId)));
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete form");

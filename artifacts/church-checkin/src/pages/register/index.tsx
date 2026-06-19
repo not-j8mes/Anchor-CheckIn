@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useParams } from "wouter";
 import {
-  useGetOrganization,
   useSubmitRegistration,
   useListRooms,
   getGetFormBySlugQueryKey,
@@ -21,8 +20,6 @@ import {
 export default function PublicRegistrationForm() {
   const params = useParams<{ embedSlug: string }>();
   const slug = params.embedSlug;
-
-  const { data: org } = useGetOrganization();
 
   const { data: form, isLoading: formLoading } = useQuery({
     queryKey: getGetFormBySlugQueryKey(slug),
@@ -70,6 +67,7 @@ export default function PublicRegistrationForm() {
   }
 
   const formFields: FormField[] = form.formFields ?? [];
+  const org = (form as typeof form & { organization?: { name?: string; logoUrl?: string | null } | null }).organization;
   const isChildCheckin = !form.registrationType || form.registrationType === "child_checkin";
   const roomAssignmentFieldId = formFields.find((f) => f.systemKey === "room_assignment")?.id;
 

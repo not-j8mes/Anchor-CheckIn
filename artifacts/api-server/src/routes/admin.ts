@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { eq } from "drizzle-orm";
 import {
   db,
   eventsTable,
@@ -14,6 +15,7 @@ import {
 } from "@workspace/db";
 import { createEventWithForm } from "./events";
 import { hasAdminAccess } from "../lib/httpGuards";
+import { requireAuthContext } from "../lib/auth";
 import {
   randomKidFirstName,
   randomAdultFirstName,
@@ -40,16 +42,14 @@ router.use((req, res, next) => {
 
 router.delete("/admin/reset", async (req, res) => {
   try {
-    // Delete all events (sets formId to null via onDelete: "set null")
-    await db.delete(eventsTable);
-    // Delete all forms — cascades to questions, registrations, answers, check-ins
-    await db.delete(formsTable);
+    const auth = requireAuthContext(req);
+    await db.delete(eventsTable).where(eq(eventsTable.organizationId, auth.organizationId));
+    await db.delete(formsTable).where(eq(formsTable.organizationId, auth.organizationId));
     // Delete normalized person/contact records; dependent participant_guardians
     // and emergency_contacts rows cascade from these deletes.
-    await db.delete(participantsTable);
-    await db.delete(guardiansTable);
-    // Delete all event categories
-    await db.delete(eventCategoriesTable);
+    await db.delete(participantsTable).where(eq(participantsTable.organizationId, auth.organizationId));
+    await db.delete(guardiansTable).where(eq(guardiansTable.organizationId, auth.organizationId));
+    await db.delete(eventCategoriesTable).where(eq(eventCategoriesTable.organizationId, auth.organizationId));
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to reset all data");
@@ -87,18 +87,19 @@ interface GuardianContact {
   email: string;
 }
 
-async function createGroup(eventId: number, formId: number): Promise<number> {
+async function createGroup(organizationId: number, eventId: number, formId: number): Promise<number> {
   const [group] = await db
     .insert(registrationGroupsTable)
-    .values({ eventId, formId, submittedAt: new Date() })
+    .values({ organizationId, eventId, formId, submittedAt: new Date() })
     .returning();
   return group.id;
 }
 
-async function createGuardian(contact: GuardianContact) {
+async function createGuardian(organizationId: number, contact: GuardianContact) {
   const [guardian] = await db
     .insert(guardiansTable)
     .values({
+      organizationId,
       firstName: contact.first,
       lastName: contact.last,
       phone: contact.phone,
@@ -109,6 +110,7 @@ async function createGuardian(contact: GuardianContact) {
 }
 
 async function createRegistration(
+  organizationId: number,
   eventId: number,
   formId: number,
   groupId: number,
@@ -120,6 +122,7 @@ async function createRegistration(
   const [participant] = await db
     .insert(participantsTable)
     .values({
+      organizationId,
       firstName: input.firstName,
       lastName: input.lastName,
       dateOfBirth: input.dob ?? null,
@@ -131,7 +134,7 @@ async function createRegistration(
 
   const guardian = input.guardianId
     ? { id: input.guardianId }
-    : await createGuardian({
+    : await createGuardian(organizationId, {
         first: contactFirstName,
         last: contactLastName,
         phone: input.contactPhone,
@@ -139,6 +142,7 @@ async function createRegistration(
       });
 
   await db.insert(participantGuardiansTable).values({
+    organizationId,
     participantId: participant.id,
     guardianId: guardian.id,
     isPrimary: true,
@@ -147,6 +151,7 @@ async function createRegistration(
 
   if (input.emergencyName) {
     await db.insert(emergencyContactsTable).values({
+      organizationId,
       participantId: participant.id,
       name: input.emergencyName,
       phone: input.emergencyPhone ?? "",
@@ -158,6 +163,7 @@ async function createRegistration(
     .insert(registrationsTable)
     .values({
       formId,
+      organizationId,
       eventId,
       participantId: participant.id,
       guardianId: guardian.id,
@@ -201,8 +207,9 @@ function roomForAge(age: number): RoomDef {
   return CHILD_ROOMS.find((r) => age >= r.ageMin && age <= r.ageMax) ?? CHILD_ROOMS[CHILD_ROOMS.length - 1]!;
 }
 
-async function seedChildCheckinEvent(): Promise<number> {
+async function seedChildCheckinEvent(organizationId: number): Promise<number> {
   const { event, form } = await createEventWithForm({
+    organizationId,
     name: "Sunday Kids Check-In",
     description: "Weekly children's ministry check-in for nursery through elementary kids.",
     eventType: "general",
@@ -224,6 +231,7 @@ async function seedChildCheckinEvent(): Promise<number> {
   await db.insert(roomsTable).values(
     CHILD_ROOMS.map((r, i) => ({
       eventId: event.id,
+      organizationId,
       name: r.name,
       description: r.description,
       capacity: r.capacity,
@@ -240,7 +248,7 @@ async function seedChildCheckinEvent(): Promise<number> {
     const lastName = guardian.last;
     const age = randomInt(0, 10);
     const ec = randomEmergencyContact(lastName);
-    await createRegistration(event.id, form.id, groupId, {
+    await createRegistration(organizationId, event.id, form.id, groupId, {
       firstName,
       lastName,
       dob: dobForAge(age),
@@ -263,7 +271,7 @@ async function seedChildCheckinEvent(): Promise<number> {
   for (let i = 0; i < 6; i++) {
     const last = randomLastName();
     const guardian = { first: randomAdultFirstName(), last, phone: randomPhone(), email: randomEmail(randomAdultFirstName(), last) };
-    const groupId = await createGroup(event.id, form.id);
+    const groupId = await createGroup(organizationId, event.id, form.id);
     await addChild(groupId, guardian);
   }
 
@@ -271,8 +279,8 @@ async function seedChildCheckinEvent(): Promise<number> {
   for (let i = 0; i < 3; i++) {
     const last = randomLastName();
     const guardian = { first: randomAdultFirstName(), last, phone: randomPhone(), email: randomEmail(randomAdultFirstName(), last) };
-    const sharedGuardian = await createGuardian(guardian);
-    const groupId = await createGroup(event.id, form.id);
+    const sharedGuardian = await createGuardian(organizationId, guardian);
+    const groupId = await createGroup(organizationId, event.id, form.id);
     await addChild(groupId, { ...guardian, id: sharedGuardian.id });
     await addChild(groupId, { ...guardian, id: sharedGuardian.id });
   }
@@ -281,8 +289,8 @@ async function seedChildCheckinEvent(): Promise<number> {
   {
     const last = randomLastName();
     const guardian = { first: randomAdultFirstName(), last, phone: randomPhone(), email: randomEmail(randomAdultFirstName(), last) };
-    const sharedGuardian = await createGuardian(guardian);
-    const groupId = await createGroup(event.id, form.id);
+    const sharedGuardian = await createGuardian(organizationId, guardian);
+    const groupId = await createGroup(organizationId, event.id, form.id);
     await addChild(groupId, { ...guardian, id: sharedGuardian.id });
     await addChild(groupId, { ...guardian, id: sharedGuardian.id });
     await addChild(groupId, { ...guardian, id: sharedGuardian.id });
@@ -291,8 +299,9 @@ async function seedChildCheckinEvent(): Promise<number> {
   return count;
 }
 
-async function seedFamilyGroupEvent(): Promise<number> {
+async function seedFamilyGroupEvent(organizationId: number): Promise<number> {
   const { event, form } = await createEventWithForm({
+    organizationId,
     name: "Young Adults Retreat",
     description: "Weekend retreat sign-up — register yourself and anyone else attending in your group.",
     eventType: "general",
@@ -315,7 +324,7 @@ async function seedFamilyGroupEvent(): Promise<number> {
   const addPerson = async (groupId: number) => {
     const firstName = randomAdultFirstName();
     const lastName = randomLastName();
-    await createRegistration(event.id, form.id, groupId, {
+    await createRegistration(organizationId, event.id, form.id, groupId, {
       firstName,
       lastName,
       contactPhone: randomPhone(),
@@ -327,20 +336,20 @@ async function seedFamilyGroupEvent(): Promise<number> {
 
   // 4 solo signups
   for (let i = 0; i < 4; i++) {
-    const groupId = await createGroup(event.id, form.id);
+    const groupId = await createGroup(organizationId, event.id, form.id);
     await addPerson(groupId);
   }
 
   // 3 pairs registering together
   for (let i = 0; i < 3; i++) {
-    const groupId = await createGroup(event.id, form.id);
+    const groupId = await createGroup(organizationId, event.id, form.id);
     await addPerson(groupId);
     await addPerson(groupId);
   }
 
   // 1 trio
   {
-    const groupId = await createGroup(event.id, form.id);
+    const groupId = await createGroup(organizationId, event.id, form.id);
     await addPerson(groupId);
     await addPerson(groupId);
     await addPerson(groupId);
@@ -349,8 +358,9 @@ async function seedFamilyGroupEvent(): Promise<number> {
   return count;
 }
 
-async function seedIndividualEvent(): Promise<number> {
+async function seedIndividualEvent(organizationId: number): Promise<number> {
   const { event, form } = await createEventWithForm({
+    organizationId,
     name: "Fall 5K Fun Run",
     description: "Each runner registers individually for the Fall 5K Fun Run.",
     eventType: "general",
@@ -373,8 +383,8 @@ async function seedIndividualEvent(): Promise<number> {
   for (let i = 0; i < 14; i++) {
     const firstName = randomAdultFirstName();
     const lastName = randomLastName();
-    const groupId = await createGroup(event.id, form.id);
-    await createRegistration(event.id, form.id, groupId, {
+    const groupId = await createGroup(organizationId, event.id, form.id);
+    await createRegistration(organizationId, event.id, form.id, groupId, {
       firstName,
       lastName,
       contactPhone: randomPhone(),
@@ -389,9 +399,10 @@ async function seedIndividualEvent(): Promise<number> {
 
 router.post("/admin/seed-test-data", async (req, res) => {
   try {
-    const childCount = await seedChildCheckinEvent();
-    const groupCount = await seedFamilyGroupEvent();
-    const individualCount = await seedIndividualEvent();
+    const auth = requireAuthContext(req);
+    const childCount = await seedChildCheckinEvent(auth.organizationId);
+    const groupCount = await seedFamilyGroupEvent(auth.organizationId);
+    const individualCount = await seedIndividualEvent(auth.organizationId);
 
     res.status(201).json({
       eventsCreated: 3,

@@ -1,9 +1,13 @@
 import { pgTable, serial, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { organizationsTable } from "./organizations";
 
 export const formsTable = pgTable("forms", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   title: text("title").notNull(),
   description: text("description"),
   isActive: boolean("is_active").notNull().default(true),
@@ -15,6 +19,9 @@ export const formsTable = pgTable("forms", {
 
 export const questionsTable = pgTable("questions", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   formId: integer("form_id").notNull().references(() => formsTable.id, { onDelete: "cascade" }),
   label: text("label").notNull(),
   type: text("type").notNull().default("text"),

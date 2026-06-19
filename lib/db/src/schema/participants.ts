@@ -1,9 +1,13 @@
 import { pgTable, serial, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { organizationsTable } from "./organizations";
 
 export const participantsTable = pgTable("participants", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   dateOfBirth: text("date_of_birth"),
@@ -19,6 +23,9 @@ export const participantsTable = pgTable("participants", {
 
 export const guardiansTable = pgTable("guardians", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email"),
@@ -29,6 +36,9 @@ export const guardiansTable = pgTable("guardians", {
 
 export const participantGuardiansTable = pgTable("participant_guardians", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   participantId: integer("participant_id")
     .notNull()
     .references(() => participantsTable.id, { onDelete: "cascade" }),
@@ -42,6 +52,9 @@ export const participantGuardiansTable = pgTable("participant_guardians", {
 
 export const emergencyContactsTable = pgTable("emergency_contacts", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   participantId: integer("participant_id")
     .notNull()
     .references(() => participantsTable.id, { onDelete: "cascade" }),

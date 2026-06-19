@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { and, eq, asc, gte, lte } from "drizzle-orm";
 import { db, eventsTable, eventSessionsTable } from "@workspace/db";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
@@ -8,6 +9,13 @@ router.get("/events/:eventId/sessions", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   if (isNaN(eventId)) { res.status(400).json({ error: "Invalid eventId" }); return; }
   try {
+    const auth = requireAuthContext(req);
+    const [ownedEvent] = await db
+      .select({ id: eventsTable.id })
+      .from(eventsTable)
+      .where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)))
+      .limit(1);
+    if (!ownedEvent) { res.status(404).json({ error: "Event not found" }); return; }
     await ensureEventDateSessions(eventId);
     const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
     if (!event?.startDate) {
@@ -47,6 +55,13 @@ router.post("/events/:eventId/sessions/today", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   if (isNaN(eventId)) { res.status(400).json({ error: "Invalid eventId" }); return; }
   try {
+    const auth = requireAuthContext(req);
+    const [ownedEvent] = await db
+      .select({ id: eventsTable.id })
+      .from(eventsTable)
+      .where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)))
+      .limit(1);
+    if (!ownedEvent) { res.status(404).json({ error: "Event not found" }); return; }
     const session = await createOrGetTodaySession(eventId);
     res.status(201).json({
       ...session,
@@ -140,6 +155,7 @@ export async function ensureEventDateSessions(eventId: number): Promise<void> {
   await db.insert(eventSessionsTable).values(
     missingDates.map((sessionDate) => ({
       eventId,
+      organizationId: event.organizationId,
       sessionDate,
       startTime: event.startTime || null,
       endTime: event.endTime || null,
@@ -165,6 +181,7 @@ export async function createOrGetTodaySession(eventId: number): Promise<typeof e
 
   const [created] = await db.insert(eventSessionsTable).values({
     eventId,
+    organizationId: event.organizationId,
     sessionDate,
     startTime: event?.startTime || null,
     endTime: event?.endTime || null,
@@ -175,6 +192,7 @@ export async function createOrGetTodaySession(eventId: number): Promise<typeof e
 
 export async function createEventSessions(
   eventId: number,
+  organizationId: number | null,
   startDate: string,
   endDate: string,
   dayOfWeek: number,
@@ -187,6 +205,7 @@ export async function createEventSessions(
   await db.insert(eventSessionsTable).values(
     dates.map((sessionDate) => ({
       eventId,
+      organizationId,
       sessionDate,
       startTime: startTime || null,
       endTime: endTime || null,

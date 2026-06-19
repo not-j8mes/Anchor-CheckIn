@@ -5,6 +5,7 @@ import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { isOriginAllowed, parseAllowedOrigins } from "./lib/httpGuards";
+import { attachAuth, requireAuth } from "./lib/auth";
 
 const app: Express = express();
 const allowedOrigins = parseAllowedOrigins(process.env["CORS_ORIGIN"]);
@@ -43,6 +44,23 @@ app.use(
 app.use(express.json({ limit: jsonBodyLimit }));
 app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }));
 
+function isPublicApiRoute(req: express.Request): boolean {
+  if (req.path === "/healthz") return true;
+  if (req.path === "/auth/login" || req.path === "/auth/logout") return true;
+  if (req.method === "GET" && req.path === "/auth/me") return true;
+  if (req.method === "GET" && /^\/forms\/by-slug\/[^/]+$/.test(req.path)) return true;
+  if (req.method === "POST" && /^\/forms\/\d+\/register$/.test(req.path)) return true;
+  if (req.method === "GET" && /^\/events\/\d+\/rooms$/.test(req.path)) return true;
+  return false;
+}
+
+app.use("/api", attachAuth, (req, res, next) => {
+  if (isPublicApiRoute(req)) {
+    next();
+    return;
+  }
+  requireAuth(req, res, next);
+});
 app.use("/api", router);
 
 const staticDir = process.env["STATIC_DIR"];
