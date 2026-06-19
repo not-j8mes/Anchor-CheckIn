@@ -51,6 +51,7 @@ import {
   Repeat,
   LogIn,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 import { useToast } from "@/hooks/use-toast";
@@ -797,7 +798,7 @@ export default function EventSelectionScreen() {
   const { data: events, isLoading } = useListEvents();
   const { data: categories = [] } = useListEventCategories();
   const { data: org } = useGetOrganization();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [, navigate] = useLocation();
 
   const [editEvent, setEditEvent] = useState<ChurchEvent | null>(null);
@@ -840,6 +841,14 @@ export default function EventSelectionScreen() {
             <span className="font-serif font-bold text-base whitespace-nowrap">{brandName}</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
+            {user?.isSuperAdmin && (
+              <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
+                <Link href="/admin">
+                  <ShieldCheck className="w-4 h-4" />
+                  <span className="sr-only sm:not-sr-only sm:ml-1.5">Platform Admin</span>
+                </Link>
+              </Button>
+            )}
             <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
               <Link href="/settings">
                 <Settings className="w-4 h-4" />

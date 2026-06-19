@@ -65,7 +65,17 @@ router.get("/forms/by-slug/:embedSlug", async (req, res) => {
       db.select({ count: sql<number>`count(*)::int` }).from(registrationsTable).where(eq(registrationsTable.formId, form[0].id)),
       db.select({ registrationType: eventsTable.registrationType, eventId: eventsTable.id, roomAssignmentMode: eventsTable.roomAssignmentMode }).from(eventsTable).where(eq(eventsTable.formId, form[0].id)).limit(1),
       form[0].organizationId
-        ? db.select().from(organizationsTable).where(eq(organizationsTable.id, form[0].organizationId)).limit(1)
+        ? db
+            .select({
+              id: organizationsTable.id,
+              name: organizationsTable.name,
+              logoUrl: organizationsTable.logoUrl,
+              headerText: organizationsTable.headerText,
+              website: organizationsTable.website,
+            })
+            .from(organizationsTable)
+            .where(eq(organizationsTable.id, form[0].organizationId))
+            .limit(1)
         : Promise.resolve([]),
     ]);
     const registrationType = linkedEvent[0]?.registrationType ?? null;

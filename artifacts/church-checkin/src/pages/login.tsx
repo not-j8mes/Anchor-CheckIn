@@ -7,8 +7,13 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import appLogo from "@assets/image_1781393408862.png";
 
+function postLoginDestination(user: { isSuperAdmin: boolean } | null, organization: unknown): string {
+  if (user?.isSuperAdmin && !organization) return "/admin";
+  return "/events";
+}
+
 export default function LoginPage() {
-  const { user, isLoading, login } = useAuth();
+  const { user, organization, isLoading, login } = useAuth();
   const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,8 +22,8 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && user) navigate("/events");
-  }, [isLoading, navigate, user]);
+    if (!isLoading && user) navigate(postLoginDestination(user, organization));
+  }, [isLoading, navigate, user, organization]);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -27,7 +32,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login(email, password);
-      navigate("/events");
+      // auth context updates async; the useEffect above handles the redirect
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in");
     } finally {
