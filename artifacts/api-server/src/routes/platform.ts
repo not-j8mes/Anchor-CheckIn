@@ -80,6 +80,12 @@ router.patch("/platform/organizations/:id", async (req, res) => {
 });
 
 router.post("/platform/organizations", async (req, res) => {
+  req.log.info({
+    userId: req.auth?.userId,
+    email: req.auth?.user?.email,
+    isSuperAdmin: req.auth?.isSuperAdmin,
+    organizationId: req.auth?.organizationId,
+  }, "platform: create organization attempt");
   const body = req.body as Record<string, unknown>;
   const organizationName =
     typeof body["organizationName"] === "string" ? body["organizationName"].trim() : "";

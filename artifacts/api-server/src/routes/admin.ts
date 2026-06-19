@@ -32,7 +32,7 @@ import {
 
 const router = Router();
 
-router.use((req, res, next) => {
+router.use("/admin", (req, res, next) => {
   if (hasAdminAccess(req)) {
     next();
     return;
