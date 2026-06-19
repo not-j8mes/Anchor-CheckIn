@@ -6,6 +6,7 @@ import { eventsTable } from "./events";
 import { participantsTable, guardiansTable } from "./participants";
 import { formFieldsTable } from "./form_fields";
 import { formVersionsTable } from "./form_versions";
+import { organizationsTable } from "./organizations";
 
 /**
  * registration_groups — a single submission that covers multiple people.
@@ -13,6 +14,9 @@ import { formVersionsTable } from "./form_versions";
  */
 export const registrationGroupsTable = pgTable("registration_groups", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   eventId: integer("event_id").references(() => eventsTable.id, { onDelete: "set null" }),
   formId: integer("form_id").references(() => formsTable.id, { onDelete: "cascade" }),
   /** ID of the registration record that is the primary registrant (no FK to avoid circular dep). */
@@ -25,6 +29,9 @@ export const registrationGroupsTable = pgTable("registration_groups", {
 
 export const registrationsTable = pgTable("registrations", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   formId: integer("form_id")
     .notNull()
     .references(() => formsTable.id, { onDelete: "cascade" }),
@@ -72,6 +79,9 @@ export const registrationsTable = pgTable("registrations", {
  */
 export const registrationCustomAnswersTable = pgTable("registration_custom_answers", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   registrationId: integer("registration_id")
     .notNull()
     .references(() => registrationsTable.id, { onDelete: "cascade" }),
@@ -84,6 +94,9 @@ export const registrationCustomAnswersTable = pgTable("registration_custom_answe
 
 export const answersTable = pgTable("answers", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   registrationId: integer("registration_id")
     .notNull()
     .references(() => registrationsTable.id, { onDelete: "cascade" }),

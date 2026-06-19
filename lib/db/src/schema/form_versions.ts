@@ -2,6 +2,7 @@ import { pgTable, serial, text, boolean, integer, timestamp } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { formsTable } from "./forms";
+import { organizationsTable } from "./organizations";
 
 /**
  * form_versions — a frozen snapshot of a form's fields taken at registration
@@ -11,6 +12,9 @@ import { formsTable } from "./forms";
  */
 export const formVersionsTable = pgTable("form_versions", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   formId: integer("form_id")
     .notNull()
     .references(() => formsTable.id, { onDelete: "cascade" }),
@@ -29,6 +33,9 @@ export const formVersionsTable = pgTable("form_versions", {
  */
 export const formVersionFieldsTable = pgTable("form_version_fields", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   formVersionId: integer("form_version_id")
     .notNull()
     .references(() => formVersionsTable.id, { onDelete: "cascade" }),

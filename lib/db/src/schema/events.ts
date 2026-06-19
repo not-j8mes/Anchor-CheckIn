@@ -2,9 +2,13 @@ import { pgTable, serial, text, integer, timestamp, boolean } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { formsTable } from "./forms";
+import { organizationsTable } from "./organizations";
 
 export const eventsTable = pgTable("events", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   name: text("name").notNull(),
   description: text("description"),
   eventType: text("event_type").notNull().default("general"),

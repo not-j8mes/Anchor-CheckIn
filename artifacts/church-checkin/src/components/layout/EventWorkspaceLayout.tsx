@@ -23,7 +23,9 @@ import {
   BarChart2,
   Settings,
   Users,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth";
 
 function registrationTypeBadge(type?: string | null) {
   if (!type || type === "child_checkin")
@@ -75,6 +77,7 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
   const eventId = Number(id);
   const [location] = useLocation();
   const { setOpenMobile } = useSidebar();
+  const { user, logout } = useAuth();
 
   const { data: event } = useGetEvent(eventId, {
     query: { enabled: !!eventId, queryKey: getGetEventQueryKey(eventId) },
@@ -93,6 +96,11 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
     if (href === base) return location === base;
     return location.startsWith(href);
   };
+
+  async function handleLogout() {
+    await logout();
+    window.location.href = "/login";
+  }
 
   // Build nav based on registration type
   type NavItem = { href: string; icon: React.ComponentType<{ className?: string }>; label: string };
@@ -173,6 +181,14 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
 
         <SidebarFooter className="p-2">
           <SidebarMenu>
+            {user && (
+              <SidebarMenuItem className="mb-2 px-3 py-2 rounded-md border border-sidebar-border bg-sidebar-accent/20">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  {user.firstName} {user.lastName}
+                </p>
+                <p className="text-xs text-sidebar-foreground/60 truncate">{user.email}</p>
+              </SidebarMenuItem>
+            )}
             <NavLink
               href={`${base}/settings`}
               icon={Settings}
@@ -180,6 +196,16 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
               active={isActive(`${base}/settings`)}
               onClick={close}
             />
+            <SidebarMenuItem className="mt-1">
+              <button
+                type="button"
+                className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full text-sm text-sidebar-foreground hover:bg-sidebar-accent/50"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-4 h-4 shrink-0 text-sidebar-foreground/70" />
+                <span>Logout</span>
+              </button>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>

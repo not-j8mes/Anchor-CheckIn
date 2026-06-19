@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { eq, asc, inArray } from "drizzle-orm";
-import { db, questionsTable } from "@workspace/db";
+import { and, eq, asc } from "drizzle-orm";
+import { db, formsTable, questionsTable } from "@workspace/db";
 import {
   CreateQuestionBody,
   CreateQuestionParams,
@@ -11,6 +11,7 @@ import {
   ReorderQuestionsParams,
   ListQuestionsParams,
 } from "@workspace/api-zod";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
@@ -18,6 +19,13 @@ router.get("/forms/:formId/questions", async (req, res) => {
   const { formId: formIdStr } = ListQuestionsParams.parse(req.params);
   const formId = Number(formIdStr);
   try {
+    const auth = requireAuthContext(req);
+    const [form] = await db
+      .select({ id: formsTable.id })
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), eq(formsTable.organizationId, auth.organizationId)))
+      .limit(1);
+    if (!form) { res.status(404).json({ error: "Form not found" }); return; }
     const questions = await db
       .select()
       .from(questionsTable)
@@ -39,9 +47,16 @@ router.post("/forms/:formId/questions", async (req, res) => {
     return;
   }
   try {
+    const auth = requireAuthContext(req);
+    const [form] = await db
+      .select({ id: formsTable.id })
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), eq(formsTable.organizationId, auth.organizationId)))
+      .limit(1);
+    if (!form) { res.status(404).json({ error: "Form not found" }); return; }
     const [question] = await db
       .insert(questionsTable)
-      .values({ ...parsed.data, formId })
+      .values({ ...parsed.data, formId, organizationId: auth.organizationId })
       .returning();
     res.status(201).json(question);
   } catch (err) {
@@ -59,12 +74,19 @@ router.put("/forms/:formId/questions/reorder", async (req, res) => {
     return;
   }
   try {
+    const auth = requireAuthContext(req);
+    const [form] = await db
+      .select({ id: formsTable.id })
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), eq(formsTable.organizationId, auth.organizationId)))
+      .limit(1);
+    if (!form) { res.status(404).json({ error: "Form not found" }); return; }
     const { questionIds } = parsed.data;
     for (let i = 0; i < questionIds.length; i++) {
       await db
         .update(questionsTable)
         .set({ order: i })
-        .where(eq(questionsTable.id, questionIds[i]));
+        .where(and(eq(questionsTable.id, questionIds[i]), eq(questionsTable.organizationId, auth.organizationId)));
     }
     const questions = await db
       .select()
@@ -87,10 +109,11 @@ router.put("/forms/:formId/questions/:questionId", async (req, res) => {
     return;
   }
   try {
+    const auth = requireAuthContext(req);
     const [updated] = await db
       .update(questionsTable)
       .set(parsed.data)
-      .where(eq(questionsTable.id, questionId))
+      .where(and(eq(questionsTable.id, questionId), eq(questionsTable.organizationId, auth.organizationId)))
       .returning();
     if (!updated) {
       res.status(404).json({ error: "Not found" });
@@ -107,7 +130,8 @@ router.delete("/forms/:formId/questions/:questionId", async (req, res) => {
   const { questionId: questionIdStr } = DeleteQuestionParams.parse(req.params);
   const questionId = Number(questionIdStr);
   try {
-    await db.delete(questionsTable).where(eq(questionsTable.id, questionId));
+    const auth = requireAuthContext(req);
+    await db.delete(questionsTable).where(and(eq(questionsTable.id, questionId), eq(questionsTable.organizationId, auth.organizationId)));
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete question");

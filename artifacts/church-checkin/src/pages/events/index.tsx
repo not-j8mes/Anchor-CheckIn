@@ -50,9 +50,11 @@ import {
   Check,
   Repeat,
   LogIn,
+  LogOut,
 } from "lucide-react";
 import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import {
   format,
   startOfMonth,
@@ -795,6 +797,8 @@ export default function EventSelectionScreen() {
   const { data: events, isLoading } = useListEvents();
   const { data: categories = [] } = useListEventCategories();
   const { data: org } = useGetOrganization();
+  const { logout } = useAuth();
+  const [, navigate] = useLocation();
 
   const [editEvent, setEditEvent] = useState<ChurchEvent | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
@@ -821,6 +825,11 @@ export default function EventSelectionScreen() {
   const brandLogo = org?.logoUrl || appLogo;
   const brandName = org?.name || DEFAULT_ORGANIZATION_NAME;
 
+  async function handleLogout() {
+    await logout();
+    navigate("/login");
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Top bar */}
@@ -836,6 +845,16 @@ export default function EventSelectionScreen() {
                 <Settings className="w-4 h-4" />
                 <span className="sr-only sm:not-sr-only sm:ml-1.5">Settings</span>
               </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="px-2 sm:px-3"
+              onClick={handleLogout}
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="sr-only sm:not-sr-only sm:ml-1.5">Logout</span>
             </Button>
             <Button asChild size="sm" className="px-2 sm:px-3" data-testid="button-create-event">
               <Link href="/events/new">

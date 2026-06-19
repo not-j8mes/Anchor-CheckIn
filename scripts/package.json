@@ -6,6 +6,8 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "seed": "tsx ./src/seed.ts",
+    "create:owner": "tsx ./src/create-owner.ts",
+    "create:user": "tsx ./src/create-user.ts",
     "fix-event-statuses": "tsx ./src/fix-event-statuses.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

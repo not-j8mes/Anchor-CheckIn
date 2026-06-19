@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { db, roomsTable, registrationsTable, eventsTable } from "@workspace/db";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
@@ -8,6 +9,11 @@ router.get("/events/:eventId/rooms", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   if (isNaN(eventId)) { res.status(400).json({ error: "Invalid eventId" }); return; }
   try {
+    const eventScope = req.auth
+      ? and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, req.auth.organizationId))
+      : eq(eventsTable.id, eventId);
+    const [event] = await db.select({ id: eventsTable.id }).from(eventsTable).where(eventScope).limit(1);
+    if (!event) { res.status(404).json({ error: "Event not found" }); return; }
     const rooms = await db
       .select({
         id: roomsTable.id,
@@ -53,9 +59,17 @@ router.post("/events/:eventId/rooms", async (req, res) => {
     return;
   }
   try {
+    const auth = requireAuthContext(req);
+    const [event] = await db
+      .select({ id: eventsTable.id })
+      .from(eventsTable)
+      .where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)))
+      .limit(1);
+    if (!event) { res.status(404).json({ error: "Event not found" }); return; }
     const [room] = await db
       .insert(roomsTable)
       .values({
+        organizationId: auth.organizationId,
         eventId,
         name: name.trim(),
         description: description?.trim() ?? null,
@@ -87,6 +101,7 @@ router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
     ageMax?: number | null;
   };
   try {
+    const auth = requireAuthContext(req);
     const [updated] = await db
       .update(roomsTable)
       .set({
@@ -98,7 +113,7 @@ router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
         ...(ageMin !== undefined && { ageMin }),
         ...(ageMax !== undefined && { ageMax }),
       })
-      .where(and(eq(roomsTable.id, roomId), eq(roomsTable.eventId, eventId)))
+      .where(and(eq(roomsTable.id, roomId), eq(roomsTable.eventId, eventId), eq(roomsTable.organizationId, auth.organizationId)))
       .returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     const [withCount] = await db
@@ -120,7 +135,7 @@ router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
         )`,
       })
       .from(roomsTable)
-      .where(eq(roomsTable.id, roomId));
+      .where(and(eq(roomsTable.id, roomId), eq(roomsTable.organizationId, auth.organizationId)));
     res.json(withCount);
   } catch (err) {
     req.log.error({ err }, "Failed to update room");
@@ -133,7 +148,8 @@ router.delete("/events/:eventId/rooms/:roomId", async (req, res) => {
   const roomId = parseInt(req.params.roomId, 10);
   if (isNaN(eventId) || isNaN(roomId)) { res.status(400).json({ error: "Invalid id" }); return; }
   try {
-    await db.delete(roomsTable).where(and(eq(roomsTable.id, roomId), eq(roomsTable.eventId, eventId)));
+    const auth = requireAuthContext(req);
+    await db.delete(roomsTable).where(and(eq(roomsTable.id, roomId), eq(roomsTable.eventId, eventId), eq(roomsTable.organizationId, auth.organizationId)));
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete room");

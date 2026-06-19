@@ -6,8 +6,6 @@ import {
   registrationsTable,
   registrationGroupsTable,
   familyEventCodesTable,
-  DEFAULT_ORGANIZATION_NAME,
-  organizationsTable,
   formsTable,
   eventsTable,
   participantsTable,
@@ -17,6 +15,7 @@ import {
 import { CreateCheckinBody, CheckoutChildParams } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
 import { isPgUniqueViolation } from "../lib/httpGuards";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
@@ -41,6 +40,7 @@ function sessionCondition(sessionId: number | null | undefined) {
 }
 
 async function getFamilyLabelCode(
+  organizationId: number,
   eventId: number | null | undefined,
   registrationGroupId: number | null | undefined,
   sessionId: number | null | undefined
@@ -52,6 +52,7 @@ async function getFamilyLabelCode(
     .where(
       and(
         eq(familyEventCodesTable.eventId, eventId),
+        eq(familyEventCodesTable.organizationId, organizationId),
         sessionId == null ? isNull(familyEventCodesTable.sessionId) : eq(familyEventCodesTable.sessionId, sessionId),
         eq(familyEventCodesTable.registrationGroupId, registrationGroupId)
       )
@@ -61,7 +62,7 @@ async function getFamilyLabelCode(
   const newCode = generateLabelCode();
   await db
     .insert(familyEventCodesTable)
-    .values({ eventId, sessionId: sessionId ?? null, registrationGroupId, labelCode: newCode })
+    .values({ organizationId, eventId, sessionId: sessionId ?? null, registrationGroupId, labelCode: newCode })
     .onConflictDoNothing();
   // Re-fetch in case a concurrent insert won the race
   const [row] = await db
@@ -70,6 +71,7 @@ async function getFamilyLabelCode(
     .where(
       and(
         eq(familyEventCodesTable.eventId, eventId),
+        eq(familyEventCodesTable.organizationId, organizationId),
         sessionId == null ? isNull(familyEventCodesTable.sessionId) : eq(familyEventCodesTable.sessionId, sessionId),
         eq(familyEventCodesTable.registrationGroupId, registrationGroupId)
       )
@@ -120,7 +122,12 @@ router.post("/checkins/walkin", async (req, res) => {
   }
 
   try {
-    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    const auth = requireAuthContext(req);
+    const [event] = await db
+      .select()
+      .from(eventsTable)
+      .where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)))
+      .limit(1);
     if (!event?.formId) {
       res.status(404).json({ error: "Event not found or has no registration form" });
       return;
@@ -132,15 +139,16 @@ router.post("/checkins/walkin", async (req, res) => {
 
     const [participant] = await db
       .insert(participantsTable)
-      .values({ firstName: childFirstName, lastName: childLastName })
+      .values({ organizationId: auth.organizationId, firstName: childFirstName, lastName: childLastName })
       .returning();
 
     const [guardian] = await db
       .insert(guardiansTable)
-      .values({ firstName: gFirst, lastName: gLast, phone: guardianPhone })
+      .values({ organizationId: auth.organizationId, firstName: gFirst, lastName: gLast, phone: guardianPhone })
       .returning();
 
     await db.insert(participantGuardiansTable).values({
+      organizationId: auth.organizationId,
       participantId: participant.id,
       guardianId: guardian.id,
       isPrimary: true,
@@ -165,6 +173,7 @@ router.post("/checkins/walkin", async (req, res) => {
           .where(
             and(
               eq(registrationsTable.eventId, eventId),
+              eq(registrationsTable.organizationId, auth.organizationId),
               eq(registrationsTable.guardianPhone, phone),
               isNotNull(registrationsTable.registrationGroupId)
             )
@@ -178,7 +187,7 @@ router.post("/checkins/walkin", async (req, res) => {
       } else {
         const [newGroup] = await db
           .insert(registrationGroupsTable)
-          .values({ eventId, formId: event.formId, submittedAt: new Date() })
+          .values({ organizationId: auth.organizationId, eventId, formId: event.formId, submittedAt: new Date() })
           .returning();
         registrationGroupId = newGroup.id;
       }
@@ -188,6 +197,7 @@ router.post("/checkins/walkin", async (req, res) => {
       .insert(registrationsTable)
       .values({
         formId: event.formId,
+        organizationId: auth.organizationId,
         eventId,
         participantId: participant.id,
         guardianId: guardian.id,
@@ -201,13 +211,13 @@ router.post("/checkins/walkin", async (req, res) => {
       .returning();
 
     const labelCode = generateLabelCode();
-    const orgs = await db.select().from(organizationsTable).limit(1);
-    const orgName = orgs[0]?.name ?? DEFAULT_ORGANIZATION_NAME;
+    const orgName = auth.organization.name;
 
     const [checkin] = await db
       .insert(checkinsTable)
       .values({
         registrationId: registration.id,
+        organizationId: auth.organizationId,
         sessionId: typeof sessionId === "number" ? sessionId : null,
         childFirstName,
         childLastName,
@@ -247,13 +257,18 @@ router.post("/checkins/bulk-checkout", async (req, res) => {
     return;
   }
   try {
-    const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
+    const auth = requireAuthContext(req);
+    const [event] = await db
+      .select()
+      .from(eventsTable)
+      .where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)))
+      .limit(1);
     if (!event) { res.status(404).json({ error: "Event not found" }); return; }
 
     const regs = await db
       .select({ id: registrationsTable.id })
       .from(registrationsTable)
-      .where(eq(registrationsTable.eventId, eventId));
+      .where(and(eq(registrationsTable.eventId, eventId), eq(registrationsTable.organizationId, auth.organizationId)));
     if (regs.length === 0) { res.json({ count: 0, checkins: [] }); return; }
 
     const regIds = regs.map((r) => r.id);
@@ -262,6 +277,7 @@ router.post("/checkins/bulk-checkout", async (req, res) => {
       .from(checkinsTable)
       .where(and(
         inArray(checkinsTable.registrationId, regIds),
+        eq(checkinsTable.organizationId, auth.organizationId),
         sessionId == null ? undefined : eq(checkinsTable.sessionId, sessionId),
         isNull(checkinsTable.checkoutAt)
       ));
@@ -278,7 +294,7 @@ router.post("/checkins/bulk-checkout", async (req, res) => {
         notes: note?.trim() || null,
         updatedAt: new Date(),
       })
-      .where(inArray(checkinsTable.id, active.map((c) => c.id)))
+      .where(and(inArray(checkinsTable.id, active.map((c) => c.id)), eq(checkinsTable.organizationId, auth.organizationId)))
       .returning();
 
     res.json({ count: updated.length, checkins: updated.map(serializeCheckin) });
@@ -296,6 +312,7 @@ router.post("/checkins/batch", async (req, res) => {
     return;
   }
   try {
+    const auth = requireAuthContext(req);
     // Resolve the shared label code: look up or create a family code if reuseFamilyCode is on,
     // otherwise generate a fresh shared code for this batch session.
     let sharedLabelCode: string;
@@ -303,16 +320,15 @@ router.post("/checkins/batch", async (req, res) => {
       const firstReg = await db
         .select({ eventId: registrationsTable.eventId, registrationGroupId: registrationsTable.registrationGroupId })
         .from(registrationsTable)
-        .where(eq(registrationsTable.id, items[0].registrationId))
+        .where(and(eq(registrationsTable.id, items[0].registrationId), eq(registrationsTable.organizationId, auth.organizationId)))
         .limit(1);
       sharedLabelCode =
-        (await getFamilyLabelCode(firstReg[0]?.eventId, firstReg[0]?.registrationGroupId, sessionId)) ??
+        (await getFamilyLabelCode(auth.organizationId, firstReg[0]?.eventId, firstReg[0]?.registrationGroupId, sessionId)) ??
         generateLabelCode();
     } else {
       sharedLabelCode = generateLabelCode();
     }
-    const orgs = await db.select().from(organizationsTable).limit(1);
-    const orgName = orgs[0]?.name ?? DEFAULT_ORGANIZATION_NAME;
+    const orgName = auth.organization.name;
 
     const checkins: ReturnType<typeof serializeCheckin>[] = [];
     const labels: object[] = [];
@@ -322,7 +338,7 @@ router.post("/checkins/batch", async (req, res) => {
       const reg = await db
         .select()
         .from(registrationsTable)
-        .where(eq(registrationsTable.id, item.registrationId))
+        .where(and(eq(registrationsTable.id, item.registrationId), eq(registrationsTable.organizationId, auth.organizationId)))
         .limit(1);
       if (!reg[0]) continue;
       const r = reg[0];
@@ -339,6 +355,7 @@ router.post("/checkins/batch", async (req, res) => {
           .insert(checkinsTable)
           .values({
             registrationId: item.registrationId,
+            organizationId: auth.organizationId,
             sessionId: sessionId ?? null,
             childFirstName: r.childFirstName,
             childLastName: r.childLastName,
@@ -385,6 +402,7 @@ router.get("/checkins", async (req, res) => {
   const dateStr = req.query.date as string | undefined;
   const formIdStr = req.query.formId as string | undefined;
   try {
+    const auth = requireAuthContext(req);
     let checkins;
 
     if (formIdStr) {
@@ -393,7 +411,7 @@ router.get("/checkins", async (req, res) => {
       const regs = await db
         .select({ id: registrationsTable.id })
         .from(registrationsTable)
-        .where(eq(registrationsTable.formId, formId));
+        .where(and(eq(registrationsTable.formId, formId), eq(registrationsTable.organizationId, auth.organizationId)));
 
       if (regs.length === 0) {
         res.json([]);
@@ -403,14 +421,14 @@ router.get("/checkins", async (req, res) => {
       checkins = await db
         .select()
         .from(checkinsTable)
-        .where(inArray(checkinsTable.registrationId, regIds))
+        .where(and(inArray(checkinsTable.registrationId, regIds), eq(checkinsTable.organizationId, auth.organizationId)))
         .orderBy(desc(checkinsTable.checkinAt));
     } else if (dateStr) {
       const date = new Date(dateStr);
       checkins = await db
         .select()
         .from(checkinsTable)
-        .where(gte(checkinsTable.checkinAt, date))
+        .where(and(gte(checkinsTable.checkinAt, date), eq(checkinsTable.organizationId, auth.organizationId)))
         .orderBy(desc(checkinsTable.checkinAt));
     } else {
       const today = new Date();
@@ -418,7 +436,7 @@ router.get("/checkins", async (req, res) => {
       checkins = await db
         .select()
         .from(checkinsTable)
-        .where(gte(checkinsTable.checkinAt, today))
+        .where(and(gte(checkinsTable.checkinAt, today), eq(checkinsTable.organizationId, auth.organizationId)))
         .orderBy(desc(checkinsTable.checkinAt));
     }
 
@@ -437,26 +455,26 @@ router.post("/checkins", async (req, res) => {
   }
   try {
     const { registrationId, room, sessionId, reuseFamilyCode } = parsed.data;
+    const auth = requireAuthContext(req);
 
+    const reg = await db
+      .select()
+      .from(registrationsTable)
+      .where(and(eq(registrationsTable.id, registrationId), eq(registrationsTable.organizationId, auth.organizationId)))
+      .limit(1);
+    if (!reg[0]) {
+      res.status(404).json({ error: "Registration not found" });
+      return;
+    }
     // Prevent duplicate active check-ins for the same registration
     const activeCheckin = await findActiveCheckin(registrationId, sessionId);
     if (activeCheckin) {
       res.status(409).json({ error: "Already checked in", checkinId: activeCheckin.id });
       return;
     }
-
-    const reg = await db
-      .select()
-      .from(registrationsTable)
-      .where(eq(registrationsTable.id, registrationId))
-      .limit(1);
-    if (!reg[0]) {
-      res.status(404).json({ error: "Registration not found" });
-      return;
-    }
     const r = reg[0];
     const labelCode = reuseFamilyCode
-      ? (await getFamilyLabelCode(r.eventId, r.registrationGroupId, sessionId)) ?? generateLabelCode()
+      ? (await getFamilyLabelCode(auth.organizationId, r.eventId, r.registrationGroupId, sessionId)) ?? generateLabelCode()
       : generateLabelCode();
     let checkin: typeof checkinsTable.$inferSelect;
     try {
@@ -464,6 +482,7 @@ router.post("/checkins", async (req, res) => {
         .insert(checkinsTable)
         .values({
           registrationId,
+          organizationId: auth.organizationId,
           sessionId: sessionId ?? null,
           childFirstName: r.childFirstName,
           childLastName: r.childLastName,
@@ -485,8 +504,7 @@ router.post("/checkins", async (req, res) => {
       throw err;
     }
 
-    const orgs = await db.select().from(organizationsTable).limit(1);
-    const orgName = orgs[0]?.name ?? DEFAULT_ORGANIZATION_NAME;
+    const orgName = auth.organization.name;
 
     const labelData = {
       childName: `${r.childFirstName} ${r.childLastName}`,
@@ -510,7 +528,8 @@ router.delete("/checkins/:checkinId", async (req, res) => {
   const checkinId = parseInt(req.params.checkinId, 10);
   if (isNaN(checkinId)) { res.status(400).json({ error: "Invalid checkinId" }); return; }
   try {
-    await db.delete(checkinsTable).where(eq(checkinsTable.id, checkinId));
+    const auth = requireAuthContext(req);
+    await db.delete(checkinsTable).where(and(eq(checkinsTable.id, checkinId), eq(checkinsTable.organizationId, auth.organizationId)));
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete checkin");
@@ -523,10 +542,11 @@ router.patch("/checkins/:checkinId", async (req, res) => {
   if (isNaN(checkinId)) { res.status(400).json({ error: "Invalid checkinId" }); return; }
   const { notes } = (req.body ?? {}) as { notes?: string };
   try {
+    const auth = requireAuthContext(req);
     const [updated] = await db
       .update(checkinsTable)
       .set({ notes: notes !== undefined ? (notes.trim() || null) : undefined, updatedAt: new Date() })
-      .where(eq(checkinsTable.id, checkinId))
+      .where(and(eq(checkinsTable.id, checkinId), eq(checkinsTable.organizationId, auth.organizationId)))
       .returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     res.json(serializeCheckin(updated));
@@ -540,10 +560,11 @@ router.put("/checkins/:checkinId/undo-checkout", async (req, res) => {
   const checkinId = parseInt(req.params.checkinId, 10);
   if (isNaN(checkinId)) { res.status(400).json({ error: "Invalid checkinId" }); return; }
   try {
+    const auth = requireAuthContext(req);
     const [updated] = await db
       .update(checkinsTable)
       .set({ checkoutAt: null, pickupPersonName: null, updatedAt: new Date() })
-      .where(eq(checkinsTable.id, checkinId))
+      .where(and(eq(checkinsTable.id, checkinId), eq(checkinsTable.organizationId, auth.organizationId)))
       .returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     res.json(serializeCheckin(updated));
@@ -558,6 +579,7 @@ router.put("/checkins/:checkinId/checkout", async (req, res) => {
   const checkinId = Number(checkinIdStr);
   const { pickupPersonName, notes } = (req.body ?? {}) as { pickupPersonName?: string; notes?: string };
   try {
+    const auth = requireAuthContext(req);
     const [updated] = await db
       .update(checkinsTable)
       .set({
@@ -566,7 +588,7 @@ router.put("/checkins/:checkinId/checkout", async (req, res) => {
         pickupPersonName: pickupPersonName?.trim() || null,
         notes: notes?.trim() || null,
       })
-      .where(eq(checkinsTable.id, checkinId))
+      .where(and(eq(checkinsTable.id, checkinId), eq(checkinsTable.organizationId, auth.organizationId)))
       .returning();
     if (!updated) {
       res.status(404).json({ error: "Not found" });

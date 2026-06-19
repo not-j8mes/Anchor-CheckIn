@@ -1,11 +1,13 @@
 import { Router } from "express";
-import { sql, gte, desc, eq, inArray } from "drizzle-orm";
+import { and, sql, gte, desc, eq, inArray } from "drizzle-orm";
 import { db, formsTable, registrationsTable, checkinsTable, eventsTable } from "@workspace/db";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
 router.get("/stats/dashboard", async (req, res) => {
   try {
+    const auth = requireAuthContext(req);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -16,7 +18,7 @@ router.get("/stats/dashboard", async (req, res) => {
     if (eventIdParam) {
       const [ev] = await db.select({ formId: eventsTable.formId })
         .from(eventsTable)
-        .where(eq(eventsTable.id, eventIdParam))
+        .where(and(eq(eventsTable.id, eventIdParam), eq(eventsTable.organizationId, auth.organizationId)))
         .limit(1);
       formId = ev?.formId ?? null;
     }
@@ -24,23 +26,24 @@ router.get("/stats/dashboard", async (req, res) => {
     // Subquery: registration IDs belonging to this event (or all)
     const regIdsSubquery = formId
       ? db.select({ id: registrationsTable.id }).from(registrationsTable).where(eq(registrationsTable.formId, formId))
-      : db.select({ id: registrationsTable.id }).from(registrationsTable);
+      : db.select({ id: registrationsTable.id }).from(registrationsTable).where(eq(registrationsTable.organizationId, auth.organizationId));
 
     const [{ totalChildren }] = formId
-      ? await db.select({ totalChildren: sql<number>`count(*)::int` }).from(registrationsTable).where(eq(registrationsTable.formId, formId))
-      : await db.select({ totalChildren: sql<number>`count(*)::int` }).from(registrationsTable);
+      ? await db.select({ totalChildren: sql<number>`count(*)::int` }).from(registrationsTable).where(and(eq(registrationsTable.formId, formId), eq(registrationsTable.organizationId, auth.organizationId)))
+      : await db.select({ totalChildren: sql<number>`count(*)::int` }).from(registrationsTable).where(eq(registrationsTable.organizationId, auth.organizationId));
 
     const [{ totalForms }] = await db
       .select({ totalForms: sql<number>`count(*)::int` })
-      .from(formsTable);
+      .from(formsTable)
+      .where(eq(formsTable.organizationId, auth.organizationId));
 
     const [{ checkedInToday }] = await db
       .select({ checkedInToday: sql<number>`count(*)::int` })
       .from(checkinsTable)
       .where(
         formId
-          ? sql`${checkinsTable.checkinAt} >= ${today} AND ${checkinsTable.registrationId} IN (${regIdsSubquery})`
-          : gte(checkinsTable.checkinAt, today)
+          ? sql`${checkinsTable.checkinAt} >= ${today} AND ${checkinsTable.organizationId} = ${auth.organizationId} AND ${checkinsTable.registrationId} IN (${regIdsSubquery})`
+          : and(gte(checkinsTable.checkinAt, today), eq(checkinsTable.organizationId, auth.organizationId))
       );
 
     const [{ totalCheckins }] = await db
@@ -48,13 +51,13 @@ router.get("/stats/dashboard", async (req, res) => {
       .from(checkinsTable)
       .where(
         formId
-          ? inArray(checkinsTable.registrationId, regIdsSubquery)
-          : sql`1=1`
+          ? and(inArray(checkinsTable.registrationId, regIdsSubquery), eq(checkinsTable.organizationId, auth.organizationId))
+          : eq(checkinsTable.organizationId, auth.organizationId)
       );
 
     const recentRegistrations = formId
-      ? await db.select().from(registrationsTable).where(eq(registrationsTable.formId, formId)).orderBy(desc(registrationsTable.createdAt)).limit(5)
-      : await db.select().from(registrationsTable).orderBy(desc(registrationsTable.createdAt)).limit(5);
+      ? await db.select().from(registrationsTable).where(and(eq(registrationsTable.formId, formId), eq(registrationsTable.organizationId, auth.organizationId))).orderBy(desc(registrationsTable.createdAt)).limit(5)
+      : await db.select().from(registrationsTable).where(eq(registrationsTable.organizationId, auth.organizationId)).orderBy(desc(registrationsTable.createdAt)).limit(5);
 
     res.json({
       totalChildren,
@@ -72,6 +75,7 @@ router.get("/stats/dashboard", async (req, res) => {
 
 router.get("/stats/checkins-by-day", async (req, res) => {
   try {
+    const auth = requireAuthContext(req);
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -81,7 +85,7 @@ router.get("/stats/checkins-by-day", async (req, res) => {
     if (eventIdParam) {
       const [ev] = await db.select({ formId: eventsTable.formId })
         .from(eventsTable)
-        .where(eq(eventsTable.id, eventIdParam))
+        .where(and(eq(eventsTable.id, eventIdParam), eq(eventsTable.organizationId, auth.organizationId)))
         .limit(1);
       formId = ev?.formId ?? null;
     }
@@ -98,8 +102,8 @@ router.get("/stats/checkins-by-day", async (req, res) => {
       .from(checkinsTable)
       .where(
         regIdsSubquery
-          ? sql`${checkinsTable.checkinAt} >= ${thirtyDaysAgo} AND ${checkinsTable.registrationId} IN (${regIdsSubquery})`
-          : gte(checkinsTable.checkinAt, thirtyDaysAgo)
+          ? sql`${checkinsTable.checkinAt} >= ${thirtyDaysAgo} AND ${checkinsTable.organizationId} = ${auth.organizationId} AND ${checkinsTable.registrationId} IN (${regIdsSubquery})`
+          : and(gte(checkinsTable.checkinAt, thirtyDaysAgo), eq(checkinsTable.organizationId, auth.organizationId))
       )
       .groupBy(sql`date_trunc('day', ${checkinsTable.checkinAt})`)
       .orderBy(sql`date_trunc('day', ${checkinsTable.checkinAt})`);

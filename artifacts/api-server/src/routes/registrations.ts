@@ -25,6 +25,7 @@ import {
   ListRegistrationsParams,
   GetRegistrationParams,
 } from "@workspace/api-zod";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
@@ -98,6 +99,7 @@ function computeFieldsHash(fields: FormField[]): string {
  * version row.
  */
 async function getOrCreateFormVersion(
+  organizationId: number | null,
   formId: number,
   form: { title: string; description: string | null },
   formFields: FormField[]
@@ -127,6 +129,7 @@ async function getOrCreateFormVersion(
     .insert(formVersionsTable)
     .values({
       formId,
+      organizationId,
       versionNumber: maxVer + 1,
       title: form.title,
       description: form.description ?? null,
@@ -138,6 +141,7 @@ async function getOrCreateFormVersion(
     await db.insert(formVersionFieldsTable).values(
       formFields.map((f) => ({
         formVersionId: newVersion.id,
+        organizationId,
         originalFieldId: f.id,
         fieldKind: f.fieldKind,
         systemKey: f.systemKey ?? null,
@@ -185,6 +189,7 @@ router.post("/forms/:formId/register", async (req, res) => {
       .where(eq(eventsTable.formId, formId))
       .limit(1);
     const eventId = event?.id ?? null;
+    const organizationId = form.organizationId ?? event?.organizationId ?? null;
 
     // ── Load all form_fields for this form ────────────────────────────────────
     const formFields = await db
@@ -219,7 +224,7 @@ router.post("/forms/:formId/register", async (req, res) => {
     }
 
     // ── Snapshot: find or create a form version for this field configuration ──
-    const formVersionId = await getOrCreateFormVersion(formId, form, formFields);
+    const formVersionId = await getOrCreateFormVersion(organizationId, formId, form, formFields);
 
     // ── Classify each submitted answer ────────────────────────────────────────
     const participantCols: Record<string, string> = {};
@@ -261,6 +266,7 @@ router.post("/forms/:formId/register", async (req, res) => {
     const [participant] = await db
       .insert(participantsTable)
       .values({
+        organizationId,
         firstName: participantCols["first_name"] ?? "",
         lastName:  participantCols["last_name"]  ?? "",
         dateOfBirth:  participantCols["date_of_birth"]  ?? null,
@@ -277,6 +283,7 @@ router.post("/forms/:formId/register", async (req, res) => {
     const [guardian] = await db
       .insert(guardiansTable)
       .values({
+        organizationId,
         firstName: guardianCols["first_name"] ?? "",
         lastName:  guardianCols["last_name"]  ?? "",
         email: guardianCols["email"] ?? null,
@@ -286,6 +293,7 @@ router.post("/forms/:formId/register", async (req, res) => {
 
     // ── Link participant ↔ guardian ───────────────────────────────────────────
     await db.insert(participantGuardiansTable).values({
+      organizationId,
       participantId: participant.id,
       guardianId:    guardian.id,
       isPrimary:  true,
@@ -295,6 +303,7 @@ router.post("/forms/:formId/register", async (req, res) => {
     // ── Create emergency contact (if name provided) ───────────────────────────
     if (emergencyCols["name"]) {
       await db.insert(emergencyContactsTable).values({
+        organizationId,
         participantId: participant.id,
         name:         emergencyCols["name"],
         phone:        emergencyCols["phone"]         ?? "",
@@ -339,7 +348,7 @@ router.post("/forms/:formId/register", async (req, res) => {
       } else {
         const [newGroup] = await db
           .insert(registrationGroupsTable)
-          .values({ eventId, formId, submittedAt: new Date() })
+          .values({ organizationId, eventId, formId, submittedAt: new Date() })
           .returning();
         registrationGroupId = newGroup.id;
       }
@@ -350,6 +359,7 @@ router.post("/forms/:formId/register", async (req, res) => {
       .insert(registrationsTable)
       .values({
         formId,
+        organizationId,
         eventId,
         formVersionId,
         participantId: participant.id,
@@ -379,6 +389,7 @@ router.post("/forms/:formId/register", async (req, res) => {
       await db.insert(registrationCustomAnswersTable).values(
         customAnswers.map((a) => ({
           registrationId: registration.id,
+          organizationId,
           formFieldId:    a.formFieldId,
           questionLabel:  a.questionLabel,
           answerValue:    a.answerValue,
@@ -399,6 +410,14 @@ router.get("/forms/:formId/registrations", async (req, res) => {
   const { formId: formIdStr } = ListRegistrationsParams.parse(req.params);
   const formId = Number(formIdStr);
   try {
+    const auth = requireAuthContext(req);
+    const [form] = await db
+      .select({ id: formsTable.id })
+      .from(formsTable)
+      .where(and(eq(formsTable.id, formId), eq(formsTable.organizationId, auth.organizationId)))
+      .limit(1);
+    if (!form) { res.status(404).json({ error: "Form not found" }); return; }
+
     const rows = await db
       .select({
         // All registration columns
@@ -446,7 +465,7 @@ router.get("/forms/:formId/registrations", async (req, res) => {
       .leftJoin(participantsTable, eq(registrationsTable.participantId, participantsTable.id))
       .leftJoin(guardiansTable, eq(registrationsTable.guardianId, guardiansTable.id))
       .leftJoin(emergencyContactsTable, eq(emergencyContactsTable.participantId, registrationsTable.participantId))
-      .where(eq(registrationsTable.formId, formId))
+      .where(and(eq(registrationsTable.formId, formId), eq(registrationsTable.organizationId, auth.organizationId)))
       .orderBy(desc(registrationsTable.createdAt));
 
     // Overlay participant/guardian data onto the legacy flat columns when the
@@ -541,10 +560,11 @@ router.put("/registration-families", async (req, res) => {
   const guardianName = [guardianFirstName, guardianLastName].filter(Boolean).join(" ");
 
   try {
+    const auth = requireAuthContext(req);
     const regs = await db
       .select()
       .from(registrationsTable)
-      .where(inArray(registrationsTable.id, ids));
+      .where(and(inArray(registrationsTable.id, ids), eq(registrationsTable.organizationId, auth.organizationId)));
 
     if (regs.length === 0) {
       res.status(404).json({ error: "No matching registrations found" });
@@ -566,7 +586,7 @@ router.put("/registration-families", async (req, res) => {
         emergencyContactPhone: emergencyContactPhone || null,
         emergencyContactRelationship: emergencyContactRelationship || null,
       })
-      .where(inArray(registrationsTable.id, regs.map((reg) => reg.id)));
+      .where(and(inArray(registrationsTable.id, regs.map((reg) => reg.id)), eq(registrationsTable.organizationId, auth.organizationId)));
 
     const guardianIds = [...new Set(regs.map((reg) => reg.guardianId).filter((id): id is number => id != null))];
     if (guardianIds.length > 0) {
@@ -622,10 +642,11 @@ router.get("/registrations/:registrationId", async (req, res) => {
   const { registrationId: regIdStr } = GetRegistrationParams.parse(req.params);
   const registrationId = Number(regIdStr);
   try {
+    const auth = requireAuthContext(req);
     const [reg] = await db
       .select()
       .from(registrationsTable)
-      .where(eq(registrationsTable.id, registrationId))
+      .where(and(eq(registrationsTable.id, registrationId), eq(registrationsTable.organizationId, auth.organizationId)))
       .limit(1);
     if (!reg) {
       res.status(404).json({ error: "Not found" });
@@ -751,10 +772,11 @@ router.put("/registrations/:registrationId", async (req, res) => {
   } = req.body as Record<string, string | undefined>;
 
   try {
+    const auth = requireAuthContext(req);
     const [reg] = await db
       .select()
       .from(registrationsTable)
-      .where(eq(registrationsTable.id, registrationId))
+      .where(and(eq(registrationsTable.id, registrationId), eq(registrationsTable.organizationId, auth.organizationId)))
       .limit(1);
     if (!reg) { res.status(404).json({ error: "Not found" }); return; }
 
@@ -783,7 +805,7 @@ router.put("/registrations/:registrationId", async (req, res) => {
         ...(emergencyContactRelationship !== undefined && { emergencyContactRelationship: emergencyContactRelationship || null }),
         ...(room !== undefined && { room: room || null }),
       })
-      .where(eq(registrationsTable.id, registrationId))
+      .where(and(eq(registrationsTable.id, registrationId), eq(registrationsTable.organizationId, auth.organizationId)))
       .returning();
 
     // Sync participant record
@@ -849,6 +871,13 @@ router.patch("/registrations/:registrationId/custom-answers", async (req, res) =
   if (!Array.isArray(answers)) { res.status(400).json({ error: "answers array required" }); return; }
 
   try {
+    const auth = requireAuthContext(req);
+    const [reg] = await db
+      .select({ id: registrationsTable.id })
+      .from(registrationsTable)
+      .where(and(eq(registrationsTable.id, registrationId), eq(registrationsTable.organizationId, auth.organizationId)))
+      .limit(1);
+    if (!reg) { res.status(404).json({ error: "Not found" }); return; }
     let updated = 0;
     for (const { id, value } of answers) {
       await db
@@ -856,7 +885,8 @@ router.patch("/registrations/:registrationId/custom-answers", async (req, res) =
         .set({ answerValue: String(value) })
         .where(and(
           eq(registrationCustomAnswersTable.id, id),
-          eq(registrationCustomAnswersTable.registrationId, registrationId)
+          eq(registrationCustomAnswersTable.registrationId, registrationId),
+          eq(registrationCustomAnswersTable.organizationId, auth.organizationId)
         ));
       updated++;
     }
@@ -871,13 +901,20 @@ router.delete("/registrations/:registrationId", async (req, res) => {
   const registrationId = parseInt(req.params.registrationId, 10);
   if (isNaN(registrationId)) { res.status(400).json({ error: "Invalid registrationId" }); return; }
   try {
+    const auth = requireAuthContext(req);
+    const [reg] = await db
+      .select({ id: registrationsTable.id })
+      .from(registrationsTable)
+      .where(and(eq(registrationsTable.id, registrationId), eq(registrationsTable.organizationId, auth.organizationId)))
+      .limit(1);
+    if (!reg) { res.status(404).json({ error: "Not found" }); return; }
     // Delete child rows explicitly — avoids relying on DB-level CASCADE being in place
     await db.delete(answersTable).where(eq(answersTable.registrationId, registrationId));
     await db.delete(registrationCustomAnswersTable).where(eq(registrationCustomAnswersTable.registrationId, registrationId));
     await db.delete(checkinsTable).where(eq(checkinsTable.registrationId, registrationId));
     const [deleted] = await db
       .delete(registrationsTable)
-      .where(eq(registrationsTable.id, registrationId))
+      .where(and(eq(registrationsTable.id, registrationId), eq(registrationsTable.organizationId, auth.organizationId)))
       .returning();
     if (!deleted) { res.status(404).json({ error: "Not found" }); return; }
     res.status(204).end();
@@ -893,10 +930,11 @@ router.patch("/registrations/:registrationId/room", async (req, res) => {
   if (isNaN(registrationId)) { res.status(400).json({ error: "Invalid registrationId" }); return; }
   const { room } = req.body as { room?: string | null };
   try {
+    const auth = requireAuthContext(req);
     const [updated] = await db
       .update(registrationsTable)
       .set({ room: room || null })
-      .where(eq(registrationsTable.id, registrationId))
+      .where(and(eq(registrationsTable.id, registrationId), eq(registrationsTable.organizationId, auth.organizationId)))
       .returning();
     if (!updated) { res.status(404).json({ error: "Not found" }); return; }
     res.json(updated);

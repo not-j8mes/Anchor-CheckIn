@@ -1,21 +1,19 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, DEFAULT_ORGANIZATION_NAME, organizationsTable } from "@workspace/db";
+import { db, organizationsTable } from "@workspace/db";
 import { UpdateOrganizationBody } from "@workspace/api-zod";
+import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
-async function ensureOrg() {
-  const existing = await db.select().from(organizationsTable).limit(1);
-  if (existing.length === 0) {
-    await db.insert(organizationsTable).values({ name: DEFAULT_ORGANIZATION_NAME });
-  }
-  return db.select().from(organizationsTable).limit(1).then((r) => r[0]);
-}
-
 router.get("/organizations/current", async (req, res) => {
   try {
-    const org = await ensureOrg();
+    const auth = requireAuthContext(req);
+    const [org] = await db
+      .select()
+      .from(organizationsTable)
+      .where(eq(organizationsTable.id, auth.organizationId))
+      .limit(1);
     res.json(org);
   } catch (err) {
     req.log.error({ err }, "Failed to get organization");
@@ -30,11 +28,11 @@ router.put("/organizations/current", async (req, res) => {
     return;
   }
   try {
-    const org = await ensureOrg();
+    const auth = requireAuthContext(req);
     const [updated] = await db
       .update(organizationsTable)
       .set({ ...parsed.data, updatedAt: new Date() })
-      .where(eq(organizationsTable.id, org.id))
+      .where(eq(organizationsTable.id, auth.organizationId))
       .returning();
     res.json(updated);
   } catch (err) {

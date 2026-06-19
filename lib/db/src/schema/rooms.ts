@@ -1,8 +1,12 @@
 import { pgTable, serial, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
 import { eventsTable } from "./events";
+import { organizationsTable } from "./organizations";
 
 export const roomsTable = pgTable("rooms", {
   id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").references(() => organizationsTable.id, {
+    onDelete: "cascade",
+  }),
   eventId: integer("event_id").notNull().references(() => eventsTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
