@@ -14,8 +14,7 @@ import {
   emergencyContactsTable,
 } from "@workspace/db";
 import { createEventWithForm } from "./events";
-import { hasAdminAccess } from "../lib/httpGuards";
-import { requireAuthContext } from "../lib/auth";
+import { requireAuth, requireAuthContext } from "../lib/auth";
 import {
   randomKidFirstName,
   randomAdultFirstName,
@@ -32,15 +31,7 @@ import {
 
 const router = Router();
 
-router.use("/admin", (req, res, next) => {
-  if (hasAdminAccess(req)) {
-    next();
-    return;
-  }
-  res.status(403).json({ error: "Admin access required" });
-});
-
-router.delete("/admin/reset", async (req, res) => {
+router.delete("/admin/reset", requireAuth, async (req, res) => {
   try {
     const auth = requireAuthContext(req);
     await db.delete(eventsTable).where(eq(eventsTable.organizationId, auth.organizationId));
@@ -397,7 +388,7 @@ async function seedIndividualEvent(organizationId: number): Promise<number> {
   return count;
 }
 
-router.post("/admin/seed-test-data", async (req, res) => {
+router.post("/admin/seed-test-data", requireAuth, async (req, res) => {
   try {
     const auth = requireAuthContext(req);
     const childCount = await seedChildCheckinEvent(auth.organizationId);
