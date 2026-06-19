@@ -14,6 +14,7 @@ import EventWorkspace from "@/pages/events/detail";
 import EventSetupWizard from "@/pages/events/setup";
 import PublicRegistrationForm from "@/pages/register";
 import SettingsPage from "@/pages/settings";
+import PlatformAdminPage from "@/pages/admin";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,39 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+function SuperAdminGate({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) { navigate("/login"); return; }
+    if (!user.isSuperAdmin) { navigate("/events"); }
+  }, [isLoading, navigate, user]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!user || !user.isSuperAdmin) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
+function ProtectedAdminPage() {
+  return (
+    <SuperAdminGate>
+      <PlatformAdminPage />
+    </SuperAdminGate>
+  );
 }
 
 function ProtectedEventSelectionScreen() {
@@ -108,6 +142,9 @@ function Router() {
 
       {/* Settings */}
       <Route path="/settings" component={ProtectedSettingsPage} />
+
+      {/* Platform admin — super admin only */}
+      <Route path="/admin" component={ProtectedAdminPage} />
 
       <Route component={NotFound} />
     </Switch>

@@ -7,13 +7,26 @@ const router = Router();
 
 router.get("/events/:eventId/rooms", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
-  if (isNaN(eventId)) { res.status(400).json({ error: "Invalid eventId" }); return; }
+  if (isNaN(eventId)) {
+    res.status(400).json({ error: "Invalid eventId" });
+    return;
+  }
   try {
-    const eventScope = req.auth
-      ? and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, req.auth.organizationId))
+    const eventScope = req.auth?.organizationId
+      ? and(
+          eq(eventsTable.id, eventId),
+          eq(eventsTable.organizationId, req.auth.organizationId),
+        )
       : eq(eventsTable.id, eventId);
-    const [event] = await db.select({ id: eventsTable.id }).from(eventsTable).where(eventScope).limit(1);
-    if (!event) { res.status(404).json({ error: "Event not found" }); return; }
+    const [event] = await db
+      .select({ id: eventsTable.id })
+      .from(eventsTable)
+      .where(eventScope)
+      .limit(1);
+    if (!event) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
     const rooms = await db
       .select({
         id: roomsTable.id,
@@ -44,16 +57,20 @@ router.get("/events/:eventId/rooms", async (req, res) => {
 
 router.post("/events/:eventId/rooms", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
-  if (isNaN(eventId)) { res.status(400).json({ error: "Invalid eventId" }); return; }
-  const { name, description, capacity, isActive, sortOrder, ageMin, ageMax } = req.body as {
-    name?: string;
-    description?: string;
-    capacity?: number;
-    isActive?: boolean;
-    sortOrder?: number;
-    ageMin?: number;
-    ageMax?: number;
-  };
+  if (isNaN(eventId)) {
+    res.status(400).json({ error: "Invalid eventId" });
+    return;
+  }
+  const { name, description, capacity, isActive, sortOrder, ageMin, ageMax } =
+    req.body as {
+      name?: string;
+      description?: string;
+      capacity?: number;
+      isActive?: boolean;
+      sortOrder?: number;
+      ageMin?: number;
+      ageMax?: number;
+    };
   if (!name?.trim()) {
     res.status(400).json({ error: "name is required" });
     return;
@@ -63,9 +80,17 @@ router.post("/events/:eventId/rooms", async (req, res) => {
     const [event] = await db
       .select({ id: eventsTable.id })
       .from(eventsTable)
-      .where(and(eq(eventsTable.id, eventId), eq(eventsTable.organizationId, auth.organizationId)))
+      .where(
+        and(
+          eq(eventsTable.id, eventId),
+          eq(eventsTable.organizationId, auth.organizationId),
+        ),
+      )
       .limit(1);
-    if (!event) { res.status(404).json({ error: "Event not found" }); return; }
+    if (!event) {
+      res.status(404).json({ error: "Event not found" });
+      return;
+    }
     const [room] = await db
       .insert(roomsTable)
       .values({
@@ -90,32 +115,47 @@ router.post("/events/:eventId/rooms", async (req, res) => {
 router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   const roomId = parseInt(req.params.roomId, 10);
-  if (isNaN(eventId) || isNaN(roomId)) { res.status(400).json({ error: "Invalid id" }); return; }
-  const { name, description, capacity, isActive, sortOrder, ageMin, ageMax } = req.body as {
-    name?: string;
-    description?: string;
-    capacity?: number | null;
-    isActive?: boolean;
-    sortOrder?: number;
-    ageMin?: number | null;
-    ageMax?: number | null;
-  };
+  if (isNaN(eventId) || isNaN(roomId)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const { name, description, capacity, isActive, sortOrder, ageMin, ageMax } =
+    req.body as {
+      name?: string;
+      description?: string;
+      capacity?: number | null;
+      isActive?: boolean;
+      sortOrder?: number;
+      ageMin?: number | null;
+      ageMax?: number | null;
+    };
   try {
     const auth = requireAuthContext(req);
     const [updated] = await db
       .update(roomsTable)
       .set({
         ...(name !== undefined && { name: name.trim() }),
-        ...(description !== undefined && { description: description?.trim() ?? null }),
+        ...(description !== undefined && {
+          description: description?.trim() ?? null,
+        }),
         ...(capacity !== undefined && { capacity }),
         ...(isActive !== undefined && { isActive }),
         ...(sortOrder !== undefined && { sortOrder }),
         ...(ageMin !== undefined && { ageMin }),
         ...(ageMax !== undefined && { ageMax }),
       })
-      .where(and(eq(roomsTable.id, roomId), eq(roomsTable.eventId, eventId), eq(roomsTable.organizationId, auth.organizationId)))
+      .where(
+        and(
+          eq(roomsTable.id, roomId),
+          eq(roomsTable.eventId, eventId),
+          eq(roomsTable.organizationId, auth.organizationId),
+        ),
+      )
       .returning();
-    if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+    if (!updated) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
     const [withCount] = await db
       .select({
         id: roomsTable.id,
@@ -135,7 +175,12 @@ router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
         )`,
       })
       .from(roomsTable)
-      .where(and(eq(roomsTable.id, roomId), eq(roomsTable.organizationId, auth.organizationId)));
+      .where(
+        and(
+          eq(roomsTable.id, roomId),
+          eq(roomsTable.organizationId, auth.organizationId),
+        ),
+      );
     res.json(withCount);
   } catch (err) {
     req.log.error({ err }, "Failed to update room");
@@ -146,10 +191,21 @@ router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
 router.delete("/events/:eventId/rooms/:roomId", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
   const roomId = parseInt(req.params.roomId, 10);
-  if (isNaN(eventId) || isNaN(roomId)) { res.status(400).json({ error: "Invalid id" }); return; }
+  if (isNaN(eventId) || isNaN(roomId)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
   try {
     const auth = requireAuthContext(req);
-    await db.delete(roomsTable).where(and(eq(roomsTable.id, roomId), eq(roomsTable.eventId, eventId), eq(roomsTable.organizationId, auth.organizationId)));
+    await db
+      .delete(roomsTable)
+      .where(
+        and(
+          eq(roomsTable.id, roomId),
+          eq(roomsTable.eventId, eventId),
+          eq(roomsTable.organizationId, auth.organizationId),
+        ),
+      );
     res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete room");

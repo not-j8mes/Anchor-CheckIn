@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { eq } from "drizzle-orm";
-import { db, organizationMembersTable, organizationsTable, usersTable } from "@workspace/db";
+import {
+  db,
+  organizationMembersTable,
+  organizationsTable,
+  usersTable,
+} from "@workspace/db";
 import {
   clearSessionCookie,
   requireAuth,
@@ -17,7 +22,8 @@ function normalizeEmail(value: unknown): string {
 
 router.post("/auth/login", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
-  const password = typeof req.body?.password === "string" ? req.body.password : "";
+  const password =
+    typeof req.body?.password === "string" ? req.body.password : "";
 
   if (!email || !password) {
     res.status(400).json({ error: "Email and password are required" });
@@ -52,29 +58,39 @@ router.post("/auth/login", async (req, res) => {
       .where(eq(organizationMembersTable.userId, user.id))
       .limit(1);
 
-    if (!membership) {
+    if (!membership && !user.isSuperAdmin) {
       res.status(403).json({ error: "No organization membership found" });
       return;
     }
 
-    setSessionCookie(res, user.id, membership.organizationId);
+    if (membership && !["owner", "admin", "staff"].includes(membership.role)) {
+      res.status(403).json({ error: "Invalid organization membership" });
+      return;
+    }
+
+    setSessionCookie(res, user.id, membership?.organizationId ?? null);
     res.json(
       serializeAuthContext({
         userId: user.id,
-        organizationId: membership.organizationId,
-        role: membership.role as "owner" | "admin" | "staff",
+        organizationId: membership?.organizationId ?? null,
+        role:
+          (membership?.role as "owner" | "admin" | "staff" | undefined) ?? null,
+        isSuperAdmin: user.isSuperAdmin,
         user: {
           id: user.id,
           firstName: user.firstName,
           lastName: user.lastName,
           email: user.email,
+          isSuperAdmin: user.isSuperAdmin,
         },
-        organization: {
-          id: membership.organizationId,
-          name: membership.organizationName,
-          subscriptionStatus: membership.subscriptionStatus,
-          plan: membership.plan,
-        },
+        organization: membership
+          ? {
+              id: membership.organizationId,
+              name: membership.organizationName,
+              subscriptionStatus: membership.subscriptionStatus,
+              plan: membership.plan,
+            }
+          : null,
       }),
     );
   } catch (err) {

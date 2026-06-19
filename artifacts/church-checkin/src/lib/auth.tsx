@@ -1,10 +1,18 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 interface AuthUser {
   id: number;
   firstName: string;
   lastName: string;
   email: string;
+  isSuperAdmin: boolean;
 }
 
 interface AuthOrganization {
@@ -17,7 +25,7 @@ interface AuthOrganization {
 
 interface AuthResponse {
   user: AuthUser;
-  organization: AuthOrganization;
+  organization: AuthOrganization | null;
 }
 
 interface AuthContextValue {
@@ -41,7 +49,9 @@ async function parseAuthResponse(response: Response): Promise<AuthResponse> {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [organization, setOrganization] = useState<AuthOrganization | null>(null);
+  const [organization, setOrganization] = useState<AuthOrganization | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   const applyAuth = useCallback((data: AuthResponse | null) => {
@@ -51,7 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch("/api/auth/me", { credentials: "same-origin" });
+      const response = await fetch("/api/auth/me", {
+        credentials: "same-origin",
+      });
       if (!response.ok) {
         applyAuth(null);
         return;
@@ -84,7 +96,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "same-origin",
+    });
     applyAuth(null);
   }, [applyAuth]);
 

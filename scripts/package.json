@@ -8,6 +8,7 @@
     "seed": "tsx ./src/seed.ts",
     "create:owner": "tsx ./src/create-owner.ts",
     "create:user": "tsx ./src/create-user.ts",
+    "create:super-admin": "tsx ./src/create-super-admin.ts",
     "fix-event-statuses": "tsx ./src/fix-event-statuses.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

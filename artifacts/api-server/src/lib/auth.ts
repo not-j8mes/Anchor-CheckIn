@@ -13,20 +13,28 @@ const MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
 
 export interface AuthContext {
   userId: number;
-  organizationId: number;
-  role: "owner" | "admin" | "staff";
+  organizationId: number | null;
+  role: "owner" | "admin" | "staff" | null;
+  isSuperAdmin: boolean;
   user: {
     id: number;
     firstName: string;
     lastName: string;
     email: string;
+    isSuperAdmin: boolean;
   };
   organization: {
     id: number;
     name: string;
     subscriptionStatus: string;
     plan: string;
-  };
+  } | null;
+}
+
+export interface OrganizationAuthContext extends AuthContext {
+  organizationId: number;
+  role: "owner" | "admin" | "staff";
+  organization: NonNullable<AuthContext["organization"]>;
 }
 
 declare global {
@@ -39,7 +47,7 @@ declare global {
 
 interface SessionPayload {
   userId: number;
-  organizationId: number;
+  organizationId: number | null;
   iat: number;
   exp: number;
 }
@@ -57,7 +65,9 @@ function encodeBase64Url(value: string): string {
 }
 
 function sign(value: string): string {
-  return createHmac("sha256", getSessionSecret()).update(value).digest("base64url");
+  return createHmac("sha256", getSessionSecret())
+    .update(value)
+    .digest("base64url");
 }
 
 function readCookie(req: Request, name: string): string | undefined {
@@ -80,7 +90,10 @@ function isValidSignature(actual: string, expected: string): boolean {
   );
 }
 
-export function createSessionToken(userId: number, organizationId: number): string {
+export function createSessionToken(
+  userId: number,
+  organizationId: number | null,
+): string {
   const now = Math.floor(Date.now() / 1000);
   const payload: SessionPayload = {
     userId,
@@ -103,7 +116,12 @@ function parseSessionToken(token: string | undefined): SessionPayload | null {
     const payload = JSON.parse(
       Buffer.from(encodedPayload, "base64url").toString("utf8"),
     ) as SessionPayload;
-    if (!payload.userId || !payload.organizationId || !payload.exp) return null;
+    if (!payload.userId || !payload.exp) return null;
+    if (
+      payload.organizationId !== null &&
+      !Number.isInteger(payload.organizationId)
+    )
+      return null;
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
     return payload;
   } catch {
@@ -114,7 +132,7 @@ function parseSessionToken(token: string | undefined): SessionPayload | null {
 export function setSessionCookie(
   res: Response,
   userId: number,
-  organizationId: number,
+  organizationId: number | null,
 ): void {
   res.cookie(COOKIE_NAME, createSessionToken(userId, organizationId), {
     httpOnly: true,
@@ -134,69 +152,101 @@ export function clearSessionCookie(res: Response): void {
   });
 }
 
-export async function getAuthContext(req: Request): Promise<AuthContext | null> {
+export async function getAuthContext(
+  req: Request,
+): Promise<AuthContext | null> {
   const payload = parseSessionToken(readCookie(req, COOKIE_NAME));
   if (!payload) return null;
 
-  const [row] = await db
+  const [user] = await db
     .select({
       userId: usersTable.id,
       firstName: usersTable.firstName,
       lastName: usersTable.lastName,
       email: usersTable.email,
-      organizationId: organizationsTable.id,
-      organizationName: organizationsTable.name,
-      subscriptionStatus: organizationsTable.subscriptionStatus,
-      plan: organizationsTable.plan,
-      role: organizationMembersTable.role,
+      isSuperAdmin: usersTable.isSuperAdmin,
     })
-    .from(organizationMembersTable)
-    .innerJoin(usersTable, eq(usersTable.id, organizationMembersTable.userId))
-    .innerJoin(
-      organizationsTable,
-      eq(organizationsTable.id, organizationMembersTable.organizationId),
-    )
-    .where(
-      and(
-        eq(organizationMembersTable.userId, payload.userId),
-        eq(organizationMembersTable.organizationId, payload.organizationId),
-      ),
-    )
+    .from(usersTable)
+    .where(eq(usersTable.id, payload.userId))
     .limit(1);
 
-  if (!row) return null;
-  if (!["owner", "admin", "staff"].includes(row.role)) return null;
+  if (!user) return null;
+
+  const [membership] =
+    payload.organizationId === null
+      ? []
+      : await db
+          .select({
+            organizationId: organizationsTable.id,
+            organizationName: organizationsTable.name,
+            subscriptionStatus: organizationsTable.subscriptionStatus,
+            plan: organizationsTable.plan,
+            role: organizationMembersTable.role,
+          })
+          .from(organizationMembersTable)
+          .innerJoin(
+            usersTable,
+            eq(usersTable.id, organizationMembersTable.userId),
+          )
+          .innerJoin(
+            organizationsTable,
+            eq(organizationsTable.id, organizationMembersTable.organizationId),
+          )
+          .where(
+            and(
+              eq(organizationMembersTable.userId, payload.userId),
+              eq(
+                organizationMembersTable.organizationId,
+                payload.organizationId,
+              ),
+            ),
+          )
+          .limit(1);
+
+  if (!membership && !user.isSuperAdmin) return null;
+  if (membership && !["owner", "admin", "staff"].includes(membership.role))
+    return null;
 
   return {
-    userId: row.userId,
-    organizationId: row.organizationId,
-    role: row.role as AuthContext["role"],
+    userId: user.userId,
+    organizationId: membership?.organizationId ?? null,
+    role: (membership?.role as AuthContext["role"]) ?? null,
+    isSuperAdmin: user.isSuperAdmin,
     user: {
-      id: row.userId,
-      firstName: row.firstName,
-      lastName: row.lastName,
-      email: row.email,
+      id: user.userId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      isSuperAdmin: user.isSuperAdmin,
     },
-    organization: {
-      id: row.organizationId,
-      name: row.organizationName,
-      subscriptionStatus: row.subscriptionStatus,
-      plan: row.plan,
-    },
+    organization: membership
+      ? {
+          id: membership.organizationId,
+          name: membership.organizationName,
+          subscriptionStatus: membership.subscriptionStatus,
+          plan: membership.plan,
+        }
+      : null,
   };
 }
 
 export function serializeAuthContext(auth: AuthContext) {
   return {
     user: auth.user,
-    organization: {
-      ...auth.organization,
-      role: auth.role,
-    },
+    organization: auth.organization
+      ? {
+          ...auth.organization,
+          role: auth.role,
+        }
+      : null,
   };
 }
 
-export async function attachAuth(req: Request, _res: Response, next: NextFunction) {
+export async function attachAuth(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+) {
   try {
     req.auth = (await getAuthContext(req)) ?? undefined;
     next();
@@ -213,7 +263,26 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   res.status(401).json({ error: "Authentication required" });
 }
 
-export function requireAuthContext(req: Request): AuthContext {
+export function requireSuperAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  if (!req.auth) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  if (!req.auth.isSuperAdmin) {
+    res.status(403).json({ error: "Super-admin access required" });
+    return;
+  }
+  next();
+}
+
+export function requireAuthContext(req: Request): OrganizationAuthContext {
   if (!req.auth) throw new Error("Authentication required");
-  return req.auth;
+  if (!req.auth.organizationId || !req.auth.organization || !req.auth.role) {
+    throw new Error("Organization membership required");
+  }
+  return req.auth as OrganizationAuthContext;
 }
