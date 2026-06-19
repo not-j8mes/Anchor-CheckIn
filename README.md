@@ -23,6 +23,16 @@ pnpm create:owner
 
 3. Start the app and sign in at `/login`.
 
+Create or promote a platform super-admin account locally:
+
+```sh
+SUPER_ADMIN_EMAIL="myemail@example.com" \
+SUPER_ADMIN_FIRST_NAME="James" \
+SUPER_ADMIN_LAST_NAME="Dureno" \
+SUPER_ADMIN_PASSWORD="strong-password-here" \
+pnpm create:super-admin
+```
+
 There is no public signup, setup-first-admin page, or browser-based organization creation flow. Account creation is command-line only.
 
 ## Railway Account Creation
@@ -51,5 +61,16 @@ railway run \
   USER_LAST_NAME="User" \
   USER_PASSWORD="temporaryPassword123" \
   ROLE="staff" \
-  pnpm create:user
+pnpm create:user
+```
+
+Create or promote a platform super-admin account through Railway:
+
+```sh
+railway run \
+  SUPER_ADMIN_EMAIL="myemail@example.com" \
+  SUPER_ADMIN_FIRST_NAME="James" \
+  SUPER_ADMIN_LAST_NAME="Dureno" \
+  SUPER_ADMIN_PASSWORD="strong-password-here" \
+  pnpm create:super-admin
 ```

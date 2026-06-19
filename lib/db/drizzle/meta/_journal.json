@@ -43,6 +43,13 @@
       "when": 1781713000000,
       "tag": "0005_anchor_events_default_org",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781883000000,
+      "tag": "0006_add_user_super_admin",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,17 @@
-import { integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  integer,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
+export const DEFAULT_ORGANIZATION_NAME =
+  "Anchor Events - Check In and Registration";
 export const DEFAULT_PLAN = "basic";
 export const DEFAULT_SUBSCRIPTION_STATUS = "trialing";
 
@@ -14,7 +23,9 @@ export const organizationsTable = pgTable("organizations", {
   address: text("address"),
   phone: text("phone"),
   website: text("website"),
-  subscriptionStatus: text("subscription_status").notNull().default(DEFAULT_SUBSCRIPTION_STATUS),
+  subscriptionStatus: text("subscription_status")
+    .notNull()
+    .default(DEFAULT_SUBSCRIPTION_STATUS),
   plan: text("plan").notNull().default(DEFAULT_PLAN),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
@@ -33,6 +44,7 @@ export const usersTable = pgTable(
     lastName: text("last_name").notNull(),
     email: text("email").notNull(),
     passwordHash: text("password_hash").notNull(),
+    isSuperAdmin: boolean("is_super_admin").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -61,7 +73,9 @@ export const organizationMembersTable = pgTable(
   ],
 );
 
-export const insertOrganizationSchema = createInsertSchema(organizationsTable).omit({ id: true });
+export const insertOrganizationSchema = createInsertSchema(
+  organizationsTable,
+).omit({ id: true });
 export const insertUserSchema = createInsertSchema(usersTable).omit({
   id: true,
   createdAt: true,
