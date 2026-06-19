@@ -91,6 +91,20 @@ function registrationTypeStripe(_type?: string | null) {
   return "event-card-accent";
 }
 
+function eventReadinessItems(event: ChurchEvent) {
+  const trackAttendance = event.trackAttendance ?? (event.registrationType === "child_checkin" || !event.registrationType);
+  const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
+  const printLabels = event.printLabels ?? isChildCheckin;
+  const requireCheckout = event.requireCheckout ?? isChildCheckin;
+
+  return [
+    { label: "Registration form", ready: !!event.formId },
+    { label: "Check-in", ready: trackAttendance },
+    ...(trackAttendance ? [{ label: "Labels", ready: printLabels }] : []),
+    ...(trackAttendance && isChildCheckin ? [{ label: "Secure checkout", ready: requireCheckout }] : []),
+  ];
+}
+
 
 // ─── Edit Event Dialog ──────────────────────────────────────────────────────
 
@@ -531,6 +545,8 @@ function EventCard({ event, onEdit, categories }: {
   const formBadge = event.formId
     ? <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px]">Form Ready</Badge>
     : <Badge variant="outline" className="text-[10px] text-muted-foreground">No Form</Badge>;
+  const readiness = eventReadinessItems(event);
+  const readyCount = readiness.filter((item) => item.ready).length;
 
   return (
     <Card
@@ -583,6 +599,23 @@ function EventCard({ event, onEdit, categories }: {
                   {checkinBadge}
                   {formBadge}
                 </div>
+                <div className="mt-3 rounded-md border border-border bg-muted/20 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-medium text-foreground">Readiness</p>
+                    <span className="text-xs text-muted-foreground">{readyCount} of {readiness.length} ready</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    {readiness.map((item) => (
+                      <span
+                        key={item.label}
+                        className={`flex items-center gap-1.5 text-xs ${item.ready ? "text-foreground" : "text-muted-foreground"}`}
+                      >
+                        <Check className={`h-3.5 w-3.5 ${item.ready ? "text-green-600" : "text-muted-foreground/50"}`} />
+                        {item.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center gap-1 flex-shrink-0">
@@ -620,6 +653,19 @@ function EventCard({ event, onEdit, categories }: {
                 >
                   <Link href={`/events/${event.id}/checkin`}>
                     <LogIn className="w-3.5 h-3.5" /> Check-In Desk
+                  </Link>
+                </Button>
+              )}
+              {event.formId && (
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Link href={`/events/${event.id}/form`}>
+                    <FileText className="w-3.5 h-3.5" /> Registration Form
                   </Link>
                 </Button>
               )}
@@ -902,19 +948,39 @@ export default function EventSelectionScreen() {
 
             {visible.length === 0 ? (
               <Card className="border-dashed">
-                <CardContent className="py-10 text-center text-muted-foreground">
+                <CardContent className="py-10 flex flex-col items-center text-center gap-3">
                   {search ? (
-                    <p>No events match "<strong>{search}</strong>"</p>
+                    <>
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                        <Search className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">No events match "{search}"</p>
+                        <p className="text-sm text-muted-foreground mt-1">Try a different name or category.</p>
+                      </div>
+                      <Button type="button" variant="outline" size="sm" onClick={() => setSearch("")}>
+                        Clear Search
+                      </Button>
+                    </>
                   ) : (
                     <>
-                      <p>No upcoming events.</p>
-                      <button
-                        type="button"
-                        onClick={() => setShowPast(true)}
-                        className="text-primary hover:underline text-sm mt-1"
-                      >
-                        Show past events
-                      </button>
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                        <Calendar className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">No upcoming events</p>
+                        <p className="text-sm text-muted-foreground mt-1">Create the next event or review past events.</p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <Button asChild size="sm">
+                          <Link href="/events/new">
+                            <Plus className="w-3.5 h-3.5" /> New Event
+                          </Link>
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => setShowPast(true)}>
+                          Show Past Events
+                        </Button>
+                      </div>
                     </>
                   )}
                 </CardContent>

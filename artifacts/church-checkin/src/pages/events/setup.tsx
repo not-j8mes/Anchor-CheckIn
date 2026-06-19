@@ -300,10 +300,57 @@ function formatPreviewDate(dateStr: string): string {
 const STEP_TITLES = [
   "Event Details",
   "Rooms / Groups",
-  "Registration Form Settings",
-  "Build Registration Form",
+  "Form Options",
+  "Registration Questions",
   "Review & Finish",
 ];
+
+const STEP_DESCRIPTIONS = [
+  "Name the event, choose who is registering, and set the schedule.",
+  "Add rooms or groups if your team needs to sort people during check-in.",
+  "Choose how registration, check-in, checkout, and labels should work.",
+  "Choose the questions people answer when they register.",
+  "Check the setup before creating the event.",
+];
+
+const STEP_ACTIONS = [
+  "Continue to Rooms",
+  "Continue to Form Options",
+  "Continue to Questions",
+  "Review Event",
+  "Finish Setup",
+];
+
+function registrationTypeLabel(type: string) {
+  return ({
+    child_checkin: "Child Check-In",
+    family_group: "Family / Group",
+    individual: "Individual",
+  } as Record<string, string>)[type] ?? type;
+}
+
+function scheduleTypeLabel(type: string) {
+  return type === "one_time" ? "One-time" : type === "multi_day" ? "Multi-day" : "Repeating";
+}
+
+function wizardSummaryItems(state: WizardState) {
+  const items = [];
+  if (state.name.trim()) items.push({ label: "Event", value: state.name.trim() });
+  if (state.registrationType) items.push({ label: "Who", value: registrationTypeLabel(state.registrationType) });
+  if (state.scheduleType) items.push({ label: "Schedule", value: scheduleTypeLabel(state.scheduleType) });
+  if (state.useRooms !== null) {
+    const isChild = !state.registrationType || state.registrationType === "child_checkin";
+    items.push({
+      label: isChild ? "Rooms" : "Groups",
+      value: state.useRooms ? `${state.rooms.length} added` : "Skipped",
+    });
+  }
+  if (state.formTitle.trim()) items.push({ label: "Form", value: state.formTitle.trim() });
+  if (state.draftFieldsInitializedAsTemplate !== null) {
+    items.push({ label: "Questions", value: `${state.draftFields.length} selected` });
+  }
+  return items;
+}
 
 // ─── Step 1: Event Details ────────────────────────────────────────────────────
 
@@ -2130,6 +2177,7 @@ export default function EventSetupWizard() {
   const canGoBack = step > 1;
   const progressPct = ((step - 1) / (STEP_TITLES.length - 1)) * 100;
   const contentMaxWidth = step === 4 ? "max-w-3xl" : "max-w-2xl";
+  const summaryItems = wizardSummaryItems(state);
 
   return (
     <div className="min-h-screen bg-background">
@@ -2171,9 +2219,11 @@ export default function EventSetupWizard() {
             <ArrowLeft className="w-4 h-4" />
             Back to Events
           </Button>
-          <div className="flex items-center gap-2 flex-1 justify-center">
+          <div className="flex items-center gap-2 flex-1 justify-center min-w-0">
             <img src={brandLogo} alt="Organization logo" className="w-5 h-5 object-contain" />
-            <span className="font-serif font-bold text-sm">New Event Setup</span>
+            <span className="font-serif font-bold text-sm truncate">
+              {state.name.trim() || "New Event Setup"}
+            </span>
           </div>
           <span className="text-xs text-muted-foreground w-16 text-right">
             Step {step} of {STEP_TITLES.length}
@@ -2219,18 +2269,22 @@ export default function EventSetupWizard() {
               style={{ width: `${progressPct + 10}%` }}
             />
           </div>
+          {summaryItems.length > 0 && (
+            <div className="flex flex-wrap gap-2 rounded-lg border border-border bg-muted/20 p-3">
+              {summaryItems.map((item) => (
+                <span key={item.label} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs">
+                  <span className="text-muted-foreground">{item.label}</span>
+                  <span className="font-medium text-foreground">{item.value}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Step content */}
         <div className="mb-2">
           <h1 className="text-2xl font-serif font-bold mb-1">{STEP_TITLES[step - 1]}</h1>
-          <p className="text-sm text-muted-foreground">
-            {step === 1 && "Set up the basic details for your event."}
-            {step === 2 && "Configure rooms or groups for this event. You can skip this step and add them later."}
-            {step === 3 && "Configure your registration form settings and choose a starting template."}
-            {step === 4 && "Add, edit, and arrange the fields for your registration form."}
-            {step === 5 && "Review your event setup before finishing."}
-          </p>
+          <p className="text-sm text-muted-foreground">{STEP_DESCRIPTIONS[step - 1]}</p>
         </div>
 
         <div className="mt-6 mb-10">
@@ -2259,7 +2313,7 @@ export default function EventSetupWizard() {
 
           {step < STEP_TITLES.length ? (
             <Button onClick={handleNext} disabled={!canProceed() || isBusy}>
-              Next
+              {STEP_ACTIONS[step - 1]}
               <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
           ) : (

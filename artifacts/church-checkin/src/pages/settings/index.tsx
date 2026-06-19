@@ -49,6 +49,14 @@ const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
 const MAX_LOGO_UPLOAD_BYTES = 1.5 * 1024 * 1024;
 const ACCEPTED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
+type BrandingFormData = {
+  name: string;
+  logoUrl: string;
+  address: string;
+  phone: string;
+  website: string;
+};
+
 // ─── Event Categories Card ────────────────────────────────────────────────────
 
 function EventCategoriesCard() {
@@ -235,13 +243,14 @@ export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<BrandingFormData>({
     name: "",
     logoUrl: "",
     address: "",
     phone: "",
     website: "",
   });
+  const [savedFormData, setSavedFormData] = useState<BrandingFormData>(formData);
 
   const { isDark, setIsDark } = useDarkMode();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -249,16 +258,24 @@ export default function Settings() {
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const brandLogo = formData.logoUrl || org?.logoUrl || appLogo;
   const brandName = formData.name || org?.name || DEFAULT_ORGANIZATION_NAME;
+  const hasBrandingChanges =
+    formData.name !== savedFormData.name ||
+    formData.logoUrl !== savedFormData.logoUrl ||
+    formData.address !== savedFormData.address ||
+    formData.phone !== savedFormData.phone ||
+    formData.website !== savedFormData.website;
 
   useEffect(() => {
     if (org) {
-      setFormData({
+      const nextFormData = {
         name: org.name || "",
         logoUrl: org.logoUrl || "",
         address: org.address || "",
         phone: org.phone || "",
         website: org.website || "",
-      });
+      };
+      setFormData(nextFormData);
+      setSavedFormData(nextFormData);
     }
   }, [org]);
 
@@ -266,6 +283,15 @@ export default function Settings() {
     mutation: {
       onSuccess: (updatedOrg) => {
         queryClient.setQueryData(getGetOrganizationQueryKey(), updatedOrg);
+        const nextSavedData = {
+          name: updatedOrg.name || "",
+          logoUrl: updatedOrg.logoUrl || "",
+          address: updatedOrg.address || "",
+          phone: updatedOrg.phone || "",
+          website: updatedOrg.website || "",
+        };
+        setFormData(nextSavedData);
+        setSavedFormData(nextSavedData);
         toast({ title: "Settings updated successfully" });
       },
       onError: () => toast({ title: "Failed to update settings", variant: "destructive" }),
@@ -382,13 +408,13 @@ export default function Settings() {
     <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
       <div>
         <h1 className="text-3xl font-serif font-bold text-foreground">Organization Settings</h1>
-        <p className="text-muted-foreground mt-1">Configure your church identity and default styling</p>
+        <p className="text-muted-foreground mt-1">Manage the name, logo, and contact details people see when they register.</p>
       </div>
 
       <Card className="border-card-border shadow-sm">
         <CardHeader>
-          <CardTitle>Appearance</CardTitle>
-          <CardDescription>Customize how the application looks for you.</CardDescription>
+          <CardTitle>Display</CardTitle>
+          <CardDescription>Choose how the admin app looks on this device.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
@@ -396,7 +422,7 @@ export default function Settings() {
               {isDark ? <Moon className="w-5 h-5 text-muted-foreground" /> : <Sun className="w-5 h-5 text-muted-foreground" />}
               <div>
                 <p className="font-medium text-sm">Dark Mode</p>
-                <p className="text-xs text-muted-foreground">Switch between light and dark theme</p>
+                <p className="text-xs text-muted-foreground">Use a darker screen style for this browser.</p>
               </div>
             </div>
             <Switch
@@ -411,14 +437,14 @@ export default function Settings() {
       <form onSubmit={handleSubmit} className="space-y-8">
         <Card className="border-card-border shadow-sm">
           <CardHeader>
-            <CardTitle>Branding</CardTitle>
+            <CardTitle>App Branding</CardTitle>
             <CardDescription>
-              These details appear on your public registration forms.
+              These details appear in the app header and on public registration forms.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name">Organization Name <span className="text-destructive">*</span></Label>
+              <Label htmlFor="name">Name shown to registrants <span className="text-destructive">*</span></Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -480,7 +506,7 @@ export default function Settings() {
             </div>
 
             <div className="pt-4 border-t border-border">
-              <h3 className="font-medium text-lg mb-4">Contact Info</h3>
+              <h3 className="font-medium text-lg mb-4">Public Contact Info</h3>
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="address">Address</Label>
@@ -513,9 +539,16 @@ export default function Settings() {
               </div>
             </div>
           </CardContent>
-          <CardFooter className="justify-end border-t border-border pt-4">
-            <Button type="submit" disabled={updateOrg.isPending}>
-              {updateOrg.isPending ? "Saving..." : "Save Branding"}
+          <CardFooter className="flex-col items-stretch gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className={`text-sm ${hasBrandingChanges ? "text-foreground" : "text-muted-foreground"}`}>
+              {updateOrg.isPending
+                ? "Saving changes..."
+                : hasBrandingChanges
+                ? "You have unsaved branding changes."
+                : "Branding is saved."}
+            </p>
+            <Button type="submit" disabled={updateOrg.isPending || !hasBrandingChanges || !formData.name.trim()}>
+              {updateOrg.isPending ? "Saving..." : hasBrandingChanges ? "Save Branding" : "Saved"}
             </Button>
           </CardFooter>
         </Card>
