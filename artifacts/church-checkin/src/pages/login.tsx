@@ -2,11 +2,10 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
-import appLogo from "@assets/image_1781393408862.png";
-
 function postLoginDestination(user: { isSuperAdmin: boolean } | null, organization: unknown): string {
   if (user?.isSuperAdmin && !organization) return "/admin";
   return "/events";
@@ -17,6 +16,7 @@ export default function LoginPage() {
   const [, navigate] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [staySignedIn, setStaySignedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,7 +31,7 @@ export default function LoginPage() {
     setNotice(null);
     setIsSubmitting(true);
     try {
-      await login(email, password);
+      await login(email, password, staySignedIn);
       // auth context updates async; the useEffect above handles the redirect
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in");
@@ -44,7 +44,6 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-xl shadow-foreground/5 p-8">
         <div className="flex flex-col items-center text-center mb-8">
-          <img src={appLogo} alt="Anchor Check-In" className="h-14 w-14 object-contain mb-4" />
           <p className="text-sm font-semibold text-muted-foreground">Anchor Check-In</p>
           <h1 className="mt-3 text-3xl font-serif font-bold text-foreground">Sign in</h1>
           <p className="mt-2 text-sm text-muted-foreground">Access your check-in dashboard.</p>
@@ -75,6 +74,23 @@ export default function LoginPage() {
               className="h-12 rounded-xl"
               required
             />
+          </div>
+
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="stay-signed-in"
+              checked={staySignedIn}
+              onCheckedChange={(checked) => setStaySignedIn(checked === true)}
+              className="mt-0.5"
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="stay-signed-in" className="cursor-pointer font-medium">
+                Stay signed in
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Keep me signed in on this trusted device for up to 14 days.
+              </p>
+            </div>
           </div>
 
           {error && (

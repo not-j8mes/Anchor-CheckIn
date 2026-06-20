@@ -4,8 +4,10 @@ import type { NextFunction, Request, Response } from "express";
 import type { AuthContext } from "./auth";
 
 process.env["DATABASE_URL"] ??= "postgresql://localhost:5432/anchor_checkin";
+process.env["SESSION_SECRET"] ??= "test-session-secret";
 let requireSuperAdmin: (typeof import("./auth"))["requireSuperAdmin"];
 let requireOrganizationRole: (typeof import("./auth"))["requireOrganizationRole"];
+let setSessionCookie: (typeof import("./auth"))["setSessionCookie"];
 let pool: (typeof import("@workspace/db"))["pool"];
 
 before(async () => {
@@ -15,6 +17,7 @@ before(async () => {
   ]);
   requireSuperAdmin = authModule.requireSuperAdmin;
   requireOrganizationRole = authModule.requireOrganizationRole;
+  setSessionCookie = authModule.setSessionCookie;
   pool = dbModule.pool;
 });
 
@@ -131,5 +134,31 @@ describe("requireOrganizationRole", () => {
       (() => assert.fail("middleware should not continue")) as NextFunction,
     );
     assert.equal(result.statusCode, 403);
+  });
+});
+
+describe("setSessionCookie", () => {
+  function recordCookie(staySignedIn: boolean) {
+    let options: Record<string, unknown> | undefined;
+    const response = {
+      cookie(_name: string, _value: string, cookieOptions: Record<string, unknown>) {
+        options = cookieOptions;
+      },
+    } as unknown as Response;
+
+    setSessionCookie(response, 1, 10, staySignedIn);
+    return options;
+  }
+
+  it("creates a browser-session cookie by default", () => {
+    const options = recordCookie(false);
+    assert.ok(options);
+    assert.equal("maxAge" in options, false);
+  });
+
+  it("creates a 14-day persistent cookie when requested", () => {
+    const options = recordCookie(true);
+    assert.ok(options);
+    assert.equal(options.maxAge, 14 * 24 * 60 * 60 * 1000);
   });
 });

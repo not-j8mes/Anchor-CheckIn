@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from "express";
+import type { CookieOptions, NextFunction, Request, Response } from "express";
 import { createHmac, timingSafeEqual } from "crypto";
 import { and, eq } from "drizzle-orm";
 import {
@@ -133,14 +133,21 @@ export function setSessionCookie(
   res: Response,
   userId: number,
   organizationId: number | null,
+  staySignedIn = false,
 ): void {
-  res.cookie(COOKIE_NAME, createSessionToken(userId, organizationId), {
+  const cookieOptions: CookieOptions = {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env["NODE_ENV"] === "production",
-    maxAge: MAX_AGE_SECONDS * 1000,
     path: "/",
-  });
+  };
+  if (staySignedIn) cookieOptions.maxAge = MAX_AGE_SECONDS * 1000;
+
+  res.cookie(
+    COOKIE_NAME,
+    createSessionToken(userId, organizationId),
+    cookieOptions,
+  );
 }
 
 export function clearSessionCookie(res: Response): void {

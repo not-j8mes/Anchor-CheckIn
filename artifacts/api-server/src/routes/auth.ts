@@ -24,6 +24,7 @@ router.post("/auth/login", async (req, res) => {
   const email = normalizeEmail(req.body?.email);
   const password =
     typeof req.body?.password === "string" ? req.body.password : "";
+  const staySignedIn = req.body?.staySignedIn === true;
 
   if (!email || !password) {
     res.status(400).json({ error: "Email and password are required" });
@@ -68,7 +69,12 @@ router.post("/auth/login", async (req, res) => {
       return;
     }
 
-    setSessionCookie(res, user.id, membership?.organizationId ?? null);
+    setSessionCookie(
+      res,
+      user.id,
+      membership?.organizationId ?? null,
+      staySignedIn,
+    );
     res.json(
       serializeAuthContext({
         userId: user.id,
