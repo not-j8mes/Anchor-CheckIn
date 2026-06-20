@@ -4,7 +4,11 @@ import pinoHttp from "pino-http";
 import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import { isOriginAllowed, parseAllowedOrigins } from "./lib/httpGuards";
+import {
+  isOriginAllowed,
+  isSameHostOrigin,
+  parseAllowedOrigins,
+} from "./lib/httpGuards";
 import { attachAuth, requireAuth } from "./lib/auth";
 
 const app: Express = express();
@@ -30,17 +34,22 @@ app.use(
     },
   }),
 );
-app.use(
+// CORS only applies to API traffic. Applying it globally can turn requests for
+// static JS/CSS into 500 responses when the app is opened on a custom domain.
+app.use("/api", (req, res, next) => {
   cors({
     origin(origin, callback) {
-      if (isOriginAllowed(origin, allowedOrigins)) {
+      if (
+        isSameHostOrigin(origin, req.get("host")) ||
+        isOriginAllowed(origin, allowedOrigins)
+      ) {
         callback(null, true);
         return;
       }
       callback(new Error("Origin is not allowed by CORS"));
     },
-  }),
-);
+  })(req, res, next);
+});
 app.use(express.json({ limit: jsonBodyLimit }));
 app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }));
 
