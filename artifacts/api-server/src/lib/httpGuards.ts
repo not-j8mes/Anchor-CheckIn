@@ -15,6 +15,19 @@ export function isOriginAllowed(
   return allowedOrigins.includes(origin);
 }
 
+export function isSameHostOrigin(
+  origin: string | undefined,
+  host: string | undefined,
+): boolean {
+  if (!origin || !host) return false;
+
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export function hasAdminAccess(
   req: { header(name: string): string | undefined },
   adminToken = process.env["ADMIN_TOKEN"],

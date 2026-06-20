@@ -4,6 +4,7 @@ import {
   hasAdminAccess,
   isOriginAllowed,
   isPgUniqueViolation,
+  isSameHostOrigin,
   parseAllowedOrigins,
 } from "./httpGuards";
 
@@ -36,6 +37,18 @@ describe("http guard helpers", () => {
       isOriginAllowed("https://other.example", ["https://app.example"], "production"),
       false,
     );
+  });
+
+  it("recognizes requests from the same host", () => {
+    assert.equal(
+      isSameHostOrigin("https://checkin.example.com", "checkin.example.com"),
+      true,
+    );
+    assert.equal(
+      isSameHostOrigin("https://other.example.com", "checkin.example.com"),
+      false,
+    );
+    assert.equal(isSameHostOrigin("not a URL", "checkin.example.com"), false);
   });
 
   it("requires admin tokens in production", () => {
