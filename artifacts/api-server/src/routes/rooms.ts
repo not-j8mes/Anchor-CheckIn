@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { db, roomsTable, registrationsTable, eventsTable } from "@workspace/db";
-import { requireAuthContext } from "../lib/auth";
+import { requireAuthContext, requireOrganizationRole } from "../lib/auth";
 
 const router = Router();
 
@@ -55,8 +55,8 @@ router.get("/events/:eventId/rooms", async (req, res) => {
   }
 });
 
-router.post("/events/:eventId/rooms", async (req, res) => {
-  const eventId = parseInt(req.params.eventId, 10);
+router.post("/events/:eventId/rooms", requireOrganizationRole("owner", "admin"), async (req, res) => {
+  const eventId = parseInt(String(req.params.eventId), 10);
   if (isNaN(eventId)) {
     res.status(400).json({ error: "Invalid eventId" });
     return;
@@ -112,9 +112,9 @@ router.post("/events/:eventId/rooms", async (req, res) => {
   }
 });
 
-router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
-  const eventId = parseInt(req.params.eventId, 10);
-  const roomId = parseInt(req.params.roomId, 10);
+router.put("/events/:eventId/rooms/:roomId", requireOrganizationRole("owner", "admin"), async (req, res) => {
+  const eventId = parseInt(String(req.params.eventId), 10);
+  const roomId = parseInt(String(req.params.roomId), 10);
   if (isNaN(eventId) || isNaN(roomId)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -188,9 +188,9 @@ router.put("/events/:eventId/rooms/:roomId", async (req, res) => {
   }
 });
 
-router.delete("/events/:eventId/rooms/:roomId", async (req, res) => {
-  const eventId = parseInt(req.params.eventId, 10);
-  const roomId = parseInt(req.params.roomId, 10);
+router.delete("/events/:eventId/rooms/:roomId", requireOrganizationRole("owner", "admin"), async (req, res) => {
+  const eventId = parseInt(String(req.params.eventId), 10);
+  const roomId = parseInt(String(req.params.roomId), 10);
   if (isNaN(eventId) || isNaN(roomId)) {
     res.status(400).json({ error: "Invalid id" });
     return;

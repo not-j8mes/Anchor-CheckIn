@@ -279,6 +279,26 @@ export function requireSuperAdmin(
   next();
 }
 
+export function requireOrganizationRole(
+  ...allowedRoles: Array<NonNullable<AuthContext["role"]>>
+) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.auth) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    if (!req.auth.organizationId || !req.auth.role) {
+      res.status(403).json({ error: "Organization membership required" });
+      return;
+    }
+    if (!allowedRoles.includes(req.auth.role)) {
+      res.status(403).json({ error: "Insufficient permissions" });
+      return;
+    }
+    next();
+  };
+}
+
 export function requireAuthContext(req: Request): OrganizationAuthContext {
   if (!req.auth) throw new Error("Authentication required");
   if (!req.auth.organizationId || !req.auth.organization || !req.auth.role) {

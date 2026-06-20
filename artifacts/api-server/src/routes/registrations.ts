@@ -29,6 +29,8 @@ import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
 
+class InvalidRegistrationGroupError extends Error {}
+
 // ─── System field → DB column mapping ────────────────────────────────────────
 // Mirrors the dbColumn values in artifacts/church-checkin/src/lib/systemFields.ts.
 
@@ -99,6 +101,7 @@ function computeFieldsHash(fields: FormField[]): string {
  * version row.
  */
 async function getOrCreateFormVersion(
+  database: Pick<typeof db, "select" | "insert">,
   organizationId: number | null,
   formId: number,
   form: { title: string; description: string | null },
@@ -106,7 +109,7 @@ async function getOrCreateFormVersion(
 ): Promise<number> {
   const fieldsHash = computeFieldsHash(formFields);
 
-  const [existing] = await db
+  const [existing] = await database
     .select({ id: formVersionsTable.id })
     .from(formVersionsTable)
     .where(
@@ -120,12 +123,12 @@ async function getOrCreateFormVersion(
   if (existing) return existing.id;
 
   // Determine the next version number for this form
-  const [{ maxVer }] = await db
+  const [{ maxVer }] = await database
     .select({ maxVer: sql<number>`COALESCE(MAX(version_number), 0)::int` })
     .from(formVersionsTable)
     .where(eq(formVersionsTable.formId, formId));
 
-  const [newVersion] = await db
+  const [newVersion] = await database
     .insert(formVersionsTable)
     .values({
       formId,
@@ -138,7 +141,7 @@ async function getOrCreateFormVersion(
     .returning();
 
   if (formFields.length > 0) {
-    await db.insert(formVersionFieldsTable).values(
+    await database.insert(formVersionFieldsTable).values(
       formFields.map((f) => ({
         formVersionId: newVersion.id,
         organizationId,
@@ -176,7 +179,17 @@ router.post("/forms/:formId/register", async (req, res) => {
 
   try {
     // ── Load form ─────────────────────────────────────────────────────────────
-    const [form] = await db.select().from(formsTable).where(eq(formsTable.id, formId)).limit(1);
+    const [form] = await db
+      .select()
+      .from(formsTable)
+      .where(
+        and(
+          eq(formsTable.id, formId),
+          eq(formsTable.isActive, true),
+          eq(formsTable.isPublic, true),
+        ),
+      )
+      .limit(1);
     if (!form) {
       res.status(404).json({ error: "Form not found" });
       return;
@@ -223,9 +236,6 @@ router.post("/forms/:formId/register", async (req, res) => {
       return;
     }
 
-    // ── Snapshot: find or create a form version for this field configuration ──
-    const formVersionId = await getOrCreateFormVersion(organizationId, formId, form, formFields);
-
     // ── Classify each submitted answer ────────────────────────────────────────
     const participantCols: Record<string, string> = {};
     const guardianCols: Record<string, string> = {};
@@ -262,8 +272,19 @@ router.post("/forms/:formId/register", async (req, res) => {
       }
     }
 
+    const registration = await db.transaction(async (tx) => {
+      // Snapshot creation and every registration write are atomic. Any failure
+      // rolls back the participant, guardian, group, registration, and answers.
+      const formVersionId = await getOrCreateFormVersion(
+        tx,
+        organizationId,
+        formId,
+        form,
+        formFields,
+      );
+
     // ── Create participant ────────────────────────────────────────────────────
-    const [participant] = await db
+    const [participant] = await tx
       .insert(participantsTable)
       .values({
         organizationId,
@@ -280,7 +301,7 @@ router.post("/forms/:formId/register", async (req, res) => {
       .returning();
 
     // ── Create guardian ───────────────────────────────────────────────────────
-    const [guardian] = await db
+    const [guardian] = await tx
       .insert(guardiansTable)
       .values({
         organizationId,
@@ -292,7 +313,7 @@ router.post("/forms/:formId/register", async (req, res) => {
       .returning();
 
     // ── Link participant ↔ guardian ───────────────────────────────────────────
-    await db.insert(participantGuardiansTable).values({
+    await tx.insert(participantGuardiansTable).values({
       organizationId,
       participantId: participant.id,
       guardianId:    guardian.id,
@@ -302,7 +323,7 @@ router.post("/forms/:formId/register", async (req, res) => {
 
     // ── Create emergency contact (if name provided) ───────────────────────────
     if (emergencyCols["name"]) {
-      await db.insert(emergencyContactsTable).values({
+      await tx.insert(emergencyContactsTable).values({
         organizationId,
         participantId: participant.id,
         name:         emergencyCols["name"],
@@ -323,13 +344,31 @@ router.post("/forms/:formId/register", async (req, res) => {
     // Priority 3: create a new group
     let registrationGroupId: number;
     if (incomingGroupId) {
+      if (!eventId || !organizationId) {
+        throw new InvalidRegistrationGroupError();
+      }
+      const [submittedGroup] = await tx
+        .select({ id: registrationGroupsTable.id })
+        .from(registrationGroupsTable)
+        .where(
+          and(
+            eq(registrationGroupsTable.id, incomingGroupId),
+            eq(registrationGroupsTable.formId, formId),
+            eq(registrationGroupsTable.eventId, eventId),
+            eq(registrationGroupsTable.organizationId, organizationId),
+          ),
+        )
+        .limit(1);
+      if (!submittedGroup) {
+        throw new InvalidRegistrationGroupError();
+      }
       registrationGroupId = incomingGroupId;
     } else {
       const guardianPhone = guardianCols["phone"] ?? null;
       let foundGroupId: number | null = null;
 
       if (guardianPhone && eventId) {
-        const [existing] = await db
+        const [existing] = await tx
           .select({ groupId: registrationsTable.registrationGroupId })
           .from(registrationsTable)
           .where(
@@ -346,7 +385,7 @@ router.post("/forms/:formId/register", async (req, res) => {
       if (foundGroupId) {
         registrationGroupId = foundGroupId;
       } else {
-        const [newGroup] = await db
+        const [newGroup] = await tx
           .insert(registrationGroupsTable)
           .values({ organizationId, eventId, formId, submittedAt: new Date() })
           .returning();
@@ -355,7 +394,7 @@ router.post("/forms/:formId/register", async (req, res) => {
     }
 
     // ── Insert registration (now includes form_version_id) ────────────────────
-    const [registration] = await db
+    const [registration] = await tx
       .insert(registrationsTable)
       .values({
         formId,
@@ -386,7 +425,7 @@ router.post("/forms/:formId/register", async (req, res) => {
 
     // ── Save custom answers ───────────────────────────────────────────────────
     if (customAnswers.length > 0) {
-      await db.insert(registrationCustomAnswersTable).values(
+      await tx.insert(registrationCustomAnswersTable).values(
         customAnswers.map((a) => ({
           registrationId: registration.id,
           organizationId,
@@ -397,8 +436,15 @@ router.post("/forms/:formId/register", async (req, res) => {
       );
     }
 
+      return registration;
+    });
+
     res.status(201).json(registration);
   } catch (err) {
+    if (err instanceof InvalidRegistrationGroupError) {
+      res.status(400).json({ error: "Registration group does not belong to this form and event" });
+      return;
+    }
     req.log.error({ err }, "Failed to submit registration");
     res.status(500).json({ error: "Internal server error" });
   }

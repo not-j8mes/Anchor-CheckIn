@@ -11,7 +11,7 @@ import {
   ReorderFormFieldsParams,
   ReorderFormFieldsBody,
 } from "@workspace/api-zod";
-import { requireAuthContext } from "../lib/auth";
+import { requireAuthContext, requireOrganizationRole } from "../lib/auth";
 
 const router = Router();
 
@@ -38,7 +38,7 @@ router.get("/forms/:formId/fields", async (req, res) => {
   }
 });
 
-router.post("/forms/:formId/fields", async (req, res) => {
+router.post("/forms/:formId/fields", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { formId: formIdStr } = CreateFormFieldParams.parse(req.params);
   const formId = Number(formIdStr);
   const parsed = CreateFormFieldBody.safeParse(req.body);
@@ -65,7 +65,7 @@ router.post("/forms/:formId/fields", async (req, res) => {
   }
 });
 
-router.put("/forms/:formId/fields/reorder", async (req, res) => {
+router.put("/forms/:formId/fields/reorder", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { formId: formIdStr } = ReorderFormFieldsParams.parse(req.params);
   const formId = Number(formIdStr);
   const parsed = ReorderFormFieldsBody.safeParse(req.body);
@@ -100,7 +100,7 @@ router.put("/forms/:formId/fields/reorder", async (req, res) => {
   }
 });
 
-router.put("/forms/:formId/fields/:fieldId", async (req, res) => {
+router.put("/forms/:formId/fields/:fieldId", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { fieldId: fieldIdStr } = UpdateFormFieldParams.parse(req.params);
   const fieldId = Number(fieldIdStr);
   const parsed = UpdateFormFieldBody.safeParse(req.body);
@@ -123,7 +123,7 @@ router.put("/forms/:formId/fields/:fieldId", async (req, res) => {
   }
 });
 
-router.delete("/forms/:formId/fields/:fieldId", async (req, res) => {
+router.delete("/forms/:formId/fields/:fieldId", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { fieldId: fieldIdStr } = DeleteFormFieldParams.parse(req.params);
   const fieldId = Number(fieldIdStr);
   try {

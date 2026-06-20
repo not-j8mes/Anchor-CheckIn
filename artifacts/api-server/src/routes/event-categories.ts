@@ -2,7 +2,7 @@ import { Router } from "express";
 import { and, eq } from "drizzle-orm";
 import { db, eventCategoriesTable, eventsTable } from "@workspace/db";
 import { randomBytes } from "crypto";
-import { requireAuthContext } from "../lib/auth";
+import { requireAuthContext, requireOrganizationRole } from "../lib/auth";
 
 const router = Router();
 
@@ -42,7 +42,7 @@ router.get("/event-categories", async (req, res) => {
   }
 });
 
-router.post("/event-categories", async (req, res) => {
+router.post("/event-categories", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { name } = req.body as { name?: string };
   if (!name?.trim()) {
     res.status(400).json({ error: "name is required" });
@@ -69,8 +69,8 @@ router.post("/event-categories", async (req, res) => {
   }
 });
 
-router.patch("/event-categories/:categoryId", async (req, res) => {
-  const categoryId = parseInt(req.params.categoryId, 10);
+router.patch("/event-categories/:categoryId", requireOrganizationRole("owner", "admin"), async (req, res) => {
+  const categoryId = parseInt(String(req.params.categoryId), 10);
   const { name } = req.body as { name?: string };
   if (!name?.trim()) {
     res.status(400).json({ error: "name is required" });
@@ -106,8 +106,8 @@ router.patch("/event-categories/:categoryId", async (req, res) => {
   }
 });
 
-router.delete("/event-categories/:categoryId", async (req, res) => {
-  const categoryId = parseInt(req.params.categoryId, 10);
+router.delete("/event-categories/:categoryId", requireOrganizationRole("owner", "admin"), async (req, res) => {
+  const categoryId = parseInt(String(req.params.categoryId), 10);
   try {
     const auth = requireAuthContext(req);
     const [existing] = await db

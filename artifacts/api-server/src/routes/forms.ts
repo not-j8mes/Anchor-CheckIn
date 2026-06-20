@@ -3,7 +3,7 @@ import { and, eq, sql, desc, asc } from "drizzle-orm";
 import { db, formsTable, questionsTable, formFieldsTable, registrationsTable, eventsTable, organizationsTable } from "@workspace/db";
 import { CreateFormBody, UpdateFormBody, GetFormParams, UpdateFormParams, DeleteFormParams } from "@workspace/api-zod";
 import { randomBytes } from "crypto";
-import { requireAuthContext } from "../lib/auth";
+import { requireAuthContext, requireOrganizationRole } from "../lib/auth";
 
 const router = Router();
 
@@ -31,7 +31,7 @@ router.get("/forms", async (req, res) => {
   }
 });
 
-router.post("/forms", async (req, res) => {
+router.post("/forms", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const parsed = CreateFormBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input" });
@@ -54,7 +54,17 @@ router.post("/forms", async (req, res) => {
 router.get("/forms/by-slug/:embedSlug", async (req, res) => {
   const { embedSlug } = req.params;
   try {
-    const form = await db.select().from(formsTable).where(eq(formsTable.embedSlug, embedSlug)).limit(1);
+    const form = await db
+      .select()
+      .from(formsTable)
+      .where(
+        and(
+          eq(formsTable.embedSlug, embedSlug),
+          eq(formsTable.isActive, true),
+          eq(formsTable.isPublic, true),
+        ),
+      )
+      .limit(1);
     if (!form[0]) {
       res.status(404).json({ error: "Not found" });
       return;
@@ -117,7 +127,7 @@ router.get("/forms/:formId", async (req, res) => {
   }
 });
 
-router.put("/forms/:formId", async (req, res) => {
+router.put("/forms/:formId", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { formId: formIdStr } = UpdateFormParams.parse(req.params);
   const formId = Number(formIdStr);
   const parsed = UpdateFormBody.safeParse(req.body);
@@ -143,7 +153,7 @@ router.put("/forms/:formId", async (req, res) => {
   }
 });
 
-router.delete("/forms/:formId", async (req, res) => {
+router.delete("/forms/:formId", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { formId: formIdStr } = DeleteFormParams.parse(req.params);
   const formId = Number(formIdStr);
   try {

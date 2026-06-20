@@ -5,6 +5,7 @@ import type { AuthContext } from "./auth";
 
 process.env["DATABASE_URL"] ??= "postgresql://localhost:5432/anchor_checkin";
 let requireSuperAdmin: (typeof import("./auth"))["requireSuperAdmin"];
+let requireOrganizationRole: (typeof import("./auth"))["requireOrganizationRole"];
 let pool: (typeof import("@workspace/db"))["pool"];
 
 before(async () => {
@@ -13,6 +14,7 @@ before(async () => {
     import("@workspace/db"),
   ]);
   requireSuperAdmin = authModule.requireSuperAdmin;
+  requireOrganizationRole = authModule.requireOrganizationRole;
   pool = dbModule.pool;
 });
 
@@ -20,11 +22,17 @@ after(async () => {
   await pool.end();
 });
 
-function authContext(isSuperAdmin: boolean): AuthContext {
+function authContext(
+  isSuperAdmin: boolean,
+  role: AuthContext["role"] = null,
+): AuthContext {
+  const organization = role
+    ? { id: 10, name: "Test Org", subscriptionStatus: "active", plan: "basic" }
+    : null;
   return {
     userId: 1,
-    organizationId: null,
-    role: null,
+    organizationId: organization?.id ?? null,
+    role,
     isSuperAdmin,
     user: {
       id: 1,
@@ -33,7 +41,7 @@ function authContext(isSuperAdmin: boolean): AuthContext {
       email: "test@example.com",
       isSuperAdmin,
     },
-    organization: null,
+    organization,
   };
 }
 
@@ -84,5 +92,44 @@ describe("requireSuperAdmin", () => {
       called = true;
     }) as NextFunction);
     assert.equal(called, true);
+  });
+});
+
+describe("requireOrganizationRole", () => {
+  const requireManager = () => requireOrganizationRole("owner", "admin");
+
+  it("allows owners and admins", () => {
+    for (const role of ["owner", "admin"] as const) {
+      const { response } = responseRecorder();
+      let called = false;
+      requireManager()(
+        { auth: authContext(false, role) } as Request,
+        response,
+        (() => { called = true; }) as NextFunction,
+      );
+      assert.equal(called, true);
+    }
+  });
+
+  it("rejects staff users", () => {
+    const { response, result } = responseRecorder();
+    let called = false;
+    requireManager()(
+      { auth: authContext(false, "staff") } as Request,
+      response,
+      (() => { called = true; }) as NextFunction,
+    );
+    assert.equal(result.statusCode, 403);
+    assert.equal(called, false);
+  });
+
+  it("rejects users without an organization membership", () => {
+    const { response, result } = responseRecorder();
+    requireManager()(
+      { auth: authContext(true) } as Request,
+      response,
+      (() => assert.fail("middleware should not continue")) as NextFunction,
+    );
+    assert.equal(result.statusCode, 403);
   });
 });

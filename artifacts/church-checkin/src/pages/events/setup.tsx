@@ -1187,7 +1187,9 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
 // System keys that belong to each section in child_checkin events
 const GUARDIAN_SECTION_KEYS = new Set([
   "guardian_first_name", "guardian_last_name", "guardian_phone", "guardian_email",
-  "secondary_guardian_name", "secondary_guardian_phone",
+  "secondary_guardian_first_name", "secondary_guardian_last_name",
+  "secondary_guardian_phone", "secondary_guardian_email",
+  "secondary_guardian_relationship",
   "authorized_pickup_names", "unauthorized_pickup_notes",
   "photo_permission", "medical_permission",
 ]);

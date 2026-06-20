@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, organizationsTable } from "@workspace/db";
 import { UpdateOrganizationBody } from "@workspace/api-zod";
+import { requireOrganizationRole } from "../lib/auth";
 import { requireAuthContext } from "../lib/auth";
 
 const router = Router();
@@ -21,7 +22,7 @@ router.get("/organizations/current", async (req, res) => {
   }
 });
 
-router.put("/organizations/current", async (req, res) => {
+router.put("/organizations/current", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const parsed = UpdateOrganizationBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid input" });

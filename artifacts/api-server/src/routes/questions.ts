@@ -11,7 +11,7 @@ import {
   ReorderQuestionsParams,
   ListQuestionsParams,
 } from "@workspace/api-zod";
-import { requireAuthContext } from "../lib/auth";
+import { requireAuthContext, requireOrganizationRole } from "../lib/auth";
 
 const router = Router();
 
@@ -38,7 +38,7 @@ router.get("/forms/:formId/questions", async (req, res) => {
   }
 });
 
-router.post("/forms/:formId/questions", async (req, res) => {
+router.post("/forms/:formId/questions", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { formId: formIdStr } = CreateQuestionParams.parse(req.params);
   const formId = Number(formIdStr);
   const parsed = CreateQuestionBody.safeParse(req.body);
@@ -65,7 +65,7 @@ router.post("/forms/:formId/questions", async (req, res) => {
   }
 });
 
-router.put("/forms/:formId/questions/reorder", async (req, res) => {
+router.put("/forms/:formId/questions/reorder", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { formId: formIdStr } = ReorderQuestionsParams.parse(req.params);
   const formId = Number(formIdStr);
   const parsed = ReorderQuestionsBody.safeParse(req.body);
@@ -100,7 +100,7 @@ router.put("/forms/:formId/questions/reorder", async (req, res) => {
   }
 });
 
-router.put("/forms/:formId/questions/:questionId", async (req, res) => {
+router.put("/forms/:formId/questions/:questionId", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { questionId: questionIdStr } = UpdateQuestionParams.parse(req.params);
   const questionId = Number(questionIdStr);
   const parsed = UpdateQuestionBody.safeParse(req.body);
@@ -126,7 +126,7 @@ router.put("/forms/:formId/questions/:questionId", async (req, res) => {
   }
 });
 
-router.delete("/forms/:formId/questions/:questionId", async (req, res) => {
+router.delete("/forms/:formId/questions/:questionId", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const { questionId: questionIdStr } = DeleteQuestionParams.parse(req.params);
   const questionId = Number(questionIdStr);
   try {
