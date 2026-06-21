@@ -182,10 +182,16 @@ export function printLabels(labels: LabelData[], labelType?: string): void {
   const pages: string[] = [];
   labels.forEach((label, i) => {
     pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderLabelHtml(label, i, labels.length)}</div>`);
-    if (isSecurityLabel && label.labelCode) {
-      pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderParentPickupLabelHtml(label)}</div>`);
-    }
   });
+  if (isSecurityLabel) {
+    const seenCodes = new Set<string>();
+    labels.forEach((label) => {
+      if (label.labelCode && !seenCodes.has(label.labelCode)) {
+        seenCodes.add(label.labelCode);
+        pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderParentPickupLabelHtml(label)}</div>`);
+      }
+    });
+  }
 
   // Remove trailing page-break from the last page to avoid a blank extra page.
   if (pages.length > 0) {
