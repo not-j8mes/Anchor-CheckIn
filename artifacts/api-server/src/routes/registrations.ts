@@ -224,8 +224,11 @@ router.post("/forms/:formId/register", async (req, res) => {
     }
 
     const missingRequiredFields = formFields
-      .filter((field) => field.required)
-      .filter((field) => !(valueByFieldId.get(field.id) ?? "").trim())
+      .filter((field) => field.required || field.fieldType === "waiver")
+      .filter((field) => {
+        const value = (valueByFieldId.get(field.id) ?? "").trim();
+        return field.fieldType === "waiver" ? value !== "true" : !value;
+      })
       .map((field) => ({ fieldId: field.id, label: field.label }));
 
     if (missingRequiredFields.length > 0) {

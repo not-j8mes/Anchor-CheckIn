@@ -15,6 +15,7 @@ export const FormFieldFieldType = {
   select: 'select',
   multiselect: 'multiselect',
   checkbox: 'checkbox',
+  waiver: 'waiver',
   date: 'date',
   phone: 'phone',
   email: 'email',

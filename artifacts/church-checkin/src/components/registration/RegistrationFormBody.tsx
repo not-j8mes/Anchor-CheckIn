@@ -110,6 +110,26 @@ export function FieldInput({
     );
   }
 
+  if (fieldType === "waiver") {
+    return (
+      <div className="space-y-3">
+        <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-4 text-sm leading-relaxed text-foreground">
+          {placeholder || "No waiver text has been provided."}
+        </div>
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/30">
+          <input
+            type="checkbox"
+            required
+            checked={value === "true"}
+            onChange={(event) => onChange(event.target.checked ? "true" : "")}
+            className="mt-0.5 h-4 w-4 rounded border-input accent-primary"
+          />
+          <span className="text-sm leading-relaxed">I have read and agree to the {label}.</span>
+        </label>
+      </div>
+    );
+  }
+
   return (
     <Input
       type={

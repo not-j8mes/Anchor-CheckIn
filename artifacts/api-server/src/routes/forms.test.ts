@@ -185,6 +185,46 @@ describe("GET /api/forms/by-slug/:embedSlug — public org field safety", () => 
     }
   });
 
+  it("requires an explicit checked value for waiver fields", async () => {
+    const suffix = Date.now();
+    const [form] = await db
+      .insert(formsTable)
+      .values({
+        title: "Waiver test form",
+        embedSlug: `waiver-test-${suffix}`,
+        isActive: true,
+        isPublic: true,
+      })
+      .returning({ id: formsTable.id });
+    const [waiver] = await db
+      .insert(formFieldsTable)
+      .values({
+        formId: form.id,
+        fieldKind: "custom",
+        label: "Liability Waiver",
+        fieldType: "waiver",
+        placeholder: "Test waiver text",
+        required: false,
+        sortOrder: 0,
+      })
+      .returning({ id: formFieldsTable.id });
+
+    try {
+      const unchecked = await postJson(`/api/forms/${form.id}/register`, {
+        fields: [{ fieldId: waiver.id, value: "false" }],
+      });
+      assert.equal(unchecked.status, 400);
+      assert.equal((unchecked.body as { error: string }).error, "Missing required fields");
+
+      const spoofed = await postJson(`/api/forms/${form.id}/register`, {
+        fields: [{ fieldId: waiver.id, value: "yes" }],
+      });
+      assert.equal(spoofed.status, 400);
+    } finally {
+      await db.delete(formsTable).where(eq(formsTable.id, form.id));
+    }
+  });
+
   it("rejects a foreign registration group and rolls back every write", async () => {
     const suffix = Date.now();
     const [organization] = await db

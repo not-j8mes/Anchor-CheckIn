@@ -1182,6 +1182,7 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   email: "Email",
   select: "Dropdown",
   checkbox: "Checkbox",
+  waiver: "Waiver / Consent",
 };
 
 // System keys that belong to each section in child_checkin events
@@ -1511,14 +1512,14 @@ function WizardFormBuilder({
   };
 
   const addCustomField = (sectionId: WizardSectionId) => {
-    if (!customForm.label.trim()) return;
+    if (!customForm.label.trim() || (customForm.fieldType === "waiver" && !customForm.placeholder.trim())) return;
     onChange([...fields, {
       clientId: `draft_custom_${Date.now()}`,
       fieldKind: "custom",
       systemKey: null,
       label: customForm.label.trim(),
       fieldType: customForm.fieldType,
-      required: customForm.required,
+      required: customForm.fieldType === "waiver" || customForm.required,
       sortOrder: fields.length,
       placeholder: customForm.placeholder.trim(),
       options: "",
@@ -1730,7 +1731,7 @@ function WizardFormBuilder({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label>Field Type</Label>
-                    <Select value={customForm.fieldType} onValueChange={(v) => setCustomForm((p) => ({ ...p, fieldType: v }))}>
+                    <Select value={customForm.fieldType} onValueChange={(v) => setCustomForm((p) => ({ ...p, fieldType: v, required: v === "waiver" ? true : p.required }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="text">Text</SelectItem>
@@ -1740,23 +1741,39 @@ function WizardFormBuilder({
                         <SelectItem value="email">Email</SelectItem>
                         <SelectItem value="select">Dropdown</SelectItem>
                         <SelectItem value="checkbox">Checkbox</SelectItem>
+                        <SelectItem value="waiver">Waiver / Consent</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                  {customForm.fieldType !== "waiver" && (
+                    <div className="space-y-1.5">
+                      <Label>Placeholder</Label>
+                      <Input
+                        placeholder="Optional hint text"
+                        value={customForm.placeholder}
+                        onChange={(e) => setCustomForm((p) => ({ ...p, placeholder: e.target.value }))}
+                      />
+                    </div>
+                  )}
+                </div>
+                {customForm.fieldType === "waiver" && (
                   <div className="space-y-1.5">
-                    <Label>Placeholder</Label>
-                    <Input
-                      placeholder="Optional hint text"
+                    <Label>Waiver Text <span className="text-destructive">*</span></Label>
+                    <Textarea
+                      placeholder="Paste the complete waiver or consent text here..."
                       value={customForm.placeholder}
                       onChange={(e) => setCustomForm((p) => ({ ...p, placeholder: e.target.value }))}
+                      rows={10}
+                      className="resize-y"
                     />
                   </div>
-                </div>
+                )}
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     id="modal-custom-required"
-                    checked={customForm.required}
+                    checked={customForm.fieldType === "waiver" || customForm.required}
+                    disabled={customForm.fieldType === "waiver"}
                     onChange={(e) => setCustomForm((p) => ({ ...p, required: e.target.checked }))}
                     className="rounded"
                   />
@@ -1770,7 +1787,7 @@ function WizardFormBuilder({
                 <Button variant="outline" onClick={() => setAddModal(null)}>Cancel</Button>
                 <Button
                   onClick={() => addModal && addCustomField(addModal.section.id)}
-                  disabled={!customForm.label.trim()}
+                  disabled={!customForm.label.trim() || (customForm.fieldType === "waiver" && !customForm.placeholder.trim())}
                 >
                   Add Question
                 </Button>
@@ -2133,7 +2150,7 @@ export default function EventSetupWizard() {
               fieldKind: field.fieldKind,
               ...(field.systemKey ? { systemKey: field.systemKey } : {}),
               label: field.label,
-              fieldType: field.fieldType as "text" | "textarea" | "date" | "phone" | "email" | "select" | "checkbox",
+              fieldType: field.fieldType as "text" | "textarea" | "date" | "phone" | "email" | "select" | "checkbox" | "waiver",
               required: field.required,
               sortOrder: field.sortOrder,
               ...(field.placeholder ? { placeholder: field.placeholder } : {}),

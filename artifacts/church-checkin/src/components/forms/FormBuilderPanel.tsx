@@ -162,6 +162,7 @@ const FIELD_TYPE_LABELS: Record<string, string> = {
   select: "Dropdown",
   multiselect: "Multiple Choice",
   checkbox: "Checkbox",
+  waiver: "Waiver / Consent",
   date: "Date",
   phone: "Phone",
   email: "Email",
@@ -523,10 +524,14 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
       toast({ title: "Label is required", variant: "destructive" });
       return;
     }
+    if (editingField?.fieldType === "waiver" && !editingField.placeholder?.trim()) {
+      toast({ title: "Waiver text is required", variant: "destructive" });
+      return;
+    }
     const data: FormFieldInput = {
       label: editingField?.label?.trim() ?? "",
       fieldType: editingField?.fieldType as FormFieldInput["fieldType"] ?? "text",
-      required: !!editingField?.required,
+      required: editingField?.fieldType === "waiver" || !!editingField?.required,
       sortOrder: editingField?.sortOrder ?? (fields?.length ?? 0),
       placeholder: editingField?.placeholder ?? "",
       options: editingField?.options ?? "",
@@ -1003,7 +1008,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                   ) : (
                     <Select
                       value={editingField?.fieldType ?? "text"}
-                      onValueChange={(v) => setEditingField((p) => ({ ...p, fieldType: v as FormField["fieldType"] }))}
+                      onValueChange={(v) => setEditingField((p) => ({ ...p, fieldType: v as FormField["fieldType"], required: v === "waiver" ? true : p?.required }))}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -1012,6 +1017,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                         <SelectItem value="select">Dropdown</SelectItem>
                         <SelectItem value="multiselect">Multiple Choice</SelectItem>
                         <SelectItem value="checkbox">Checkbox</SelectItem>
+                        <SelectItem value="waiver">Waiver / Consent</SelectItem>
                         <SelectItem value="date">Date</SelectItem>
                         <SelectItem value="phone">Phone Number</SelectItem>
                         <SelectItem value="email">Email</SelectItem>
@@ -1030,6 +1036,20 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                       onChange={(e) => setEditingField((p) => ({ ...p, options: e.target.value }))}
                       placeholder="Option A, Option B, Option C"
                     />
+                  </div>
+                )}
+
+                {!isEditingSystemField && editingField?.fieldType === "waiver" && (
+                  <div className="space-y-1.5">
+                    <Label>Waiver Text <span className="text-destructive">*</span></Label>
+                    <Textarea
+                      value={editingField?.placeholder ?? ""}
+                      onChange={(e) => setEditingField((p) => ({ ...p, placeholder: e.target.value }))}
+                      placeholder="Paste the complete waiver or consent text here..."
+                      rows={10}
+                      className="resize-y"
+                    />
+                    <p className="text-xs text-muted-foreground">Registrants must accept this waiver before submitting.</p>
                   </div>
                 )}
 
@@ -1062,7 +1082,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                   <Input
                     value={editingField?.label ?? ""}
                     onChange={(e) => setEditingField((p) => ({ ...p, label: e.target.value }))}
-                    placeholder="e.g. T-Shirt Size"
+                    placeholder={editingField?.fieldType === "waiver" ? "e.g. Liability Waiver" : "e.g. T-Shirt Size"}
                     autoFocus
                   />
                 </div>
@@ -1072,7 +1092,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                     <Label>Field Type</Label>
                     <Select
                       value={editingField?.fieldType ?? "text"}
-                      onValueChange={(v) => setEditingField((p) => ({ ...p, fieldType: v as FormField["fieldType"] }))}
+                      onValueChange={(v) => setEditingField((p) => ({ ...p, fieldType: v as FormField["fieldType"], required: v === "waiver" ? true : p?.required }))}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -1081,6 +1101,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                         <SelectItem value="select">Dropdown</SelectItem>
                         <SelectItem value="multiselect">Multiple Choice</SelectItem>
                         <SelectItem value="checkbox">Checkbox</SelectItem>
+                        <SelectItem value="waiver">Waiver / Consent</SelectItem>
                         <SelectItem value="date">Date</SelectItem>
                         <SelectItem value="phone">Phone Number</SelectItem>
                         <SelectItem value="email">Email</SelectItem>
@@ -1092,7 +1113,8 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                   <div className="flex items-center gap-2 pt-7">
                     <Switch
                       id="fe-required"
-                      checked={editingField?.required ?? false}
+                      checked={editingField?.fieldType === "waiver" || editingField?.required || false}
+                      disabled={editingField?.fieldType === "waiver"}
                       onCheckedChange={(c) => setEditingField((p) => ({ ...p, required: c }))}
                     />
                     <Label htmlFor="fe-required">Required</Label>
@@ -1127,7 +1149,19 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                   </div>
                 )}
 
-                {!["checkbox", "select", "multiselect"].includes(editingField?.fieldType ?? "text") && (
+                {editingField?.fieldType === "waiver" ? (
+                  <div className="space-y-1.5">
+                    <Label>Waiver Text <span className="text-destructive">*</span></Label>
+                    <Textarea
+                      value={editingField?.placeholder ?? ""}
+                      onChange={(e) => setEditingField((p) => ({ ...p, placeholder: e.target.value }))}
+                      placeholder="Paste the complete waiver or consent text here..."
+                      rows={10}
+                      className="resize-y"
+                    />
+                    <p className="text-xs text-muted-foreground">Acceptance is always required for waiver fields.</p>
+                  </div>
+                ) : !["checkbox", "select", "multiselect"].includes(editingField?.fieldType ?? "text") && (
                   <div className="space-y-1.5">
                     <Label>Placeholder (optional)</Label>
                     <Input
@@ -1349,6 +1383,21 @@ function PreviewField({ field, rooms = [] }: { field: FormField; rooms?: Room[] 
         <input type="checkbox" disabled className="rounded" />
         <span className="text-sm text-foreground">{field.label}</span>
         {field.required && <span className="text-destructive text-xs font-bold">*</span>}
+      </div>
+    );
+  }
+
+  if (field.fieldType === "waiver") {
+    return (
+      <div className="space-y-2">
+        {label}
+        <div className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-md border bg-muted/30 p-3 text-sm leading-relaxed">
+          {field.placeholder || "Waiver text"}
+        </div>
+        <label className="flex items-start gap-2 text-sm text-foreground">
+          <input type="checkbox" disabled className="mt-0.5 rounded" />
+          I have read and agree to the {field.label}.
+        </label>
       </div>
     );
   }

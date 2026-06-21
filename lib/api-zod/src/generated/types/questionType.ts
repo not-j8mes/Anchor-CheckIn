@@ -15,6 +15,7 @@ export const QuestionType = {
   select: 'select',
   multiselect: 'multiselect',
   checkbox: 'checkbox',
+  waiver: 'waiver',
   date: 'date',
   phone: 'phone',
   email: 'email',

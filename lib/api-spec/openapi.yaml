@@ -1345,7 +1345,7 @@ components:
           type: string
         type:
           type: string
-          enum: [text, textarea, select, multiselect, checkbox, date, phone, email, number]
+          enum: [text, textarea, select, multiselect, checkbox, waiver, date, phone, email, number]
         required:
           type: boolean
         order:
@@ -1367,7 +1367,7 @@ components:
           type: string
         type:
           type: string
-          enum: [text, textarea, select, multiselect, checkbox, date, phone, email, number]
+          enum: [text, textarea, select, multiselect, checkbox, waiver, date, phone, email, number]
         required:
           type: boolean
         order:
@@ -1407,7 +1407,7 @@ components:
           type: string
         fieldType:
           type: string
-          enum: [text, textarea, select, multiselect, checkbox, date, phone, email, number]
+          enum: [text, textarea, select, multiselect, checkbox, waiver, date, phone, email, number]
         placeholder:
           type: ["string", "null"]
         required:
@@ -1432,7 +1432,7 @@ components:
           type: string
         fieldType:
           type: string
-          enum: [text, textarea, select, multiselect, checkbox, date, phone, email, number]
+          enum: [text, textarea, select, multiselect, checkbox, waiver, date, phone, email, number]
         placeholder:
           type: string
         required:
@@ -1605,7 +1605,7 @@ components:
           type: string
         fieldType:
           type: string
-          enum: [text, textarea, select, multiselect, checkbox, date, phone, email, number]
+          enum: [text, textarea, select, multiselect, checkbox, waiver, date, phone, email, number]
         placeholder:
           type: ["string", "null"]
         required:
