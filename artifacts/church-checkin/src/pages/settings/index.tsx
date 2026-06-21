@@ -41,10 +41,11 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Database, KeyRound, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Upload, UserPlus, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, Database, KeyRound, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Upload, UserPlus, Users } from "lucide-react";
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 import { useAuth } from "@/lib/auth";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const DEFAULT_ORGANIZATION_NAME = "Anchor Events";
 const MAX_LOGO_UPLOAD_BYTES = 1.5 * 1024 * 1024;
@@ -763,68 +764,76 @@ export default function Settings() {
       {/* Event Categories */}
       <EventCategoriesCard />
 
-      <Card className="border-card-border shadow-sm">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-primary" />
-            <CardTitle>Test Data</CardTitle>
-          </div>
-          <CardDescription>
-            Create demo events and registrations for trying out check-in, rooms, labels, and family registrations.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-muted/30 p-4">
-            <div>
-              <p className="font-medium text-sm">Add Test Data</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Adds one child check-in event, one family/group event, and one individual event dated for next week.
-              </p>
-            </div>
-            <Button
-              size="sm"
-              className="flex-shrink-0 gap-1.5"
-              onClick={() => seedTestData.mutate()}
-              disabled={seedTestData.isPending}
-            >
-              <Database className="w-4 h-4" />
-              {seedTestData.isPending ? "Adding..." : "Add Test Data"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Advanced section */}
+      <Collapsible>
+        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group w-full">
+          <ChevronDown className="w-4 h-4 transition-transform group-data-[state=open]:rotate-180" />
+          Advanced
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-6 mt-4">
+          <Card className="border-card-border shadow-sm">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-primary" />
+                <CardTitle>Test Data</CardTitle>
+              </div>
+              <CardDescription>
+                Create demo events and registrations for trying out check-in, rooms, labels, and family registrations.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-muted/30 p-4">
+                <div>
+                  <p className="font-medium text-sm">Add Test Data</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Adds one child check-in event, one family/group event, and one individual event dated for next week.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  className="flex-shrink-0 gap-1.5"
+                  onClick={() => seedTestData.mutate()}
+                  disabled={seedTestData.isPending}
+                >
+                  <Database className="w-4 h-4" />
+                  {seedTestData.isPending ? "Adding..." : "Add Test Data"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Danger Zone */}
-      <Card className="border-destructive/40 shadow-sm">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-destructive" />
-            <CardTitle className="text-destructive">Danger Zone</CardTitle>
-          </div>
-          <CardDescription>
-            These actions are permanent and cannot be undone.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-start justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-            <div>
-              <p className="font-medium text-sm">Delete All Data</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Permanently removes all events, forms, registrations, check-ins, and children from the system.
-              </p>
-            </div>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="flex-shrink-0 gap-1.5"
-              onClick={() => { setDeleteConfirmText(""); setDeleteDialogOpen(true); }}
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete All Data
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          <Card className="border-destructive/40 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <CardTitle className="text-destructive">Danger Zone</CardTitle>
+              </div>
+              <CardDescription>
+                These actions are permanent and cannot be undone.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-start justify-between gap-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <div>
+                  <p className="font-medium text-sm">Delete All Data</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Permanently removes all events, forms, registrations, check-ins, and children from the system.
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="flex-shrink-0 gap-1.5"
+                  onClick={() => { setDeleteConfirmText(""); setDeleteDialogOpen(true); }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete All Data
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) setDeleteConfirmText(""); }}>
