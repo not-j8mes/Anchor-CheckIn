@@ -29,7 +29,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { ArrowLeft, Building2, Users, RefreshCw, Pencil, LogOut, AlertCircle } from "lucide-react";
-import appLogo from "@assets/image_1781393408862.png";
+import { DEFAULT_APP_LOGO } from "@/lib/branding";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -812,7 +812,7 @@ export default function PlatformAdminPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
             <img
-              src={appLogo}
+              src={DEFAULT_APP_LOGO}
               alt="Anchor Check-In"
               className="w-6 h-6 object-contain shrink-0"
             />

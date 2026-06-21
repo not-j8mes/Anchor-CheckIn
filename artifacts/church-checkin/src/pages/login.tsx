@@ -6,6 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
+import { DEFAULT_APP_LOGO } from "@/lib/branding";
 function postLoginDestination(user: { isSuperAdmin: boolean } | null, organization: unknown): string {
   if (user?.isSuperAdmin && !organization) return "/admin";
   return "/events";
@@ -44,6 +45,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card shadow-xl shadow-foreground/5 p-8">
         <div className="flex flex-col items-center text-center mb-8">
+          <img src={DEFAULT_APP_LOGO} alt="Anchor Check-In logo" className="mb-3 h-20 w-20 object-contain" />
           <p className="text-sm font-semibold text-muted-foreground">Anchor Check-In</p>
           <h1 className="mt-3 text-3xl font-serif font-bold text-foreground">Sign in</h1>
           <p className="mt-2 text-sm text-muted-foreground">Access your check-in dashboard.</p>

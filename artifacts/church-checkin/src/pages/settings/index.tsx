@@ -42,7 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, Database, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Upload } from "lucide-react";
-import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
+import { DEFAULT_APP_LOGO } from "@/lib/branding";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 
 const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
@@ -256,7 +256,7 @@ export default function Settings() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const logoInputRef = useRef<HTMLInputElement | null>(null);
-  const brandLogo = formData.logoUrl || org?.logoUrl || appLogo;
+  const brandLogo = formData.logoUrl || org?.logoUrl || DEFAULT_APP_LOGO;
   const brandName = formData.name || org?.name || DEFAULT_ORGANIZATION_NAME;
   const hasBrandingChanges =
     formData.name !== savedFormData.name ||
@@ -373,7 +373,7 @@ export default function Settings() {
         <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
           <div className="max-w-3xl mx-auto px-6 h-14 flex items-center gap-4">
             <div className="flex items-center gap-2 text-foreground">
-              <img src={appLogo} alt={`${DEFAULT_ORGANIZATION_NAME} logo`} className="w-6 h-6 object-contain" />
+              <img src={DEFAULT_APP_LOGO} alt={`${DEFAULT_ORGANIZATION_NAME} logo`} className="w-6 h-6 object-contain" />
               <span className="font-serif font-bold text-base">{DEFAULT_ORGANIZATION_NAME}</span>
             </div>
           </div>

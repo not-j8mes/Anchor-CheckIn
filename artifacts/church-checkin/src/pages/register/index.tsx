@@ -16,6 +16,7 @@ import {
   RegistrationFormBody,
   getFieldSection,
 } from "@/components/registration/RegistrationFormBody";
+import { DEFAULT_APP_LOGO } from "@/lib/branding";
 
 export default function PublicRegistrationForm() {
   const params = useParams<{ embedSlug: string }>();
@@ -128,9 +129,7 @@ export default function PublicRegistrationForm() {
           {org?.logoUrl ? (
             <img src={org.logoUrl} alt={org.name} className="h-20 mx-auto object-contain" />
           ) : (
-            <div className="w-20 h-20 mx-auto bg-primary text-primary-foreground rounded-full flex items-center justify-center font-serif text-3xl font-bold">
-              {org?.name?.charAt(0) ?? "C"}
-            </div>
+            <img src={DEFAULT_APP_LOGO} alt="Anchor Check-In logo" className="h-20 w-20 mx-auto object-contain" />
           )}
           <h1 className="text-3xl font-serif font-bold text-foreground">{org?.name}</h1>
           {form.description && (

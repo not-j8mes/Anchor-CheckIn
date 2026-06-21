@@ -16,8 +16,8 @@ import {
   CalendarDays,
   LogOut,
 } from "lucide-react";
-import appLogo from "@assets/image_1781393408862.png";
 import { useAuth } from "@/lib/auth";
+import { DEFAULT_APP_LOGO } from "@/lib/branding";
 
 const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
 
@@ -26,7 +26,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: org } = useGetOrganization();
   const { user, logout } = useAuth();
   const { setOpenMobile } = useSidebar();
-  const brandLogo = org?.logoUrl || appLogo;
+  const brandLogo = org?.logoUrl || DEFAULT_APP_LOGO;
   const brandName = org?.name || DEFAULT_ORGANIZATION_NAME;
 
   const navigation = [

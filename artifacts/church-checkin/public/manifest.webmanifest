@@ -1,0 +1,25 @@
+{
+  "name": "Anchor Check-In",
+  "short_name": "Anchor",
+  "description": "Event registration and check-in for Anchor organizations.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#22365E",
+  "background_color": "#FCFBF7",
+  "icons": [
+    {
+      "src": "/icons/anchor-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/anchor-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

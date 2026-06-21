@@ -53,7 +53,7 @@ import {
   LogOut,
   ShieldCheck,
 } from "lucide-react";
-import appLogo from "@assets/ChatGPT_Image_Jun_10,_2026,_01_32_42_PM_1781112954294.png";
+import { DEFAULT_APP_LOGO } from "@/lib/branding";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import {
@@ -789,7 +789,7 @@ export default function EventSelectionScreen() {
   const visible = viewMode === "list"
     ? filtered.filter((e) => showPast || !isPast(e))
     : filtered;
-  const brandLogo = org?.logoUrl || appLogo;
+  const brandLogo = org?.logoUrl || DEFAULT_APP_LOGO;
   const brandName = org?.name || DEFAULT_ORGANIZATION_NAME;
 
   async function handleLogout() {
