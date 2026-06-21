@@ -62,6 +62,7 @@ import {
   DoorOpen,
   RefreshCw,
   Phone,
+  FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -75,7 +76,7 @@ import {
 
 // ─── Section definitions ───────────────────────────────────────────────────────
 
-type SectionKey = "guardian_info" | "child_info" | "emergency_contact" | "additional_questions";
+type SectionKey = "guardian_info" | "child_info" | "emergency_contact" | "additional_questions" | "waivers";
 
 interface SectionDef {
   key: SectionKey;
@@ -133,6 +134,17 @@ const SECTIONS: SectionDef[] = [
     addSystemLabel: "Add System Field",
     addCustomLabel: "Add Custom Question",
   },
+  {
+    key: "waivers",
+    title: "Waivers",
+    description: "Optional agreements registrants must read and accept before submitting.",
+    headerClass: "bg-indigo-50 border-b border-indigo-100",
+    titleClass: "text-indigo-900",
+    iconClass: "text-indigo-700",
+    Icon: FileText,
+    addSystemLabel: "",
+    addCustomLabel: "Add Waiver",
+  },
 ];
 
 const SECTION_CATEGORY_MAP: Record<SystemFieldCategory, SectionKey> = {
@@ -144,6 +156,7 @@ const SECTION_CATEGORY_MAP: Record<SystemFieldCategory, SectionKey> = {
 };
 
 function getFieldSection(field: FormField): SectionKey {
+  if (field.fieldType === "waiver" || field.sectionKey === "waivers") return "waivers";
   // System fields always auto-place by category (ignores any stored sectionKey, which may be stale).
   if (field.fieldKind === "system" && field.systemKey) {
     const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
@@ -185,6 +198,7 @@ const SECTION_CATEGORY_FILTER: Record<SectionKey, SystemFieldCategory[]> = {
   child_info: ["participant", "rooms"],
   emergency_contact: ["emergency_safety"],
   additional_questions: ["individual", "guardian", "emergency_safety", "participant", "rooms"],
+  waivers: [],
 };
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
@@ -271,7 +285,7 @@ function FieldCard({ field, index, total, onEdit, onDelete, onMove, onInlineUpda
     ? `System · ${sysDef ? CATEGORY_DISPLAY_LABELS[sysDef.category] : "System"} · ${FIELD_TYPE_LABELS[field.fieldType] ?? field.fieldType}`
     : `Custom · ${FIELD_TYPE_LABELS[field.fieldType] ?? field.fieldType}`;
 
-  const showPlaceholder = !["checkbox", "select", "multiselect"].includes(field.fieldType);
+  const showPlaceholder = !["checkbox", "select", "multiselect", "waiver"].includes(field.fieldType);
 
   return (
     <div className="flex items-stretch rounded-lg border border-border bg-background hover:shadow-sm transition-shadow overflow-hidden">
@@ -324,8 +338,9 @@ function FieldCard({ field, index, total, onEdit, onDelete, onMove, onInlineUpda
           <button
             type="button"
             onClick={() => onInlineUpdate({ required: !field.required })}
+            disabled={field.fieldType === "waiver"}
             aria-pressed={!!field.required}
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 ${
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:cursor-default ${
               field.required
                 ? "bg-amber-50 border-amber-400/80 text-amber-900 hover:bg-amber-100 focus-visible:ring-amber-400"
                 : "bg-background border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground focus-visible:ring-border"
@@ -495,6 +510,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
       child_info: [],
       emergency_contact: [],
       additional_questions: [],
+      waivers: [],
     };
     sorted.forEach((f) => result[getFieldSection(f)].push(f));
     return result;
@@ -537,7 +553,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
       options: editingField?.options ?? "",
       fieldKind: editingField?.fieldKind as FormFieldInput["fieldKind"],
       systemKey: editingField?.systemKey ?? undefined,
-      sectionKey: editingField?.sectionKey ?? "additional_questions",
+      sectionKey: editingField?.fieldType === "waiver" ? "waivers" : editingField?.sectionKey ?? "additional_questions",
     };
     if (editingField?.id) {
       updateFormField.mutate({ formId, fieldId: editingField.id, data }, {
@@ -589,14 +605,15 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     const swapIdx = dir === "up" ? idx - 1 : idx + 1;
     [sectionArr[idx], sectionArr[swapIdx]] = [sectionArr[swapIdx], sectionArr[idx]];
     // Rebuild full global order: guardian → child → emergency → additional
-    const orderedIds = (["guardian_info", "child_info", "emergency_contact", "additional_questions"] as SectionKey[]).flatMap(
+    const orderedIds = (["guardian_info", "child_info", "emergency_contact", "additional_questions", "waivers"] as SectionKey[]).flatMap(
       (s) => (s === section ? sectionArr : fieldsBySection[s]).map((f) => f.id)
     );
     reorderFormFields.mutate({ formId, data: { fieldIds: orderedIds } });
   };
 
   const openCustomEditor = (targetSection: SectionKey = "additional_questions") => {
-    setEditingField({ fieldKind: "custom", fieldType: "text", required: false, sectionKey: targetSection });
+    const isWaiver = targetSection === "waivers";
+    setEditingField({ fieldKind: "custom", fieldType: isWaiver ? "waiver" : "text", required: isWaiver, sectionKey: targetSection });
     setModalMode("field-editor");
   };
 
@@ -660,6 +677,9 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                 <Button size="sm" variant="outline" onClick={() => openCustomEditor()}>
                   <Plus className="w-4 h-4 mr-1.5" /> Add Custom Question
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => openCustomEditor("waivers")}>
+                  <FileText className="w-4 h-4 mr-1.5" /> Add Waiver
+                </Button>
               </>
             )}
           </div>
@@ -685,7 +705,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
-                      {section.key !== "additional_questions" && (
+                      {section.key !== "additional_questions" && section.key !== "waivers" && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -751,6 +771,9 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
               <Button size="sm" variant="outline" onClick={() => openCustomEditor()}>
                 <Plus className="w-4 h-4 mr-1.5" /> Add Custom Question
               </Button>
+              <Button size="sm" variant="outline" onClick={() => openCustomEditor("waivers")}>
+                <FileText className="w-4 h-4 mr-1.5" /> Add Waiver
+              </Button>
             </div>
             {!fields || fields.length === 0 ? (
               <Card className="border-dashed bg-transparent">
@@ -761,12 +784,12 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                 </CardContent>
               </Card>
             ) : (
-              [...fields].sort((a, b) => a.sortOrder - b.sortOrder).map((field, index) => (
+              [...fields].filter((field) => field.fieldType !== "waiver").sort((a, b) => a.sortOrder - b.sortOrder).map((field, index, visibleFields) => (
                 <FieldCard
                   key={field.id}
                   field={field}
                   index={index}
-                  total={fields.length}
+                  total={visibleFields.length}
                   onEdit={() => openFieldEditor(field)}
                   onDelete={() => handleDeleteField(field)}
                   onMove={(dir) => {
@@ -783,6 +806,36 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                 />
               ))
             )}
+            <div className="rounded-xl border border-border overflow-hidden shadow-sm mt-5">
+              <div className="px-4 py-2.5 flex items-center justify-between bg-indigo-50 border-b border-indigo-100">
+                <div className="flex items-center gap-2.5">
+                  <FileText className="w-4 h-4 text-indigo-700" />
+                  <div>
+                    <span className="font-semibold text-sm text-indigo-900">Waivers</span>
+                    <p className="text-xs text-indigo-700/80">Optional agreements registrants must accept.</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="ghost" className="h-7 text-xs text-indigo-900" onClick={() => openCustomEditor("waivers")}>
+                  <Plus className="w-3 h-3 mr-1" /> Add Waiver
+                </Button>
+              </div>
+              <div className="p-3 space-y-2 bg-background">
+                {fieldsBySection.waivers.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4 italic">No waiver added.</p>
+                ) : fieldsBySection.waivers.map((field, index) => (
+                  <FieldCard
+                    key={field.id}
+                    field={field}
+                    index={index}
+                    total={fieldsBySection.waivers.length}
+                    onEdit={() => openFieldEditor(field)}
+                    onDelete={() => handleDeleteField(field)}
+                    onMove={(dir) => handleMoveSectionField(field.id, "waivers", dir)}
+                    onInlineUpdate={(updates, onSaved) => handleInlineUpdate(field, updates, onSaved)}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -975,12 +1028,12 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
             <DialogTitle>
               {editingField?.id
                 ? isEditingSystemField ? "Edit System Field" : "Edit Custom Question"
-                : "Add Custom Question"}
+                : editingField?.fieldType === "waiver" ? "Add Waiver" : "Add Custom Question"}
             </DialogTitle>
             <DialogDescription>
               {editingField?.id
                 ? "Advanced settings. Label, required, and placeholder are editable directly on the field card."
-                : "Configure this custom question."}
+                : editingField?.fieldType === "waiver" ? "Add the agreement registrants must accept." : "Configure this custom question."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1017,7 +1070,6 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                         <SelectItem value="select">Dropdown</SelectItem>
                         <SelectItem value="multiselect">Multiple Choice</SelectItem>
                         <SelectItem value="checkbox">Checkbox</SelectItem>
-                        <SelectItem value="waiver">Waiver / Consent</SelectItem>
                         <SelectItem value="date">Date</SelectItem>
                         <SelectItem value="phone">Phone Number</SelectItem>
                         <SelectItem value="email">Email</SelectItem>
@@ -1054,7 +1106,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                 )}
 
                 {/* Section selector */}
-                {isChildCheckin && !isEditingSystemField && (
+                {isChildCheckin && !isEditingSystemField && editingField?.fieldType !== "waiver" && (
                   <div className="space-y-1.5">
                     <Label>Section</Label>
                     <Select
@@ -1078,7 +1130,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
               /* ── Adding a new custom field: full form ── */
               <>
                 <div className="space-y-1.5">
-                  <Label>Field Label</Label>
+                  <Label>{editingField?.fieldType === "waiver" ? "Waiver Title" : "Field Label"}</Label>
                   <Input
                     value={editingField?.label ?? ""}
                     onChange={(e) => setEditingField((p) => ({ ...p, label: e.target.value }))}
@@ -1087,11 +1139,13 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                   />
                 </div>
 
+                {editingField?.fieldType !== "waiver" && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label>Field Type</Label>
                     <Select
                       value={editingField?.fieldType ?? "text"}
+                      disabled={editingField?.sectionKey === "waivers"}
                       onValueChange={(v) => setEditingField((p) => ({ ...p, fieldType: v as FormField["fieldType"], required: v === "waiver" ? true : p?.required }))}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1101,7 +1155,6 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                         <SelectItem value="select">Dropdown</SelectItem>
                         <SelectItem value="multiselect">Multiple Choice</SelectItem>
                         <SelectItem value="checkbox">Checkbox</SelectItem>
-                        <SelectItem value="waiver">Waiver / Consent</SelectItem>
                         <SelectItem value="date">Date</SelectItem>
                         <SelectItem value="phone">Phone Number</SelectItem>
                         <SelectItem value="email">Email</SelectItem>
@@ -1113,15 +1166,15 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                   <div className="flex items-center gap-2 pt-7">
                     <Switch
                       id="fe-required"
-                      checked={editingField?.fieldType === "waiver" || editingField?.required || false}
-                      disabled={editingField?.fieldType === "waiver"}
+                      checked={editingField?.required || false}
                       onCheckedChange={(c) => setEditingField((p) => ({ ...p, required: c }))}
                     />
                     <Label htmlFor="fe-required">Required</Label>
                   </div>
                 </div>
+                )}
 
-                {isChildCheckin && (
+                {isChildCheckin && editingField?.fieldType !== "waiver" && (
                   <div className="space-y-1.5">
                     <Label>Section</Label>
                     <Select
@@ -1177,7 +1230,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalMode("none")}>Cancel</Button>
             <Button onClick={handleSaveField} disabled={createFormField.isPending || updateFormField.isPending}>
-              {editingField?.id ? "Save Changes" : "Add Question"}
+              {editingField?.id ? "Save Changes" : editingField?.fieldType === "waiver" ? "Add Waiver" : "Add Question"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1267,6 +1320,21 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                       </div>
                       <div className="px-6 py-5 space-y-5">
                         {fieldsBySection.additional_questions.map((field) => (
+                          <PreviewField key={field.id} field={field} rooms={eventRooms} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Waivers — separate optional section at the end */}
+                  {fieldsBySection.waivers.length > 0 && (
+                    <div className="border-t border-border">
+                      <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-3.5 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-indigo-700" />
+                        <span className="text-base font-semibold text-indigo-900">Waivers</span>
+                      </div>
+                      <div className="px-6 py-5 space-y-5">
+                        {fieldsBySection.waivers.map((field) => (
                           <PreviewField key={field.id} field={field} rooms={eventRooms} />
                         ))}
                       </div>

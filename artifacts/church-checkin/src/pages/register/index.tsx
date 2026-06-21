@@ -90,7 +90,7 @@ export default function PublicRegistrationForm() {
         for (const f of formFields.filter((f) => getFieldSection(f) === "emergency_contact")) {
           fields.push({ fieldId: f.id, value: emergencyAnswers[f.id] ?? "" });
         }
-        for (const f of formFields.filter((f) => getFieldSection(f) === "additional_questions")) {
+        for (const f of formFields.filter((f) => ["additional_questions", "waivers"].includes(getFieldSection(f)))) {
           fields.push({ fieldId: f.id, value: additionalAnswers[f.id] ?? "" });
         }
 

@@ -1204,7 +1204,7 @@ const EMERGENCY_SECTION_KEYS = new Set([
   "emergency_contact_name", "emergency_contact_phone", "emergency_contact_relationship",
 ]);
 
-type WizardSectionId = "guardian" | "child" | "emergency" | "additional" | "participant";
+type WizardSectionId = "guardian" | "child" | "emergency" | "additional" | "waivers" | "participant";
 
 interface WizardSectionDef {
   id: WizardSectionId;
@@ -1274,6 +1274,18 @@ const CHILD_CHECKIN_SECTIONS: WizardSectionDef[] = [
     iconBg: "bg-slate-100",
     iconColor: "text-slate-500",
   },
+  {
+    id: "waivers",
+    title: "Waivers",
+    iconName: "FileText",
+    helperText: "Optional agreements registrants must read and accept",
+    emptyLabel: "No waiver added. Add one if this event requires consent.",
+    canAddCustom: true,
+    addSystemButtonLabel: null,
+    headerBg: "bg-indigo-50",
+    iconBg: "bg-indigo-100",
+    iconColor: "text-indigo-700",
+  },
 ];
 
 const OTHER_REG_SECTIONS: WizardSectionDef[] = [
@@ -1301,9 +1313,22 @@ const OTHER_REG_SECTIONS: WizardSectionDef[] = [
     iconBg: "bg-slate-100",
     iconColor: "text-slate-500",
   },
+  {
+    id: "waivers",
+    title: "Waivers",
+    iconName: "FileText",
+    helperText: "Optional agreements registrants must read and accept",
+    emptyLabel: "No waiver added. Add one if this event requires consent.",
+    canAddCustom: true,
+    addSystemButtonLabel: null,
+    headerBg: "bg-indigo-50",
+    iconBg: "bg-indigo-100",
+    iconColor: "text-indigo-700",
+  },
 ];
 
 function getWizardSection(field: DraftFieldSpec, registrationType: string): WizardSectionId {
+  if (field.fieldType === "waiver" || field.sectionKey === "waivers") return "waivers";
   if (registrationType !== "child_checkin") {
     if (field.fieldKind === "custom" || field.sectionKey === "additional_questions") return "additional";
     return "participant";
@@ -1395,8 +1420,9 @@ function WizardFieldCard({ field, index, total, onUpdate, onDelete, onMove }: Wi
           <button
             type="button"
             onClick={() => onUpdate({ required: !field.required })}
+            disabled={field.fieldType === "waiver"}
             aria-pressed={field.required}
-            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all select-none ${
+            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border transition-all select-none disabled:cursor-default ${
               field.required
                 ? "bg-amber-50 border-amber-400/80 text-amber-900 hover:bg-amber-100"
                 : "bg-background border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
@@ -1463,7 +1489,12 @@ function WizardFormBuilder({
   const openAddModal = (section: WizardSectionDef) => {
     setAddModal({ section, tab: section.addSystemButtonLabel ? "system" : "custom" });
     setSystemSearch("");
-    setCustomForm({ label: "", fieldType: "text", required: false, placeholder: "" });
+    setCustomForm({
+      label: "",
+      fieldType: section.id === "waivers" ? "waiver" : "text",
+      required: section.id === "waivers",
+      placeholder: "",
+    });
   };
 
   const toggleCollapse = (sectionId: WizardSectionId) => {
@@ -1527,6 +1558,7 @@ function WizardFormBuilder({
         sectionId === "guardian"  ? "guardian_info" :
         sectionId === "child"     ? "child_info" :
         sectionId === "emergency" ? "emergency_contact" :
+        sectionId === "waivers"   ? "waivers" :
         null,
     }]);
     setAddModal(null);
@@ -1541,6 +1573,7 @@ function WizardFormBuilder({
   };
 
   const getAddButtonLabel = (section: WizardSectionDef) => {
+    if (section.id === "waivers") return "Add Waiver";
     if (section.id === "additional") return "Add Question";
     if (section.id === "guardian")   return "Parent Field";
     if (section.id === "child")      return "Child Field";
@@ -1645,7 +1678,9 @@ function WizardFormBuilder({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {!addModal?.section.addSystemButtonLabel ? "Add Custom Question" : `Add to ${addModal?.section.title}`}
+              {addModal?.section.id === "waivers"
+                ? "Add Waiver"
+                : !addModal?.section.addSystemButtonLabel ? "Add Custom Question" : `Add to ${addModal?.section.title}`}
             </DialogTitle>
             <DialogDescription className="sr-only">{addModal?.section.title}</DialogDescription>
           </DialogHeader>
@@ -1716,9 +1751,9 @@ function WizardFormBuilder({
             <div className="space-y-4">
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label>Question Label <span className="text-destructive">*</span></Label>
+                  <Label>{addModal?.section.id === "waivers" ? "Waiver Title" : "Question Label"} <span className="text-destructive">*</span></Label>
                   <Input
-                    placeholder="e.g. T-shirt size"
+                    placeholder={addModal?.section.id === "waivers" ? "e.g. Liability Waiver" : "e.g. T-shirt size"}
                     value={customForm.label}
                     onChange={(e) => setCustomForm((p) => ({ ...p, label: e.target.value }))}
                     autoFocus
@@ -1728,7 +1763,7 @@ function WizardFormBuilder({
                     }}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                {addModal?.section.id !== "waivers" && <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label>Field Type</Label>
                     <Select value={customForm.fieldType} onValueChange={(v) => setCustomForm((p) => ({ ...p, fieldType: v, required: v === "waiver" ? true : p.required }))}>
@@ -1741,7 +1776,6 @@ function WizardFormBuilder({
                         <SelectItem value="email">Email</SelectItem>
                         <SelectItem value="select">Dropdown</SelectItem>
                         <SelectItem value="checkbox">Checkbox</SelectItem>
-                        <SelectItem value="waiver">Waiver / Consent</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1755,7 +1789,7 @@ function WizardFormBuilder({
                       />
                     </div>
                   )}
-                </div>
+                </div>}
                 {customForm.fieldType === "waiver" && (
                   <div className="space-y-1.5">
                     <Label>Waiver Text <span className="text-destructive">*</span></Label>
@@ -1768,7 +1802,7 @@ function WizardFormBuilder({
                     />
                   </div>
                 )}
-                <div className="flex items-center gap-2">
+                {addModal?.section.id !== "waivers" && <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     id="modal-custom-required"
@@ -1778,7 +1812,7 @@ function WizardFormBuilder({
                     className="rounded"
                   />
                   <label htmlFor="modal-custom-required" className="text-sm cursor-pointer">Required</label>
-                </div>
+                </div>}
               </div>
               <p className="text-xs text-muted-foreground border-t pt-2.5">
                 Custom questions are stored only for this event registration and not saved to any profile.
@@ -1789,7 +1823,7 @@ function WizardFormBuilder({
                   onClick={() => addModal && addCustomField(addModal.section.id)}
                   disabled={!customForm.label.trim() || (customForm.fieldType === "waiver" && !customForm.placeholder.trim())}
                 >
-                  Add Question
+                  {addModal?.section.id === "waivers" ? "Add Waiver" : "Add Question"}
                 </Button>
               </DialogFooter>
             </div>

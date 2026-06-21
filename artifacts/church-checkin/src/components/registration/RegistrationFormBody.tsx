@@ -11,15 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MessageSquare, Phone, Plus, Trash2, User, Users } from "lucide-react";
+import { FileText, MessageSquare, Phone, Plus, Trash2, User, Users } from "lucide-react";
 import { SYSTEM_FIELDS_BY_KEY } from "@/lib/systemFields";
 import type { FormField, Room } from "@workspace/api-client-react";
 
 // ─── Section classifier (single source of truth) ─────────────────────────────
 
-export type FieldSection = "guardian_info" | "child_info" | "emergency_contact" | "additional_questions";
+export type FieldSection = "guardian_info" | "child_info" | "emergency_contact" | "additional_questions" | "waivers";
 
 export function getFieldSection(field: FormField): FieldSection {
+  if (field.fieldType === "waiver" || field.sectionKey === "waivers") return "waivers";
   if (field.fieldKind === "system" && field.systemKey) {
     const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
     if (def?.category === "guardian") return "guardian_info";
@@ -191,6 +192,7 @@ export function RegistrationFormBody({
   const childFields = formFields.filter((f) => getFieldSection(f) === "child_info");
   const emergencyFields = formFields.filter((f) => getFieldSection(f) === "emergency_contact");
   const additionalFields = formFields.filter((f) => getFieldSection(f) === "additional_questions");
+  const waiverFields = formFields.filter((f) => getFieldSection(f) === "waivers");
 
   return (
     <div className="space-y-6">
@@ -323,6 +325,32 @@ export function RegistrationFormBody({
                 <Label className="text-sm font-medium flex items-center gap-1">
                   {field.label}
                   {field.required && <span className="text-destructive">*</span>}
+                </Label>
+                <FieldInput
+                  field={field}
+                  value={additionalAnswers[field.id] ?? ""}
+                  onChange={(v) => onAdditionalChange(field.id, v)}
+                  rooms={rooms}
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Waivers — optional section shown once at the end */}
+      {waiverFields.length > 0 && (
+        <Card className="shadow-sm overflow-hidden">
+          <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-4 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-indigo-700" />
+            <h3 className="text-lg font-semibold text-indigo-900">Waivers</h3>
+          </div>
+          <CardContent className="p-6 space-y-6">
+            {waiverFields.map((field) => (
+              <div key={field.id} className="space-y-1.5">
+                <Label className="text-sm font-medium flex items-center gap-1">
+                  {field.label}
+                  <span className="text-destructive">*</span>
                 </Label>
                 <FieldInput
                   field={field}
