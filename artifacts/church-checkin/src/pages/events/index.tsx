@@ -94,20 +94,6 @@ function registrationTypeStripe(_type?: string | null) {
   return "event-card-accent";
 }
 
-function eventReadinessItems(event: ChurchEvent) {
-  const trackAttendance = event.trackAttendance ?? (event.registrationType === "child_checkin" || !event.registrationType);
-  const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
-  const printLabels = event.printLabels ?? isChildCheckin;
-  const requireCheckout = event.requireCheckout ?? isChildCheckin;
-
-  return [
-    { label: "Registration form", ready: !!event.formId },
-    { label: "Check-in", ready: trackAttendance },
-    ...(trackAttendance ? [{ label: "Labels", ready: printLabels }] : []),
-    ...(trackAttendance && isChildCheckin ? [{ label: "Secure checkout", ready: requireCheckout }] : []),
-  ];
-}
-
 
 // ─── Edit Event Dialog ──────────────────────────────────────────────────────
 
@@ -548,9 +534,6 @@ function EventCard({ event, onEdit, categories }: {
   const formBadge = event.formId
     ? <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px]">Form Ready</Badge>
     : <Badge variant="outline" className="text-[10px] text-muted-foreground">No Form</Badge>;
-  const readiness = eventReadinessItems(event);
-  const readyCount = readiness.filter((item) => item.ready).length;
-
   return (
     <Card
       className="overflow-hidden hover:shadow-md hover:bg-amber-50/20 transition-all border cursor-pointer"
@@ -601,23 +584,6 @@ function EventCard({ event, onEdit, categories }: {
                   </span>
                   {checkinBadge}
                   {formBadge}
-                </div>
-                <div className="mt-3 rounded-md border border-border bg-muted/20 px-3 py-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-xs font-medium text-foreground">Readiness</p>
-                    <span className="text-xs text-muted-foreground">{readyCount} of {readiness.length} ready</span>
-                  </div>
-                  <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                    {readiness.map((item) => (
-                      <span
-                        key={item.label}
-                        className={`flex items-center gap-1.5 text-xs ${item.ready ? "text-foreground" : "text-muted-foreground"}`}
-                      >
-                        <Check className={`h-3.5 w-3.5 ${item.ready ? "text-green-600" : "text-muted-foreground/50"}`} />
-                        {item.label}
-                      </span>
-                    ))}
-                  </div>
                 </div>
               </div>
 
@@ -852,9 +818,14 @@ export default function EventSelectionScreen() {
             <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
               <Link href="/settings">
                 <Settings className="w-4 h-4" />
-                <span className="sr-only sm:not-sr-only sm:ml-1.5">Settings</span>
+                <span className="sr-only sm:not-sr-only sm:ml-1.5">Org Settings</span>
               </Link>
             </Button>
+            {user && (
+              <span className="hidden sm:block text-sm text-muted-foreground border-l border-border pl-2 sm:pl-3">
+                {user.firstName} {user.lastName}
+              </span>
+            )}
             <Button
               type="button"
               variant="ghost"

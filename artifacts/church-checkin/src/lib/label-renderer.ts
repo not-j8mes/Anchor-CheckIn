@@ -109,15 +109,17 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
 </div>`.trim();
 }
 
+const MAX_NAMES_PER_PARENT_LABEL = 6;
+
 /**
- * Renders the parent/guardian pickup stub — 90mm × 62mm, page 2 of the
- * child security label pair. The pickup code is the dominant element so
- * the volunteer can match it quickly at checkout.
- * Accepts all labels sharing the same code so every child's name is listed.
+ * Renders one parent/guardian pickup stub — 90mm × 62mm.
+ * Accepts a slice of labels (max MAX_NAMES_PER_PARENT_LABEL) sharing the same
+ * code. pageNum/pageTotal are shown in the header when there are multiple stubs.
  */
-export function renderParentPickupLabelHtml(labels: LabelData[]): string {
+export function renderParentPickupLabelHtml(labels: LabelData[], pageNum = 1, pageTotal = 1): string {
   const label = labels[0];
   const dateStr = format(new Date(label.checkinDate), "MMM d, h:mm a");
+  const pageTag = pageTotal > 1 ? ` · ${pageNum}/${pageTotal}` : "";
 
   const codeChars = label.labelCode
     .split("")
@@ -138,13 +140,13 @@ export function renderParentPickupLabelHtml(labels: LabelData[]): string {
   <!-- Header -->
   <div style="padding:2mm 3.5mm;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #000000;flex-shrink:0;">
     <span style="font-size:6.5pt;font-weight:800;color:#000000;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;">${escHtml(label.organizationName || DEFAULT_ORGANIZATION_NAME)}</span>
-    <span style="font-size:6pt;font-weight:600;color:#000000;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr)}</span>
+    <span style="font-size:6pt;font-weight:600;color:#000000;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr + pageTag)}</span>
   </div>
 
   <!-- Body -->
   <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;padding:2mm 3.5mm 2.5mm;min-height:0;overflow:hidden;">
 
-    <!-- Top: pill + all children names -->
+    <!-- Top: pill + all children names for this stub -->
     <div>
       <div style="display:inline-flex;align-items:center;gap:1.2mm;font-size:5.5pt;font-weight:800;color:#000000;border:1.5px solid #000000;border-radius:9999px;padding:0.6mm 2.2mm;white-space:nowrap;margin-bottom:1.8mm;">${PERSON_ICON}&nbsp;PARENT PICKUP LABEL</div>
       ${childNamesList}
@@ -176,12 +178,15 @@ export function printLabels(labels: LabelData[], labelType?: string): void {
 
   const isSecurityLabel = labelType === "child_security";
 
-  let container = document.getElementById("single-label-print-root");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "single-label-print-root";
-    document.body.appendChild(container);
-  }
+  // Remove any stale container from a previous print (afterprint may not have fired).
+  const stale = document.getElementById("single-label-print-root");
+  if (stale) stale.remove();
+
+  const container = document.createElement("div");
+  container.id = "single-label-print-root";
+  // line-height/font-size:0 prevents whitespace text nodes from adding phantom height.
+  container.style.cssText = "margin:0;padding:0;line-height:0;font-size:0;";
+  document.body.appendChild(container);
 
   const pages: string[] = [];
   labels.forEach((label, i) => {
@@ -196,7 +201,13 @@ export function printLabels(labels: LabelData[], labelType?: string): void {
       }
     });
     codeGroups.forEach((groupLabels) => {
-      pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderParentPickupLabelHtml(groupLabels)}</div>`);
+      const chunks: LabelData[][] = [];
+      for (let i = 0; i < groupLabels.length; i += MAX_NAMES_PER_PARENT_LABEL) {
+        chunks.push(groupLabels.slice(i, i + MAX_NAMES_PER_PARENT_LABEL));
+      }
+      chunks.forEach((chunk, idx) => {
+        pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderParentPickupLabelHtml(chunk, idx + 1, chunks.length)}</div>`);
+      });
     });
   }
 
@@ -211,7 +222,7 @@ export function printLabels(labels: LabelData[], labelType?: string): void {
   // Let the browser finish layout before opening the print dialog.
   setTimeout(() => window.print(), 0);
 
-  window.addEventListener("afterprint", () => { container!.innerHTML = ""; }, { once: true });
+  window.addEventListener("afterprint", () => { container.remove(); }, { once: true });
 }
 
 function escHtml(str: string): string {
