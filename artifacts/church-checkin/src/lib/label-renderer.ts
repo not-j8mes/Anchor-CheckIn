@@ -113,12 +113,11 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
  * Renders the parent/guardian pickup stub — 90mm × 62mm, page 2 of the
  * child security label pair. The pickup code is the dominant element so
  * the volunteer can match it quickly at checkout.
+ * Accepts all labels sharing the same code so every child's name is listed.
  */
-export function renderParentPickupLabelHtml(label: LabelData): string {
+export function renderParentPickupLabelHtml(labels: LabelData[]): string {
+  const label = labels[0];
   const dateStr = format(new Date(label.checkinDate), "MMM d, h:mm a");
-  const nameParts = label.childName.trim().split(/\s+/);
-  const firstName = nameParts[0] ?? label.childName;
-  const lastName = nameParts.slice(1).join(" ");
 
   const codeChars = label.labelCode
     .split("")
@@ -126,6 +125,11 @@ export function renderParentPickupLabelHtml(label: LabelData): string {
       (ch) =>
         `<span style="font-family:'Courier New',Courier,monospace;font-size:32pt;font-weight:900;color:#000000;line-height:1;letter-spacing:0.04em;">${escHtml(ch)}</span>`
     )
+    .join("");
+
+  const nameFontSize = labels.length <= 2 ? "9pt" : labels.length <= 4 ? "8pt" : "7pt";
+  const childNamesList = labels
+    .map((l) => `<div style="font-size:${nameFontSize};font-weight:700;color:#000000;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(l.childName)}</div>`)
     .join("");
 
   return `
@@ -140,10 +144,10 @@ export function renderParentPickupLabelHtml(label: LabelData): string {
   <!-- Body -->
   <div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;padding:2mm 3.5mm 2.5mm;min-height:0;overflow:hidden;">
 
-    <!-- Top: pill + child name -->
+    <!-- Top: pill + all children names -->
     <div>
       <div style="display:inline-flex;align-items:center;gap:1.2mm;font-size:5.5pt;font-weight:800;color:#000000;border:1.5px solid #000000;border-radius:9999px;padding:0.6mm 2.2mm;white-space:nowrap;margin-bottom:1.8mm;">${PERSON_ICON}&nbsp;PARENT PICKUP LABEL</div>
-      <div style="font-size:10pt;font-weight:700;color:#000000;line-height:1.25;">${escHtml(firstName)}${lastName ? ` ${escHtml(lastName)}` : ""}</div>
+      ${childNamesList}
     </div>
 
     <!-- Center: large pickup code -->
@@ -184,12 +188,15 @@ export function printLabels(labels: LabelData[], labelType?: string): void {
     pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderLabelHtml(label, i, labels.length)}</div>`);
   });
   if (isSecurityLabel) {
-    const seenCodes = new Set<string>();
+    const codeGroups = new Map<string, LabelData[]>();
     labels.forEach((label) => {
-      if (label.labelCode && !seenCodes.has(label.labelCode)) {
-        seenCodes.add(label.labelCode);
-        pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderParentPickupLabelHtml(label)}</div>`);
+      if (label.labelCode) {
+        if (!codeGroups.has(label.labelCode)) codeGroups.set(label.labelCode, []);
+        codeGroups.get(label.labelCode)!.push(label);
       }
+    });
+    codeGroups.forEach((groupLabels) => {
+      pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderParentPickupLabelHtml(groupLabels)}</div>`);
     });
   }
 
