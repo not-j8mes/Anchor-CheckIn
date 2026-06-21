@@ -57,6 +57,13 @@
       "when": 1782050000000,
       "tag": "0007_anchor_events_brand_name",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782051000000,
+      "tag": "0008_staff_usernames",
+      "breakpoints": true
     }
   ]
 }

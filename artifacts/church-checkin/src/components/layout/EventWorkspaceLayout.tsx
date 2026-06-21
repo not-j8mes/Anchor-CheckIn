@@ -187,7 +187,7 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
                 <p className="text-sm font-medium text-sidebar-foreground truncate">
                   {user.firstName} {user.lastName}
                 </p>
-                <p className="text-xs text-sidebar-foreground/60 truncate">{user.email}</p>
+                <p className="text-xs text-sidebar-foreground/60 truncate">{user.email || user.username}</p>
               </SidebarMenuItem>
             )}
             <NavLink

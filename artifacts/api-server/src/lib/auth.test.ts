@@ -42,6 +42,7 @@ function authContext(
       firstName: "Test",
       lastName: "User",
       email: "test@example.com",
+      username: null,
       isSuperAdmin,
     },
     organization,

@@ -20,7 +20,8 @@ export interface AuthContext {
     id: number;
     firstName: string;
     lastName: string;
-    email: string;
+    email: string | null;
+    username: string | null;
     isSuperAdmin: boolean;
   };
   organization: {
@@ -171,6 +172,7 @@ export async function getAuthContext(
       firstName: usersTable.firstName,
       lastName: usersTable.lastName,
       email: usersTable.email,
+      username: usersTable.username,
       isSuperAdmin: usersTable.isSuperAdmin,
     })
     .from(usersTable)
@@ -224,6 +226,7 @@ export async function getAuthContext(
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
+      username: user.username,
       isSuperAdmin: user.isSuperAdmin,
     },
     organization: membership

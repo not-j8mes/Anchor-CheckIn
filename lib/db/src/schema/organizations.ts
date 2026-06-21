@@ -42,13 +42,17 @@ export const usersTable = pgTable(
     id: serial("id").primaryKey(),
     firstName: text("first_name").notNull(),
     lastName: text("last_name").notNull(),
-    email: text("email").notNull(),
+    email: text("email"),
+    username: text("username"),
     passwordHash: text("password_hash").notNull(),
     isSuperAdmin: boolean("is_super_admin").notNull().default(false),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
-  (table) => [uniqueIndex("users_email_unique").on(table.email)],
+  (table) => [
+    uniqueIndex("users_email_unique").on(table.email),
+    uniqueIndex("users_username_unique").on(table.username),
+  ],
 );
 
 export const organizationMembersTable = pgTable(

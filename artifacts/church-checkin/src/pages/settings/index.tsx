@@ -41,9 +41,10 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Database, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Upload } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Database, KeyRound, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Upload, UserPlus, Users } from "lucide-react";
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
 import { useDarkMode } from "@/hooks/use-dark-mode";
+import { useAuth } from "@/lib/auth";
 
 const DEFAULT_ORGANIZATION_NAME = "Anchor Events";
 const MAX_LOGO_UPLOAD_BYTES = 1.5 * 1024 * 1024;
@@ -56,6 +57,206 @@ type BrandingFormData = {
   phone: string;
   website: string;
 };
+
+type OrganizationMember = {
+  id: number;
+  userId: number;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  username: string | null;
+  role: "owner" | "admin" | "staff";
+  createdAt: string;
+};
+
+async function memberRequest<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    ...init,
+    credentials: "same-origin",
+    headers: { "content-type": "application/json", ...init?.headers },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? "Request failed");
+  }
+  if (response.status === 204) return undefined as T;
+  return response.json() as Promise<T>;
+}
+
+function OrganizationMembersCard({ currentUserId, currentRole }: { currentUserId: number; currentRole: "owner" | "admin" }) {
+  const { toast } = useToast();
+  const [members, setMembers] = useState<OrganizationMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
+  const [resetMember, setResetMember] = useState<OrganizationMember | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ role: "staff", firstName: "", lastName: "", username: "", email: "", password: "" });
+  const [newPassword, setNewPassword] = useState("");
+  const [editUsername, setEditUsername] = useState("");
+
+  const loadMembers = async () => {
+    try {
+      setMembers(await memberRequest<OrganizationMember[]>("/api/organizations/current/members"));
+    } catch (error) {
+      toast({ title: "Could not load organization members", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void loadMembers(); }, []);
+
+  const resetForm = () => setForm({ role: "staff", firstName: "", lastName: "", username: "", email: "", password: "" });
+
+  const addMember = async () => {
+    setSaving(true);
+    try {
+      const member = await memberRequest<OrganizationMember>("/api/organizations/current/members", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
+      setMembers((current) => [...current, member]);
+      setAddOpen(false);
+      resetForm();
+      toast({ title: `${member.firstName} was added` });
+    } catch (error) {
+      toast({ title: "Could not add member", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetPassword = async () => {
+    if (!resetMember) return;
+    setSaving(true);
+    try {
+      await memberRequest(`/api/organizations/current/members/${resetMember.id}/password`, {
+        method: "PUT",
+        body: JSON.stringify({ password: newPassword || undefined, username: resetMember.username ? editUsername : undefined }),
+      });
+      if (resetMember.username) {
+        setMembers((current) => current.map((member) => member.id === resetMember.id ? { ...member, username: editUsername } : member));
+      }
+      setResetMember(null);
+      setNewPassword("");
+      setEditUsername("");
+      toast({ title: "Login updated" });
+    } catch (error) {
+      toast({ title: "Could not update password", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeMember = async (member: OrganizationMember) => {
+    if (!confirm(`Remove ${member.firstName} ${member.lastName}`.trim() + " from this organization?")) return;
+    try {
+      await memberRequest(`/api/organizations/current/members/${member.id}`, { method: "DELETE" });
+      setMembers((current) => current.filter((item) => item.id !== member.id));
+      toast({ title: "Member removed" });
+    } catch (error) {
+      toast({ title: "Could not remove member", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    }
+  };
+
+  const canManage = (member: OrganizationMember) => member.userId !== currentUserId
+    && member.role !== "owner"
+    && (currentRole === "owner" || member.role === "staff");
+
+  return (
+    <>
+      <Card className="border-card-border shadow-sm">
+        <CardHeader className="flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Organization Members</CardTitle>
+            <CardDescription className="mt-1">Manage people and dedicated check-in accounts for this organization.</CardDescription>
+          </div>
+          <Button type="button" size="sm" className="shrink-0 gap-1.5" onClick={() => setAddOpen(true)}>
+            <UserPlus className="h-4 w-4" /> Add Member
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Loading members…</p>
+          ) : (
+            <div className="divide-y divide-border rounded-lg border border-border">
+              {members.map((member) => (
+                <div key={member.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-medium">{[member.firstName, member.lastName].filter(Boolean).join(" ")}</p>
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium capitalize text-muted-foreground">{member.role}</span>
+                    </div>
+                    <p className="truncate text-sm text-muted-foreground">{member.username ? `Username: ${member.username}` : member.email}</p>
+                  </div>
+                  {canManage(member) && (
+                    <div className="flex shrink-0 gap-2">
+                      <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => { setResetMember(member); setNewPassword(""); setEditUsername(member.username ?? ""); }}>
+                        <KeyRound className="h-3.5 w-3.5" /> {member.username ? "Manage Login" : "Reset Password"}
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => void removeMember(member)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={addOpen} onOpenChange={(open) => { setAddOpen(open); if (!open) resetForm(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Organization Member</DialogTitle>
+            <DialogDescription>Create a staff login for a person or dedicated check-in computer.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {currentRole === "owner" && (
+              <div className="space-y-1.5">
+                <Label>Role</Label>
+                <Select value={form.role} onValueChange={(role) => setForm((current) => ({ ...current, role }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="staff">Staff</SelectItem><SelectItem value="admin">Administrator</SelectItem></SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>{form.role === "staff" ? "Display Name" : "First Name"}</Label>
+                <Input value={form.firstName} onChange={(e) => setForm((current) => ({ ...current, firstName: e.target.value }))} placeholder={form.role === "staff" ? "Check-In Desk 1" : "First name"} />
+              </div>
+              {form.role === "admin" && <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.lastName} onChange={(e) => setForm((current) => ({ ...current, lastName: e.target.value }))} /></div>}
+            </div>
+            {form.role === "staff" ? (
+              <div className="space-y-1.5"><Label>Login Username</Label><Input autoComplete="off" value={form.username} onChange={(e) => setForm((current) => ({ ...current, username: e.target.value.toLowerCase() }))} placeholder="checkin-desk-1" /></div>
+            ) : (
+              <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} /></div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Initial Password</Label>
+              <Input type="text" autoComplete="off" value={form.password} onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} placeholder="At least 8 characters" />
+              <p className="text-xs text-muted-foreground">Copy this password now. It cannot be viewed after the account is created, but it can be reset.</p>
+            </div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={() => void addMember()} disabled={saving || !form.firstName.trim() || form.password.length < 8 || (form.role === "staff" ? form.username.length < 3 : !form.email || !form.lastName)}>{saving ? "Adding…" : "Add Member"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!resetMember} onOpenChange={(open) => { if (!open) { setResetMember(null); setNewPassword(""); } }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>{resetMember?.username ? "Manage Login" : "Reset Password"}</DialogTitle><DialogDescription>Update login details for {resetMember?.firstName}. Their existing password cannot be viewed.</DialogDescription></DialogHeader>
+          <div className="space-y-4 py-2">
+            {resetMember?.username && <div className="space-y-1.5"><Label>Username</Label><Input autoComplete="off" value={editUsername} onChange={(e) => setEditUsername(e.target.value.toLowerCase())} /></div>}
+            <div className="space-y-1.5"><Label>New Password {resetMember?.username && <span className="font-normal text-muted-foreground">(optional)</span>}</Label><Input type="text" autoComplete="off" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={resetMember?.username ? "Leave blank to keep current password" : "At least 8 characters"} /></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setResetMember(null)}>Cancel</Button><Button onClick={() => void resetPassword()} disabled={saving || (resetMember?.username ? editUsername.length < 3 || (!!newPassword && newPassword.length < 8) : newPassword.length < 8)}>{saving ? "Saving…" : "Save Login"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 // ─── Event Categories Card ────────────────────────────────────────────────────
 
@@ -240,6 +441,7 @@ function EventCategoriesCard() {
 
 export default function Settings() {
   const { data: org, isLoading } = useGetOrganization();
+  const { user, organization } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -553,6 +755,10 @@ export default function Settings() {
           </CardFooter>
         </Card>
       </form>
+
+      {user && (organization?.role === "owner" || organization?.role === "admin") && (
+        <OrganizationMembersCard currentUserId={user.id} currentRole={organization.role} />
+      )}
 
       {/* Event Categories */}
       <EventCategoriesCard />

@@ -15,7 +15,7 @@ function postLoginDestination(user: { isSuperAdmin: boolean } | null, organizati
 export default function LoginPage() {
   const { user, organization, isLoading, login } = useAuth();
   const [, navigate] = useLocation();
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [staySignedIn, setStaySignedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export default function LoginPage() {
     setNotice(null);
     setIsSubmitting(true);
     try {
-      await login(email, password, staySignedIn);
+      await login(identifier, password, staySignedIn);
       // auth context updates async; the useEffect above handles the redirect
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in");
@@ -54,13 +54,13 @@ export default function LoginPage() {
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="identifier">Email or username</Label>
             <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              id="identifier"
+              type="text"
+              autoComplete="username"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
               className="h-12 rounded-xl"
               required
             />

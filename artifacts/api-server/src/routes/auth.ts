@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import {
   db,
   organizationMembersTable,
@@ -16,18 +16,18 @@ import { verifyPassword } from "../lib/passwords";
 
 const router = Router();
 
-function normalizeEmail(value: unknown): string {
+function normalizeIdentifier(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
 router.post("/auth/login", async (req, res) => {
-  const email = normalizeEmail(req.body?.email);
+  const identifier = normalizeIdentifier(req.body?.identifier ?? req.body?.email);
   const password =
     typeof req.body?.password === "string" ? req.body.password : "";
   const staySignedIn = req.body?.staySignedIn === true;
 
-  if (!email || !password) {
-    res.status(400).json({ error: "Email and password are required" });
+  if (!identifier || !password) {
+    res.status(400).json({ error: "Email or username and password are required" });
     return;
   }
 
@@ -35,11 +35,11 @@ router.post("/auth/login", async (req, res) => {
     const [user] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.email, email))
+      .where(or(eq(usersTable.email, identifier), eq(usersTable.username, identifier)))
       .limit(1);
 
     if (!user || !verifyPassword(password, user.passwordHash)) {
-      res.status(401).json({ error: "Invalid email or password" });
+      res.status(401).json({ error: "Invalid email/username or password" });
       return;
     }
 
@@ -87,6 +87,7 @@ router.post("/auth/login", async (req, res) => {
           firstName: user.firstName,
           lastName: user.lastName,
           email: user.email,
+          username: user.username,
           isSuperAdmin: user.isSuperAdmin,
         },
         organization: membership

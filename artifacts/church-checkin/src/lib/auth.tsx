@@ -11,7 +11,8 @@ interface AuthUser {
   id: number;
   firstName: string;
   lastName: string;
-  email: string;
+  email: string | null;
+  username: string | null;
   isSuperAdmin: boolean;
 }
 
@@ -32,7 +33,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   organization: AuthOrganization | null;
   isLoading: boolean;
-  login: (email: string, password: string, staySignedIn: boolean) => Promise<void>;
+  login: (identifier: string, password: string, staySignedIn: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -81,13 +82,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const login = useCallback(
-    async (email: string, password: string, staySignedIn: boolean) => {
+    async (identifier: string, password: string, staySignedIn: boolean) => {
       const data = await parseAuthResponse(
         await fetch("/api/auth/login", {
           method: "POST",
           credentials: "same-origin",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email, password, staySignedIn }),
+          body: JSON.stringify({ identifier, password, staySignedIn }),
         }),
       );
       applyAuth(data);
