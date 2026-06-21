@@ -11,7 +11,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 export const DEFAULT_ORGANIZATION_NAME =
-  "Anchor Events - Check In and Registration";
+  "Anchor Events";
 export const DEFAULT_PLAN = "basic";
 export const DEFAULT_SUBSCRIPTION_STATUS = "trialing";
 

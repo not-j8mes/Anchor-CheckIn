@@ -1,7 +1,7 @@
 {
-  "name": "Anchor Check-In",
+  "name": "Anchor Events",
   "short_name": "Anchor",
-  "description": "Event registration and check-in for Anchor organizations.",
+  "description": "Check-in and Registration",
   "id": "/",
   "start_url": "/",
   "scope": "/",

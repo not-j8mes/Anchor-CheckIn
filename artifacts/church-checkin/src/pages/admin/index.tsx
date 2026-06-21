@@ -813,7 +813,7 @@ export default function PlatformAdminPage() {
           <div className="flex items-center gap-3 min-w-0">
             <img
               src={DEFAULT_APP_LOGO}
-              alt="Anchor Check-In"
+              alt="Anchor Events"
               className="w-6 h-6 object-contain shrink-0"
             />
             <span className="font-serif font-bold text-base text-foreground whitespace-nowrap">

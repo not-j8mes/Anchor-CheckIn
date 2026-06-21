@@ -26,6 +26,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { APP_NAME, DEFAULT_APP_LOGO } from "@/lib/branding";
 
 function registrationTypeBadge(type?: string | null) {
   if (!type || type === "child_checkin")
@@ -223,6 +224,10 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
           </div>
         </div>
         {children}
+        <footer className="flex shrink-0 items-center justify-center gap-2 border-t border-border/60 bg-background px-4 py-3 text-xs text-muted-foreground">
+          <img src={DEFAULT_APP_LOGO} alt="" className="h-4 w-4 object-contain" aria-hidden="true" />
+          <span>Powered by <span className="font-semibold text-foreground/70">{APP_NAME}</span></span>
+        </footer>
       </main>
     </div>
   );

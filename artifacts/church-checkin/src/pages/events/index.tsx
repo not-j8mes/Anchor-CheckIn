@@ -53,9 +53,10 @@ import {
   LogOut,
   ShieldCheck,
 } from "lucide-react";
-import { DEFAULT_APP_LOGO } from "@/lib/branding";
+import { APP_NAME, DEFAULT_APP_LOGO } from "@/lib/branding";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { TrimmedLogo } from "@/components/branding/TrimmedLogo";
 import {
   format,
   startOfMonth,
@@ -69,7 +70,7 @@ import {
   subMonths,
 } from "date-fns";
 
-const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
+const DEFAULT_ORGANIZATION_NAME = "Anchor Events";
 
 function categoryLabel(type: string, categories: EventCategory[]) {
   return categories.find((c) => c.slug === type)?.name ?? type;
@@ -789,8 +790,13 @@ export default function EventSelectionScreen() {
   const visible = viewMode === "list"
     ? filtered.filter((e) => showPast || !isPast(e))
     : filtered;
-  const brandLogo = org?.logoUrl || DEFAULT_APP_LOGO;
-  const brandName = org?.name || DEFAULT_ORGANIZATION_NAME;
+  const hasCustomOrganizationName = Boolean(
+    org?.name
+    && org.name !== DEFAULT_ORGANIZATION_NAME
+    && org.name !== "Anchor Events - Check In and Registration"
+  );
+  const navLogo = org?.logoUrl || DEFAULT_APP_LOGO;
+  const navName = hasCustomOrganizationName ? org!.name : APP_NAME;
 
   async function handleLogout() {
     await logout();
@@ -802,9 +808,11 @@ export default function EventSelectionScreen() {
       {/* Top bar */}
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-foreground min-w-0 shrink-0">
-            <img src={brandLogo} alt={`${brandName} logo`} className="w-6 h-6 object-contain shrink-0" />
-            <span className="font-serif font-bold text-base whitespace-nowrap">{brandName}</span>
+          <div className="flex items-center gap-2 text-foreground min-w-0 shrink">
+            <div className="h-8 w-12 shrink-0 sm:w-16">
+              <TrimmedLogo src={navLogo} alt={`${navName} logo`} className="h-full w-full object-contain" />
+            </div>
+            <span className="max-w-32 truncate font-serif text-sm font-bold sm:max-w-64 sm:text-base">{navName}</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
             {user?.isSuperAdmin && (
@@ -846,7 +854,7 @@ export default function EventSelectionScreen() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-4 pb-6 sm:pt-6 sm:pb-10 space-y-6 sm:space-y-8">
         {/* Hero header */}
         <div className="text-center space-y-1.5 sm:space-y-2">
           <h1 className="text-2xl sm:text-4xl font-serif font-bold text-foreground">Select an Event</h1>
@@ -996,6 +1004,11 @@ export default function EventSelectionScreen() {
             )}
           </div>
         )}
+
+        <footer className="flex items-center justify-center gap-2 pt-4 text-xs text-muted-foreground">
+          <img src={DEFAULT_APP_LOGO} alt="" className="h-4 w-4 object-contain" aria-hidden="true" />
+          <span>Powered by <span className="font-semibold text-foreground/70">{APP_NAME}</span></span>
+        </footer>
       </div>
 
       {editEvent && (

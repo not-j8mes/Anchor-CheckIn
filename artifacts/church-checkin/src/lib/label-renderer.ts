@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import type { LabelData } from "@workspace/api-client-react";
 
-const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
+const DEFAULT_ORGANIZATION_NAME = "Anchor Events";
 
 // ---------------------------------------------------------------------------
 // Name-sizing helpers

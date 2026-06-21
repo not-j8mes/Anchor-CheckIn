@@ -5,7 +5,7 @@ import { sql } from "drizzle-orm"
 
 export const organizations = pgTable("organizations", {
 	id: serial().primaryKey().notNull(),
-	name: text().default('Anchor Events - Check In and Registration').notNull(),
+	name: text().default('Anchor Events').notNull(),
 	logoUrl: text("logo_url"),
 	headerText: text("header_text"),
 	address: text(),

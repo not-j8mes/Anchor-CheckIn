@@ -129,7 +129,7 @@ export default function PublicRegistrationForm() {
           {org?.logoUrl ? (
             <img src={org.logoUrl} alt={org.name} className="h-20 mx-auto object-contain" />
           ) : (
-            <img src={DEFAULT_APP_LOGO} alt="Anchor Check-In logo" className="h-20 w-20 mx-auto object-contain" />
+            <img src={DEFAULT_APP_LOGO} alt="Anchor Events logo" className="h-20 w-20 mx-auto object-contain" />
           )}
           <h1 className="text-3xl font-serif font-bold text-foreground">{org?.name}</h1>
           {form.description && (

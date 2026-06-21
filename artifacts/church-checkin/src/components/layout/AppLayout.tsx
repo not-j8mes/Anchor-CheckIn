@@ -19,7 +19,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
 
-const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
+const DEFAULT_ORGANIZATION_NAME = "Anchor Events";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();

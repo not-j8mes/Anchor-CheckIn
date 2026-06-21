@@ -45,7 +45,7 @@ import { AlertTriangle, ArrowLeft, Database, Moon, Sun, Trash2, Tag, Plus, Penci
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 
-const DEFAULT_ORGANIZATION_NAME = "Anchor Events - Check In and Registration";
+const DEFAULT_ORGANIZATION_NAME = "Anchor Events";
 const MAX_LOGO_UPLOAD_BYTES = 1.5 * 1024 * 1024;
 const ACCEPTED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
