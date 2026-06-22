@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 
-const STORAGE_KEY = "church-checkin-dark-mode";
+// Versioned so preferences accidentally persisted by the old system-theme
+// initialization do not override the intended light-mode default.
+const STORAGE_KEY = "church-checkin-dark-mode-v2";
 
 function getDarkModePreference() {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored !== null) return stored === "true";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return false;
 }
 
 function applyDarkMode(isDark: boolean) {
