@@ -43,6 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, ChevronDown, Database, KeyRound, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Upload, UserPlus, Users } from "lucide-react";
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
+import { TrimmedLogo } from "@/components/branding/TrimmedLogo";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 import { useAuth } from "@/lib/auth";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -169,8 +170,8 @@ function OrganizationMembersCard({ currentUserId, currentRole }: { currentUserId
       <Card className="border-card-border shadow-sm">
         <CardHeader className="flex-row items-start justify-between gap-4">
           <div>
-            <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Organization Members</CardTitle>
-            <CardDescription className="mt-1">Manage people and dedicated check-in accounts for this organization.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Members & Access</CardTitle>
+            <CardDescription className="mt-1">Manage administrators, staff, and dedicated check-in accounts.</CardDescription>
           </div>
           <Button type="button" size="sm" className="shrink-0 gap-1.5" onClick={() => setAddOpen(true)}>
             <UserPlus className="h-4 w-4" /> Add Member
@@ -574,14 +575,16 @@ export default function Settings() {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
-          <div className="max-w-3xl mx-auto px-6 h-14 flex items-center gap-4">
+          <div className="max-w-5xl mx-auto px-6 h-14 flex items-center gap-4">
             <div className="flex items-center gap-2 text-foreground">
-              <img src={DEFAULT_APP_LOGO} alt={`${DEFAULT_ORGANIZATION_NAME} logo`} className="w-6 h-6 object-contain" />
+              <div className="h-8 w-12 shrink-0 sm:w-16">
+                <TrimmedLogo src={DEFAULT_APP_LOGO} alt={`${DEFAULT_ORGANIZATION_NAME} logo`} className="h-full w-full object-contain" />
+              </div>
               <span className="font-serif font-bold text-base">{DEFAULT_ORGANIZATION_NAME}</span>
             </div>
           </div>
         </header>
-        <div className="max-w-3xl mx-auto px-6 py-10">
+        <div className="max-w-5xl mx-auto px-6 py-10">
           <div className="animate-pulse space-y-6">
             <div className="h-10 w-48 bg-muted rounded"></div>
             <div className="h-64 bg-muted/50 rounded-xl"></div>
@@ -595,9 +598,11 @@ export default function Settings() {
     <div className="min-h-screen bg-background">
       {/* Top bar */}
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-foreground">
-            <img src={brandLogo} alt={`${brandName} logo`} className="w-6 h-6 object-contain" />
+        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
+          <div className="flex min-w-0 shrink items-center gap-2 text-foreground">
+            <div className="h-8 w-12 shrink-0 sm:w-16">
+              <TrimmedLogo src={brandLogo} alt={`${brandName} logo`} className="h-full w-full object-contain" />
+            </div>
             <span className="font-serif font-bold text-base">{brandName}</span>
           </div>
           <Button asChild variant="ghost" size="sm">
@@ -608,39 +613,23 @@ export default function Settings() {
         </div>
       </header>
 
-    <div className="max-w-3xl mx-auto px-6 py-10 space-y-8">
+    <div className="max-w-3xl mx-auto px-6 py-10">
       <div>
         <h1 className="text-3xl font-serif font-bold text-foreground">Organization Settings</h1>
-        <p className="text-muted-foreground mt-1">Manage the name, logo, and contact details people see when they register.</p>
+        <p className="text-muted-foreground mt-1">Manage your organization, events, people, and app preferences.</p>
       </div>
 
-      <Card className="border-card-border shadow-sm">
-        <CardHeader>
-          <CardTitle>Display</CardTitle>
-          <CardDescription>Choose how the admin app looks on this device.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {isDark ? <Moon className="w-5 h-5 text-muted-foreground" /> : <Sun className="w-5 h-5 text-muted-foreground" />}
-              <div>
-                <p className="font-medium text-sm">Dark Mode</p>
-                <p className="text-xs text-muted-foreground">Use a darker screen style for this browser.</p>
-              </div>
-            </div>
-            <Switch
-              checked={isDark}
-              onCheckedChange={setIsDark}
-              aria-label="Toggle dark mode"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <main className="mt-8 space-y-10">
+      <section id="organization" className="scroll-mt-24 space-y-3">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Organization</h2>
+          <p className="text-sm text-muted-foreground">The identity and contact details shown to registrants.</p>
+        </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
         <Card className="border-card-border shadow-sm">
           <CardHeader>
-            <CardTitle>App Branding</CardTitle>
+            <CardTitle>Profile & Branding</CardTitle>
             <CardDescription>
               These details appear in the app header and on public registration forms.
             </CardDescription>
@@ -748,27 +737,65 @@ export default function Settings() {
                 ? "Saving changes..."
                 : hasBrandingChanges
                 ? "You have unsaved branding changes."
-                : "Branding is saved."}
+                : "Organization details are saved."}
             </p>
             <Button type="submit" disabled={updateOrg.isPending || !hasBrandingChanges || !formData.name.trim()}>
-              {updateOrg.isPending ? "Saving..." : hasBrandingChanges ? "Save Branding" : "Saved"}
+              {updateOrg.isPending ? "Saving..." : hasBrandingChanges ? "Save Changes" : "Saved"}
             </Button>
           </CardFooter>
         </Card>
       </form>
+      </section>
+
+      <section id="events" className="scroll-mt-24 space-y-3">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Events</h2>
+          <p className="text-sm text-muted-foreground">Defaults and organization tools used when creating events.</p>
+        </div>
+        <EventCategoriesCard />
+      </section>
 
       {user && (organization?.role === "owner" || organization?.role === "admin") && (
-        <OrganizationMembersCard currentUserId={user.id} currentRole={organization.role} />
+        <section id="people" className="scroll-mt-24 space-y-3">
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">People & Access</h2>
+            <p className="text-sm text-muted-foreground">Control who can sign in and help run check-in.</p>
+          </div>
+          <OrganizationMembersCard currentUserId={user.id} currentRole={organization.role} />
+        </section>
       )}
 
-      {/* Event Categories */}
-      <EventCategoriesCard />
+      <section id="appearance" className="scroll-mt-24 space-y-3">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Appearance</h2>
+          <p className="text-sm text-muted-foreground">Personal display preferences for this device.</p>
+        </div>
+        <Card className="border-card-border shadow-sm">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                {isDark ? <Moon className="w-5 h-5 text-muted-foreground" /> : <Sun className="w-5 h-5 text-muted-foreground" />}
+                <div>
+                  <p className="font-medium text-sm">Dark Mode</p>
+                  <p className="text-xs text-muted-foreground">Use a darker screen style in this browser.</p>
+                </div>
+              </div>
+              <Switch checked={isDark} onCheckedChange={setIsDark} aria-label="Toggle dark mode" />
+            </div>
+          </CardContent>
+        </Card>
+      </section>
 
       {/* Advanced section */}
+      <section id="advanced" className="scroll-mt-24 space-y-3">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Advanced</h2>
+          <p className="text-sm text-muted-foreground">Testing tools and destructive data controls.</p>
+        </div>
       <Collapsible>
-        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group w-full">
+        <CollapsibleTrigger className="group flex w-full items-center justify-between rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium shadow-sm transition-colors hover:bg-muted/50">
+          <span>Show advanced settings</span>
           <ChevronDown className="w-4 h-4 transition-transform group-data-[state=open]:rotate-180" />
-          Advanced
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-6 mt-4">
           <Card className="border-card-border shadow-sm">
@@ -834,6 +861,7 @@ export default function Settings() {
           </Card>
         </CollapsibleContent>
       </Collapsible>
+      </section>
 
       {/* Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) setDeleteConfirmText(""); }}>
@@ -893,6 +921,7 @@ export default function Settings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </main>
     </div>
     </div>
   );
