@@ -31,6 +31,88 @@ const router = Router();
 
 class InvalidRegistrationGroupError extends Error {}
 
+async function syncSecondaryGuardianForParticipant(
+  txOrDb: Pick<typeof db, "select" | "insert" | "update" | "delete">,
+  input: {
+    organizationId: number | null;
+    participantId: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    relationship?: string | null;
+  },
+) {
+  if (!input.organizationId || !input.participantId) return;
+
+  const firstName = input.firstName?.trim() ?? "";
+  const lastName = input.lastName?.trim() ?? "";
+  const phone = input.phone?.trim() ?? "";
+  const email = input.email?.trim() ?? "";
+  const relationship = input.relationship?.trim() ?? "";
+  const hasSecondaryGuardian = Boolean(firstName || lastName || phone || email || relationship);
+
+  const [existingLink] = await txOrDb
+    .select({
+      linkId: participantGuardiansTable.id,
+      guardianId: participantGuardiansTable.guardianId,
+    })
+    .from(participantGuardiansTable)
+    .where(
+      and(
+        eq(participantGuardiansTable.participantId, input.participantId),
+        eq(participantGuardiansTable.isPrimary, false),
+      ),
+    )
+    .limit(1);
+
+  if (!hasSecondaryGuardian) {
+    if (existingLink) {
+      await txOrDb
+        .delete(participantGuardiansTable)
+        .where(eq(participantGuardiansTable.id, existingLink.linkId));
+    }
+    return;
+  }
+
+  if (existingLink) {
+    await txOrDb
+      .update(guardiansTable)
+      .set({
+        firstName,
+        lastName,
+        phone: phone || null,
+        email: email || null,
+      })
+      .where(eq(guardiansTable.id, existingLink.guardianId));
+    await txOrDb
+      .update(participantGuardiansTable)
+      .set({ relationship: relationship || null, canPickUp: true })
+      .where(eq(participantGuardiansTable.id, existingLink.linkId));
+    return;
+  }
+
+  const [secondaryGuardian] = await txOrDb
+    .insert(guardiansTable)
+    .values({
+      organizationId: input.organizationId,
+      firstName,
+      lastName,
+      phone: phone || null,
+      email: email || null,
+    })
+    .returning();
+
+  await txOrDb.insert(participantGuardiansTable).values({
+    organizationId: input.organizationId,
+    participantId: input.participantId,
+    guardianId: secondaryGuardian.id,
+    relationship: relationship || null,
+    isPrimary: false,
+    canPickUp: true,
+  });
+}
+
 // ─── System field → DB column mapping ────────────────────────────────────────
 // Mirrors the dbColumn values in artifacts/church-checkin/src/lib/systemFields.ts.
 
@@ -223,8 +305,25 @@ router.post("/forms/:formId/register", async (req, res) => {
       valueByFieldId.set(fieldId, value);
     }
 
+    const secondaryGuardianFields = formFields.filter((field) =>
+      field.sectionKey === "secondary_guardian" ||
+      field.systemKey?.startsWith("secondary_guardian_"),
+    );
+    const isSecondaryGuardianField = (field: typeof formFields[number]) =>
+      field.sectionKey === "secondary_guardian" ||
+      field.systemKey?.startsWith("secondary_guardian_");
+    const allowSecondGuardian = form.allowSecondGuardian ?? secondaryGuardianFields.length > 0;
+    const hasSecondaryGuardianAnswer = secondaryGuardianFields.some((field) =>
+      (valueByFieldId.get(field.id) ?? "").trim(),
+    );
+
     const missingRequiredFields = formFields
       .filter((field) => field.required || field.fieldType === "waiver")
+      .filter((field) =>
+        (
+          !isSecondaryGuardianField(field)
+        ) || (allowSecondGuardian && hasSecondaryGuardianAnswer),
+      )
       .filter((field) => {
         const value = (valueByFieldId.get(field.id) ?? "").trim();
         return field.fieldType === "waiver" ? value !== "true" : !value;
@@ -252,6 +351,7 @@ router.post("/forms/:formId/register", async (req, res) => {
 
       const formField = fieldById.get(fieldId);
       if (!formField) continue;
+      if (!allowSecondGuardian && isSecondaryGuardianField(formField)) continue;
 
       if (formField.fieldKind === "system" && formField.systemKey) {
         // room_assignment maps directly to registrations.room (not to a participant/guardian table)
@@ -322,6 +422,16 @@ router.post("/forms/:formId/register", async (req, res) => {
       guardianId:    guardian.id,
       isPrimary:  true,
       canPickUp:  true,
+    });
+
+    await syncSecondaryGuardianForParticipant(tx, {
+      organizationId,
+      participantId: participant.id,
+      firstName: registrationCols["secondary_guardian_first_name"] ?? null,
+      lastName: registrationCols["secondary_guardian_last_name"] ?? null,
+      phone: registrationCols["secondary_guardian_phone"] ?? null,
+      email: registrationCols["secondary_guardian_email"] ?? null,
+      relationship: registrationCols["secondary_guardian_relationship"] ?? null,
     });
 
     // ── Create emergency contact (if name provided) ───────────────────────────
@@ -651,6 +761,18 @@ router.put("/registration-families", async (req, res) => {
     }
 
     for (const reg of regs) {
+      await syncSecondaryGuardianForParticipant(db, {
+        organizationId: reg.organizationId,
+        participantId: reg.participantId,
+        firstName: secondaryGuardianFirstName ?? null,
+        lastName: secondaryGuardianLastName ?? null,
+        phone: secondaryGuardianPhone ?? null,
+        email: secondaryGuardianEmail ?? null,
+        relationship: secondaryGuardianRelationship ?? null,
+      });
+    }
+
+    for (const reg of regs) {
       if (!reg.participantId) continue;
 
       const [existing] = await db
@@ -901,6 +1023,24 @@ router.put("/registrations/:registrationId", async (req, res) => {
         ...(guardianPhone !== undefined && { phone: guardianPhone }),
         ...(guardianEmail !== undefined && { email: guardianEmail || null }),
       }).where(eq(guardiansTable.id, reg.guardianId));
+    }
+
+    const secondaryGuardianChanged =
+      secondaryGuardianFirstName !== undefined ||
+      secondaryGuardianLastName !== undefined ||
+      secondaryGuardianPhone !== undefined ||
+      secondaryGuardianEmail !== undefined ||
+      secondaryGuardianRelationship !== undefined;
+    if (secondaryGuardianChanged) {
+      await syncSecondaryGuardianForParticipant(db, {
+        organizationId: reg.organizationId,
+        participantId: reg.participantId,
+        firstName: updated.secondaryGuardianFirstName,
+        lastName: updated.secondaryGuardianLastName,
+        phone: updated.secondaryGuardianPhone,
+        email: updated.secondaryGuardianEmail,
+        relationship: updated.secondaryGuardianRelationship,
+      });
     }
 
     res.json(updated);

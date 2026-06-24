@@ -71,6 +71,8 @@ export const ListFormsResponseItem = zod.object({
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
   "allowAdditionalPeople": zod.boolean().optional(),
+  "showSectionsOneAtATime": zod.boolean().optional(),
+  "allowSecondGuardian": zod.boolean().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -86,7 +88,9 @@ export const CreateFormBody = zod.object({
   "description": zod.string().optional(),
   "isActive": zod.boolean().optional(),
   "isPublic": zod.boolean().optional(),
-  "allowAdditionalPeople": zod.boolean().optional()
+  "allowAdditionalPeople": zod.boolean().optional(),
+  "showSectionsOneAtATime": zod.boolean().optional(),
+  "allowSecondGuardian": zod.boolean().nullish()
 })
 
 export const CreateFormResponse = zod.object({
@@ -96,6 +100,8 @@ export const CreateFormResponse = zod.object({
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
   "allowAdditionalPeople": zod.boolean().optional(),
+  "showSectionsOneAtATime": zod.boolean().optional(),
+  "allowSecondGuardian": zod.boolean().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -193,6 +199,8 @@ export const CreateEventResponse = zod.object({
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
   "allowAdditionalPeople": zod.boolean().optional(),
+  "showSectionsOneAtATime": zod.boolean().optional(),
+  "allowSecondGuardian": zod.boolean().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -335,6 +343,8 @@ export const GetEventResponse = zod.object({
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
   "allowAdditionalPeople": zod.boolean().optional(),
+  "showSectionsOneAtATime": zod.boolean().optional(),
+  "allowSecondGuardian": zod.boolean().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -449,6 +459,8 @@ export const GetFormBySlugResponse = zod.object({
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
   "allowAdditionalPeople": zod.boolean().optional(),
+  "showSectionsOneAtATime": zod.boolean().optional(),
+  "allowSecondGuardian": zod.boolean().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -497,6 +509,8 @@ export const GetFormResponse = zod.object({
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
   "allowAdditionalPeople": zod.boolean().optional(),
+  "showSectionsOneAtATime": zod.boolean().optional(),
+  "allowSecondGuardian": zod.boolean().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -543,7 +557,9 @@ export const UpdateFormBody = zod.object({
   "description": zod.string().optional(),
   "isActive": zod.boolean().optional(),
   "isPublic": zod.boolean().optional(),
-  "allowAdditionalPeople": zod.boolean().optional()
+  "allowAdditionalPeople": zod.boolean().optional(),
+  "showSectionsOneAtATime": zod.boolean().optional(),
+  "allowSecondGuardian": zod.boolean().nullish()
 })
 
 export const UpdateFormResponse = zod.object({
@@ -553,6 +569,8 @@ export const UpdateFormResponse = zod.object({
   "isActive": zod.boolean(),
   "isPublic": zod.boolean(),
   "allowAdditionalPeople": zod.boolean().optional(),
+  "showSectionsOneAtATime": zod.boolean().optional(),
+  "allowSecondGuardian": zod.boolean().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -1249,6 +1267,38 @@ export const ListChildrenResponseItem = zod.object({
   "guardianName": zod.string().optional(),
   "guardianPhone": zod.string().optional(),
   "guardianEmail": zod.string().nullish(),
+  "primaryGuardian": zod.object({
+  "id": zod.number().nullish(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "name": zod.string().optional(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "relationship": zod.string().nullish()
+}).optional(),
+  "secondGuardian": zod.object({
+  "id": zod.number().nullish(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "name": zod.string().optional(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "relationship": zod.string().nullish()
+}).nullish(),
+  "emergencyContact": zod.object({
+  "id": zod.number().nullish(),
+  "name": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "relationship": zod.string().nullish()
+}).nullish(),
+  "secondaryGuardianFirstName": zod.string().nullish(),
+  "secondaryGuardianLastName": zod.string().nullish(),
+  "secondaryGuardianPhone": zod.string().nullish(),
+  "secondaryGuardianEmail": zod.string().nullish(),
+  "secondaryGuardianRelationship": zod.string().nullish(),
+  "emergencyContactName": zod.string().nullish(),
+  "emergencyContactPhone": zod.string().nullish(),
+  "emergencyContactRelationship": zod.string().nullish(),
   "allergies": zod.string().nullish(),
   "medicalNotes": zod.string().nullish(),
   "specialNeeds": zod.string().nullish(),
@@ -1278,6 +1328,38 @@ export const GetChildResponse = zod.object({
   "guardianName": zod.string().optional(),
   "guardianPhone": zod.string().optional(),
   "guardianEmail": zod.string().nullish(),
+  "primaryGuardian": zod.object({
+  "id": zod.number().nullish(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "name": zod.string().optional(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "relationship": zod.string().nullish()
+}).optional(),
+  "secondGuardian": zod.object({
+  "id": zod.number().nullish(),
+  "firstName": zod.string().nullish(),
+  "lastName": zod.string().nullish(),
+  "name": zod.string().optional(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "relationship": zod.string().nullish()
+}).nullish(),
+  "emergencyContact": zod.object({
+  "id": zod.number().nullish(),
+  "name": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "relationship": zod.string().nullish()
+}).nullish(),
+  "secondaryGuardianFirstName": zod.string().nullish(),
+  "secondaryGuardianLastName": zod.string().nullish(),
+  "secondaryGuardianPhone": zod.string().nullish(),
+  "secondaryGuardianEmail": zod.string().nullish(),
+  "secondaryGuardianRelationship": zod.string().nullish(),
+  "emergencyContactName": zod.string().nullish(),
+  "emergencyContactPhone": zod.string().nullish(),
+  "emergencyContactRelationship": zod.string().nullish(),
   "allergies": zod.string().nullish(),
   "medicalNotes": zod.string().nullish(),
   "specialNeeds": zod.string().nullish(),

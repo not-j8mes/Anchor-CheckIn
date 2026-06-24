@@ -12,4 +12,7 @@ export interface FormInput {
   isActive?: boolean;
   isPublic?: boolean;
   allowAdditionalPeople?: boolean;
+  showSectionsOneAtATime?: boolean;
+  /** @nullable */
+  allowSecondGuardian?: boolean | null;
 }

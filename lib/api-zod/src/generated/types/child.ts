@@ -5,6 +5,9 @@
  * Church check-in and registration API
  * OpenAPI spec version: 0.1.0
  */
+import type { ChildEmergencyContact } from './childEmergencyContact';
+import type { ChildPrimaryGuardian } from './childPrimaryGuardian';
+import type { ChildSecondGuardian } from './childSecondGuardian';
 
 export interface Child {
   id: number;
@@ -16,6 +19,27 @@ export interface Child {
   guardianPhone?: string;
   /** @nullable */
   guardianEmail?: string | null;
+  primaryGuardian?: ChildPrimaryGuardian;
+  /** @nullable */
+  secondGuardian?: ChildSecondGuardian;
+  /** @nullable */
+  emergencyContact?: ChildEmergencyContact;
+  /** @nullable */
+  secondaryGuardianFirstName?: string | null;
+  /** @nullable */
+  secondaryGuardianLastName?: string | null;
+  /** @nullable */
+  secondaryGuardianPhone?: string | null;
+  /** @nullable */
+  secondaryGuardianEmail?: string | null;
+  /** @nullable */
+  secondaryGuardianRelationship?: string | null;
+  /** @nullable */
+  emergencyContactName?: string | null;
+  /** @nullable */
+  emergencyContactPhone?: string | null;
+  /** @nullable */
+  emergencyContactRelationship?: string | null;
   /** @nullable */
   allergies?: string | null;
   /** @nullable */

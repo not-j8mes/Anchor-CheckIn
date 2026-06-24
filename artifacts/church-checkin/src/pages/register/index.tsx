@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "wouter";
 import {
   useSubmitRegistration,
@@ -11,16 +11,19 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Plus } from "lucide-react";
 import {
+  type FieldSection,
   RegistrationFormBody,
   getFieldSection,
+  isSecondaryGuardianField,
 } from "@/components/registration/RegistrationFormBody";
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
 
 export default function PublicRegistrationForm() {
   const params = useParams<{ embedSlug: string }>();
   const slug = params.embedSlug;
+  const formRef = useRef<HTMLFormElement>(null);
 
   const { data: form, isLoading: formLoading } = useQuery({
     queryKey: getGetFormBySlugQueryKey(slug),
@@ -37,6 +40,7 @@ export default function PublicRegistrationForm() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeSectionIndex, setActiveSectionIndex] = useState(0);
 
   const submitRegistration = useSubmitRegistration();
 
@@ -47,6 +51,36 @@ export default function PublicRegistrationForm() {
       queryKey: getListRoomsQueryKey(eventId),
     },
   });
+
+  const formFields: FormField[] = form?.formFields ?? [];
+  const org = (form as typeof form & { organization?: { name?: string; logoUrl?: string | null } | null } | undefined)?.organization;
+  const isChildCheckin = !form?.registrationType || form.registrationType === "child_checkin";
+  const roomAssignmentFieldId = formFields.find((f) => f.systemKey === "room_assignment")?.id;
+  const hasSecondaryGuardianFields = formFields.some(isSecondaryGuardianField);
+  const allowSecondGuardian = form?.allowSecondGuardian ?? hasSecondaryGuardianFields;
+  const showSectionStepper = !!form && isChildCheckin && !!form.showSectionsOneAtATime;
+  const sectionMeta: Record<FieldSection, { title: string }> = {
+    guardian_info: { title: "Parent / Guardian" },
+    child_info: { title: isChildCheckin ? "Child Information" : "Attendee Information" },
+    emergency_contact: { title: "Emergency Contact" },
+    additional_questions: { title: "Additional Questions" },
+    waivers: { title: "Waivers" },
+  };
+  const stepSections = ([
+    "guardian_info",
+    "child_info",
+    "emergency_contact",
+    "additional_questions",
+    "waivers",
+  ] as FieldSection[]).filter((section) =>
+    formFields.some((field) => getFieldSection(field) === section),
+  );
+  const activeSection = stepSections[activeSectionIndex] ?? stepSections[0];
+  const isLastSection = activeSectionIndex >= stepSections.length - 1;
+
+  useEffect(() => {
+    setActiveSectionIndex((index) => Math.min(index, Math.max(stepSections.length - 1, 0)));
+  }, [stepSections.length]);
 
   if (formLoading) {
     return (
@@ -67,15 +101,70 @@ export default function PublicRegistrationForm() {
     );
   }
 
-  const formFields: FormField[] = form.formFields ?? [];
-  const org = (form as typeof form & { organization?: { name?: string; logoUrl?: string | null } | null }).organization;
-  const isChildCheckin = !form.registrationType || form.registrationType === "child_checkin";
-  const roomAssignmentFieldId = formFields.find((f) => f.systemKey === "room_assignment")?.id;
+  const fieldHasValue = (field: FormField, value: string | undefined) => {
+    if (!field.required && field.fieldType !== "waiver") return true;
+    if (field.fieldType === "checkbox" || field.fieldType === "waiver") return value === "true";
+    return !!value?.trim();
+  };
+
+  const shouldRequireField = (field: FormField) => {
+    if (!isSecondaryGuardianField(field)) return true;
+    if (!allowSecondGuardian) return false;
+    return formFields
+      .filter(isSecondaryGuardianField)
+      .some((secondaryField) => !!guardianAnswers[secondaryField.id]?.trim());
+  };
+
+  const getFirstMissingSection = (): FieldSection | null => {
+    for (const section of stepSections) {
+      const fieldsInSection = formFields.filter((field) => getFieldSection(field) === section);
+      if (section === "guardian_info") {
+        if (
+          fieldsInSection.some((field) =>
+            shouldRequireField(field) && !fieldHasValue(field, guardianAnswers[field.id]),
+          )
+        ) return section;
+      } else if (section === "child_info") {
+        if (
+          childrenAnswers.some((childAnswerMap) =>
+            fieldsInSection.some((field) => !fieldHasValue(field, childAnswerMap[field.id])),
+          )
+        ) return section;
+      } else if (section === "emergency_contact") {
+        if (fieldsInSection.some((field) => !fieldHasValue(field, emergencyAnswers[field.id]))) return section;
+      } else {
+        if (fieldsInSection.some((field) => !fieldHasValue(field, additionalAnswers[field.id]))) return section;
+      }
+    }
+    return null;
+  };
+
+  const handleNextSection = () => {
+    if (!formRef.current?.reportValidity()) return;
+    setSubmitError(null);
+    setActiveSectionIndex((index) => Math.min(index + 1, stepSections.length - 1));
+  };
+
+  const handlePreviousSection = () => {
+    setSubmitError(null);
+    setActiveSectionIndex((index) => Math.max(index - 1, 0));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form) return;
     setSubmitError(null);
+
+    if (showSectionStepper) {
+      const missingSection = getFirstMissingSection();
+      if (missingSection) {
+        const sectionIndex = stepSections.indexOf(missingSection);
+        if (sectionIndex >= 0) setActiveSectionIndex(sectionIndex);
+        setSubmitError("Please complete the required fields before submitting.");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -119,6 +208,7 @@ export default function PublicRegistrationForm() {
     setEmergencyAnswers({});
     setAdditionalAnswers({});
     setSubmitError(null);
+    setActiveSectionIndex(0);
   };
 
   return (
@@ -162,6 +252,7 @@ export default function PublicRegistrationForm() {
           </Card>
         ) : (
           <form
+            ref={formRef}
             onSubmit={handleSubmit}
             className="space-y-6"
             data-testid="registration-form"
@@ -170,11 +261,35 @@ export default function PublicRegistrationForm() {
               <h2 className="text-2xl font-serif font-bold text-foreground">{form.title}</h2>
             </div>
 
+            {showSectionStepper && stepSections.length > 1 && (
+              <div className="rounded-lg border bg-background px-4 py-3 shadow-sm">
+                <div className="mb-3 flex items-center justify-between text-sm">
+                  <span className="font-medium text-foreground">
+                    {sectionMeta[activeSection].title}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Step {activeSectionIndex + 1} of {stepSections.length}
+                  </span>
+                </div>
+                <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${stepSections.length}, minmax(0, 1fr))` }}>
+                  {stepSections.map((section, index) => (
+                    <div
+                      key={section}
+                      className={`h-2 rounded-full transition-colors ${
+                        index <= activeSectionIndex ? "bg-primary" : "bg-muted"
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <RegistrationFormBody
               formFields={formFields}
               rooms={rooms}
               isChildCheckin={isChildCheckin}
               allowAdditionalPeople={form.allowAdditionalPeople}
+              allowSecondGuardian={allowSecondGuardian}
               guardianAnswers={guardianAnswers}
               childrenAnswers={childrenAnswers}
               emergencyAnswers={emergencyAnswers}
@@ -199,25 +314,63 @@ export default function PublicRegistrationForm() {
               onRemoveChild={(index) =>
                 setChildrenAnswers((prev) => prev.filter((_, i) => i !== index))
               }
+              visibleSections={showSectionStepper && activeSection ? [activeSection] : undefined}
             />
 
             {submitError && (
               <p className="text-center text-destructive text-sm">{submitError}</p>
             )}
 
-            <Button
-              type="submit"
-              size="lg"
-              className="w-full h-14 text-lg font-bold"
-              disabled={isSubmitting}
-              data-testid="button-submit-registration"
-            >
-              {isSubmitting
-                ? "Submitting..."
-                : childrenAnswers.length > 1
-                  ? `Register ${childrenAnswers.length} ${isChildCheckin ? "Children" : "People"}`
-                  : "Complete Registration"}
-            </Button>
+            {showSectionStepper && stepSections.length > 1 ? (
+              <div className="flex flex-col-reverse gap-3 sm:flex-row">
+                <Button
+                  type="button"
+                  size="lg"
+                  variant="outline"
+                  className="h-12 flex-1"
+                  onClick={handlePreviousSection}
+                  disabled={activeSectionIndex === 0 || isSubmitting}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+                {isLastSection ? (
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="h-12 flex-1 font-bold"
+                    disabled={isSubmitting}
+                    data-testid="button-submit-registration"
+                  >
+                    {isSubmitting ? "Submitting..." : "Complete Registration"}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="h-12 flex-1 font-bold"
+                    onClick={handleNextSection}
+                  >
+                    Next
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full h-14 text-lg font-bold"
+                disabled={isSubmitting}
+                data-testid="button-submit-registration"
+              >
+                {isSubmitting
+                  ? "Submitting..."
+                  : childrenAnswers.length > 1
+                    ? `Register ${childrenAnswers.length} ${isChildCheckin ? "Children" : "People"}`
+                    : "Complete Registration"}
+              </Button>
+            )}
 
             <p className="text-center text-xs text-muted-foreground pb-4">
               Fields marked with <span className="text-destructive">*</span> are required.

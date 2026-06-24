@@ -47,6 +47,9 @@ export interface Form {
   isActive: boolean;
   isPublic: boolean;
   allowAdditionalPeople?: boolean;
+  showSectionsOneAtATime?: boolean;
+  /** @nullable */
+  allowSecondGuardian?: boolean | null;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;
@@ -58,6 +61,9 @@ export interface FormInput {
   isActive?: boolean;
   isPublic?: boolean;
   allowAdditionalPeople?: boolean;
+  showSectionsOneAtATime?: boolean;
+  /** @nullable */
+  allowSecondGuardian?: boolean | null;
 }
 
 export type QuestionType = typeof QuestionType[keyof typeof QuestionType];
@@ -142,6 +148,9 @@ export interface FormWithQuestions {
   isActive: boolean;
   isPublic: boolean;
   allowAdditionalPeople?: boolean;
+  showSectionsOneAtATime?: boolean;
+  /** @nullable */
+  allowSecondGuardian?: boolean | null;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;
@@ -415,6 +424,55 @@ export interface AnswerInput {
   value: string;
 }
 
+export type ChildPrimaryGuardian = {
+  /** @nullable */
+  id?: number | null;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  name?: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  relationship?: string | null;
+};
+
+/**
+ * @nullable
+ */
+export type ChildSecondGuardian = {
+  /** @nullable */
+  id?: number | null;
+  /** @nullable */
+  firstName?: string | null;
+  /** @nullable */
+  lastName?: string | null;
+  name?: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  relationship?: string | null;
+} | null;
+
+/**
+ * @nullable
+ */
+export type ChildEmergencyContact = {
+  /** @nullable */
+  id?: number | null;
+  /** @nullable */
+  name?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  relationship?: string | null;
+} | null;
+
 export interface Child {
   id: number;
   firstName: string;
@@ -425,6 +483,27 @@ export interface Child {
   guardianPhone?: string;
   /** @nullable */
   guardianEmail?: string | null;
+  primaryGuardian?: ChildPrimaryGuardian;
+  /** @nullable */
+  secondGuardian?: ChildSecondGuardian;
+  /** @nullable */
+  emergencyContact?: ChildEmergencyContact;
+  /** @nullable */
+  secondaryGuardianFirstName?: string | null;
+  /** @nullable */
+  secondaryGuardianLastName?: string | null;
+  /** @nullable */
+  secondaryGuardianPhone?: string | null;
+  /** @nullable */
+  secondaryGuardianEmail?: string | null;
+  /** @nullable */
+  secondaryGuardianRelationship?: string | null;
+  /** @nullable */
+  emergencyContactName?: string | null;
+  /** @nullable */
+  emergencyContactPhone?: string | null;
+  /** @nullable */
+  emergencyContactRelationship?: string | null;
   /** @nullable */
   allergies?: string | null;
   /** @nullable */

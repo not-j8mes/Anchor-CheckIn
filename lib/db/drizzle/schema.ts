@@ -51,6 +51,8 @@ export const forms = pgTable("forms", {
 	embedSlug: text("embed_slug").notNull(),
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	allowAdditionalPeople: boolean("allow_additional_people").default(false).notNull(),
+	showSectionsOneAtATime: boolean("show_sections_one_at_a_time").default(false).notNull(),
+	allowSecondGuardian: boolean("allow_second_guardian"),
 }, (table) => [
 	unique("forms_embed_slug_unique").on(table.embedSlug),
 ]);

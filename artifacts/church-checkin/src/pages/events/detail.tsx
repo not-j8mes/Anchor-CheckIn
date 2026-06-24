@@ -1706,6 +1706,11 @@ function RegistrationEditDialog({
     guardianLastName: guardianParts.slice(1).join(" "),
     guardianPhone: reg.guardianPhone ?? "",
     guardianEmail: reg.guardianEmail ?? "",
+    secondaryGuardianFirstName: reg.secondaryGuardianFirstName ?? "",
+    secondaryGuardianLastName: reg.secondaryGuardianLastName ?? "",
+    secondaryGuardianPhone: reg.secondaryGuardianPhone ?? "",
+    secondaryGuardianEmail: reg.secondaryGuardianEmail ?? "",
+    secondaryGuardianRelationship: reg.secondaryGuardianRelationship ?? "",
     allergies: reg.allergies ?? "",
     medicalNotes: reg.medicalNotes ?? "",
     specialNeeds: reg.specialNeeds ?? "",
@@ -1768,6 +1773,11 @@ function RegistrationEditDialog({
           guardianLastName: form.guardianLastName.trim() || undefined,
           guardianPhone: form.guardianPhone.trim() || undefined,
           guardianEmail: form.guardianEmail.trim() || undefined,
+          secondaryGuardianFirstName: form.secondaryGuardianFirstName.trim(),
+          secondaryGuardianLastName: form.secondaryGuardianLastName.trim(),
+          secondaryGuardianPhone: form.secondaryGuardianPhone.trim(),
+          secondaryGuardianEmail: form.secondaryGuardianEmail.trim(),
+          secondaryGuardianRelationship: form.secondaryGuardianRelationship.trim(),
           allergies: form.allergies.trim(),
           medicalNotes: form.medicalNotes.trim(),
           specialNeeds: form.specialNeeds.trim(),
@@ -1907,6 +1917,8 @@ function RegistrationEditDialog({
                     ? "Parent or guardian details for pickup and communication."
                     : "Contact details for this registrant."}
                 </p>
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Primary Guardian</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5"><Label>First Name</Label><Input value={form.guardianFirstName} onChange={set("guardianFirstName")} /></div>
                   <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.guardianLastName} onChange={set("guardianLastName")} /></div>
@@ -1919,6 +1931,41 @@ function RegistrationEditDialog({
                   <Label>Email</Label>
                   <Input type="email" value={form.guardianEmail} onChange={set("guardianEmail")} />
                 </div>
+                </div>
+                {isChildCheckin && (
+                  <div className="space-y-3 border-t border-border pt-4">
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Second Parent / Guardian
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Optional additional guardian listed for this child.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label>First Name</Label>
+                        <Input value={form.secondaryGuardianFirstName} onChange={set("secondaryGuardianFirstName")} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Last Name</Label>
+                        <Input value={form.secondaryGuardianLastName} onChange={set("secondaryGuardianLastName")} />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Phone</Label>
+                      <Input type="tel" value={form.secondaryGuardianPhone} onChange={set("secondaryGuardianPhone")} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Email</Label>
+                      <Input type="email" value={form.secondaryGuardianEmail} onChange={set("secondaryGuardianEmail")} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Relationship</Label>
+                      <Input value={form.secondaryGuardianRelationship} onChange={set("secondaryGuardianRelationship")} placeholder="e.g. Parent, Step-parent" />
+                    </div>
+                  </div>
+                )}
                 {pickupAnswers.length > 0 && (
                   <div className="pt-3 border-t border-border space-y-3">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pickup Authorization</p>
@@ -4839,6 +4886,7 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
     description: event.form?.description ?? "",
     isActive: event.form?.isActive ?? true,
     isPublic: event.form?.isPublic ?? false,
+    showSectionsOneAtATime: event.form?.showSectionsOneAtATime ?? false,
   });
 
   const updateForm = useUpdateForm({
@@ -4974,6 +5022,18 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
                     onCheckedChange={(v) => setFormSettings((p) => ({ ...p, isPublic: v }))}
                   />
                 </div>
+                {isChildCheckin && (
+                  <div className="flex items-center justify-between py-0.5">
+                    <div>
+                      <Label className="text-sm font-medium">One section at a time</Label>
+                      <p className="text-xs text-muted-foreground">Show Next and Back steps on the public form</p>
+                    </div>
+                    <Switch
+                      checked={formSettings.showSectionsOneAtATime}
+                      onCheckedChange={(v) => setFormSettings((p) => ({ ...p, showSectionsOneAtATime: v }))}
+                    />
+                  </div>
+                )}
               </CardContent>
               <CardFooter className="border-t border-border pt-4">
                 <Button

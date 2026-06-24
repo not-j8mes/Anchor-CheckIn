@@ -13,6 +13,8 @@ export const formsTable = pgTable("forms", {
   isActive: boolean("is_active").notNull().default(true),
   isPublic: boolean("is_public").notNull().default(true),
   allowAdditionalPeople: boolean("allow_additional_people").notNull().default(false),
+  showSectionsOneAtATime: boolean("show_sections_one_at_a_time").notNull().default(false),
+  allowSecondGuardian: boolean("allow_second_guardian"),
   embedSlug: text("embed_slug").notNull().unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

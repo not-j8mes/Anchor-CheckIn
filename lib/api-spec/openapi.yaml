@@ -1274,6 +1274,10 @@ components:
           type: boolean
         allowAdditionalPeople:
           type: boolean
+        showSectionsOneAtATime:
+          type: boolean
+        allowSecondGuardian:
+          type: ["boolean", "null"]
         embedSlug:
           type: string
         submissionCount:
@@ -1295,6 +1299,10 @@ components:
           type: boolean
         allowAdditionalPeople:
           type: boolean
+        showSectionsOneAtATime:
+          type: boolean
+        allowSecondGuardian:
+          type: ["boolean", "null"]
 
     FormWithQuestions:
       type: object
@@ -1312,6 +1320,10 @@ components:
           type: boolean
         allowAdditionalPeople:
           type: boolean
+        showSectionsOneAtATime:
+          type: boolean
+        allowSecondGuardian:
+          type: ["boolean", "null"]
         embedSlug:
           type: string
         submissionCount:
@@ -1723,6 +1735,67 @@ components:
         guardianPhone:
           type: string
         guardianEmail:
+          type: ["string", "null"]
+        primaryGuardian:
+          type: object
+          properties:
+            id:
+              type: ["integer", "null"]
+            firstName:
+              type: ["string", "null"]
+            lastName:
+              type: ["string", "null"]
+            name:
+              type: string
+            phone:
+              type: ["string", "null"]
+            email:
+              type: ["string", "null"]
+            relationship:
+              type: ["string", "null"]
+        secondGuardian:
+          type: ["object", "null"]
+          properties:
+            id:
+              type: ["integer", "null"]
+            firstName:
+              type: ["string", "null"]
+            lastName:
+              type: ["string", "null"]
+            name:
+              type: string
+            phone:
+              type: ["string", "null"]
+            email:
+              type: ["string", "null"]
+            relationship:
+              type: ["string", "null"]
+        emergencyContact:
+          type: ["object", "null"]
+          properties:
+            id:
+              type: ["integer", "null"]
+            name:
+              type: ["string", "null"]
+            phone:
+              type: ["string", "null"]
+            relationship:
+              type: ["string", "null"]
+        secondaryGuardianFirstName:
+          type: ["string", "null"]
+        secondaryGuardianLastName:
+          type: ["string", "null"]
+        secondaryGuardianPhone:
+          type: ["string", "null"]
+        secondaryGuardianEmail:
+          type: ["string", "null"]
+        secondaryGuardianRelationship:
+          type: ["string", "null"]
+        emergencyContactName:
+          type: ["string", "null"]
+        emergencyContactPhone:
+          type: ["string", "null"]
+        emergencyContactRelationship:
           type: ["string", "null"]
         allergies:
           type: ["string", "null"]

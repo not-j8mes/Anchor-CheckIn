@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,9 +19,11 @@ import type { FormField, Room } from "@workspace/api-client-react";
 // ─── Section classifier (single source of truth) ─────────────────────────────
 
 export type FieldSection = "guardian_info" | "child_info" | "emergency_contact" | "additional_questions" | "waivers";
+const SECONDARY_GUARDIAN_SECTION_KEY = "secondary_guardian";
 
 export function getFieldSection(field: FormField): FieldSection {
   if (field.fieldType === "waiver" || field.sectionKey === "waivers") return "waivers";
+  if (field.sectionKey === SECONDARY_GUARDIAN_SECTION_KEY) return "guardian_info";
   if (field.fieldKind === "system" && field.systemKey) {
     const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
     if (def?.category === "guardian") return "guardian_info";
@@ -29,6 +32,10 @@ export function getFieldSection(field: FormField): FieldSection {
     return "additional_questions";
   }
   return (field.sectionKey as FieldSection) ?? "additional_questions";
+}
+
+export function isSecondaryGuardianField(field: FormField): boolean {
+  return field.sectionKey === SECONDARY_GUARDIAN_SECTION_KEY || (field.systemKey?.startsWith("secondary_guardian_") ?? false);
 }
 
 // ─── Field renderer ───────────────────────────────────────────────────────────
@@ -160,6 +167,7 @@ export interface RegistrationFormBodyProps {
   rooms: Room[];
   isChildCheckin: boolean;
   allowAdditionalPeople?: boolean;
+  allowSecondGuardian?: boolean;
   guardianAnswers: Record<number, string>;
   childrenAnswers: Record<number, string>[];
   emergencyAnswers: Record<number, string>;
@@ -170,6 +178,7 @@ export interface RegistrationFormBodyProps {
   onAdditionalChange: (fieldId: number, value: string) => void;
   onAddChild: () => void;
   onRemoveChild: (index: number) => void;
+  visibleSections?: FieldSection[];
 }
 
 export function RegistrationFormBody({
@@ -177,6 +186,7 @@ export function RegistrationFormBody({
   rooms,
   isChildCheckin,
   allowAdditionalPeople = false,
+  allowSecondGuardian = true,
   guardianAnswers,
   childrenAnswers,
   emergencyAnswers,
@@ -187,17 +197,30 @@ export function RegistrationFormBody({
   onAdditionalChange,
   onAddChild,
   onRemoveChild,
+  visibleSections,
 }: RegistrationFormBodyProps) {
   const guardianFields = formFields.filter((f) => getFieldSection(f) === "guardian_info");
+  const primaryGuardianFields = guardianFields.filter((field) => !isSecondaryGuardianField(field));
+  const secondaryGuardianFields = guardianFields.filter(isSecondaryGuardianField);
+  const [showSecondaryGuardian, setShowSecondaryGuardian] = useState(() =>
+    allowSecondGuardian && secondaryGuardianFields.some((field) => !!guardianAnswers[field.id]),
+  );
   const childFields = formFields.filter((f) => getFieldSection(f) === "child_info");
   const emergencyFields = formFields.filter((f) => getFieldSection(f) === "emergency_contact");
   const additionalFields = formFields.filter((f) => getFieldSection(f) === "additional_questions");
   const waiverFields = formFields.filter((f) => getFieldSection(f) === "waivers");
+  const isSectionVisible = (section: FieldSection) =>
+    !visibleSections || visibleSections.includes(section);
+
+  const removeSecondaryGuardian = () => {
+    secondaryGuardianFields.forEach((field) => onGuardianChange(field.id, ""));
+    setShowSecondaryGuardian(false);
+  };
 
   return (
     <div className="space-y-6">
       {/* Parent / Guardian section */}
-      {guardianFields.length > 0 && (
+      {isSectionVisible("guardian_info") && guardianFields.length > 0 && (
         <Card className="shadow-sm overflow-hidden">
           <div className="bg-primary px-6 py-4 flex items-center gap-2">
             <User className="w-5 h-5 text-primary-foreground" />
@@ -206,7 +229,7 @@ export function RegistrationFormBody({
             </h3>
           </div>
           <CardContent className="p-6 space-y-5">
-            {guardianFields.map((field) => (
+            {primaryGuardianFields.map((field) => (
               <div key={field.id} className="space-y-1.5">
                 <Label className="text-sm font-medium flex items-center gap-1">
                   {field.label}
@@ -220,12 +243,60 @@ export function RegistrationFormBody({
                 />
               </div>
             ))}
+            {allowSecondGuardian && secondaryGuardianFields.length > 0 && !showSecondaryGuardian && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-dashed h-12 text-base font-medium"
+                onClick={() => setShowSecondaryGuardian(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Second Parent / Guardian
+              </Button>
+            )}
+            {allowSecondGuardian && secondaryGuardianFields.length > 0 && showSecondaryGuardian && (
+              <div className="space-y-5 rounded-lg border border-dashed border-border bg-muted/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold text-foreground">
+                      Second Parent / Guardian
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Optional additional contact for this registration.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={removeSecondaryGuardian}
+                  >
+                    <Trash2 className="w-4 h-4 mr-1" /> Remove
+                  </Button>
+                </div>
+                {secondaryGuardianFields.map((field) => (
+                  <div key={field.id} className="space-y-1.5">
+                    <Label className="text-sm font-medium flex items-center gap-1">
+                      {field.label.replace(/^Secondary\s+/i, "")}
+                      {field.required && <span className="text-destructive">*</span>}
+                    </Label>
+                    <FieldInput
+                      field={field}
+                      value={guardianAnswers[field.id] ?? ""}
+                      onChange={(v) => onGuardianChange(field.id, v)}
+                      rooms={rooms}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
       {/* Per-child sections */}
-      {childrenAnswers.map((childAnswerMap, idx) => (
+      {isSectionVisible("child_info") && childrenAnswers.map((childAnswerMap, idx) => (
         <Card key={idx} className="shadow-sm overflow-hidden">
           <div className="bg-secondary px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -274,7 +345,7 @@ export function RegistrationFormBody({
       ))}
 
       {/* Add another child/person */}
-      {(isChildCheckin || allowAdditionalPeople) && (
+      {isSectionVisible("child_info") && (isChildCheckin || allowAdditionalPeople) && (
         <Button
           type="button"
           variant="outline"
@@ -287,7 +358,7 @@ export function RegistrationFormBody({
       )}
 
       {/* Emergency Contact — shown once, not per-child */}
-      {emergencyFields.length > 0 && (
+      {isSectionVisible("emergency_contact") && emergencyFields.length > 0 && (
         <Card className="shadow-sm overflow-hidden">
           <div className="bg-rose-50 border-b border-rose-100 px-6 py-4 flex items-center gap-2">
             <Phone className="w-5 h-5 text-rose-700" />
@@ -313,7 +384,7 @@ export function RegistrationFormBody({
       )}
 
       {/* Additional Questions — shown once, not per-child/person */}
-      {additionalFields.length > 0 && (
+      {isSectionVisible("additional_questions") && additionalFields.length > 0 && (
         <Card className="shadow-sm overflow-hidden">
           <div className="bg-muted/60 border-b border-border px-6 py-4 flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-muted-foreground" />
@@ -339,7 +410,7 @@ export function RegistrationFormBody({
       )}
 
       {/* Waivers — optional section shown once at the end */}
-      {waiverFields.length > 0 && (
+      {isSectionVisible("waivers") && waiverFields.length > 0 && (
         <Card className="shadow-sm overflow-hidden">
           <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-4 flex items-center gap-2">
             <FileText className="w-5 h-5 text-indigo-700" />

@@ -14,6 +14,9 @@ export interface Form {
   isActive: boolean;
   isPublic: boolean;
   allowAdditionalPeople?: boolean;
+  showSectionsOneAtATime?: boolean;
+  /** @nullable */
+  allowSecondGuardian?: boolean | null;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;

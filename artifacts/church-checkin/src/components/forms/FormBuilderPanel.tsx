@@ -77,6 +77,11 @@ import {
 // ─── Section definitions ───────────────────────────────────────────────────────
 
 type SectionKey = "guardian_info" | "child_info" | "emergency_contact" | "additional_questions" | "waivers";
+const SECONDARY_GUARDIAN_SECTION_KEY = "secondary_guardian";
+const DEFAULT_SECONDARY_GUARDIAN_KEYS = [
+  "secondary_guardian_first_name",
+  "secondary_guardian_last_name",
+];
 
 interface SectionDef {
   key: SectionKey;
@@ -157,6 +162,7 @@ const SECTION_CATEGORY_MAP: Record<SystemFieldCategory, SectionKey> = {
 
 function getFieldSection(field: FormField): SectionKey {
   if (field.fieldType === "waiver" || field.sectionKey === "waivers") return "waivers";
+  if (field.sectionKey === SECONDARY_GUARDIAN_SECTION_KEY) return "guardian_info";
   // System fields always auto-place by category (ignores any stored sectionKey, which may be stale).
   if (field.fieldKind === "system" && field.systemKey) {
     const def = SYSTEM_FIELDS_BY_KEY.get(field.systemKey);
@@ -200,6 +206,14 @@ const SECTION_CATEGORY_FILTER: Record<SectionKey, SystemFieldCategory[]> = {
   additional_questions: ["individual", "guardian", "emergency_safety", "participant", "rooms"],
   waivers: [],
 };
+
+function isSecondaryGuardianSystemKey(systemKey?: string | null): boolean {
+  return systemKey?.startsWith("secondary_guardian_") ?? false;
+}
+
+function isSecondaryGuardianField(field: FormField): boolean {
+  return isSecondaryGuardianSystemKey(field.systemKey) || field.sectionKey === SECONDARY_GUARDIAN_SECTION_KEY;
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -433,6 +447,8 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     isActive: true,
     isPublic: true,
     allowAdditionalPeople: false,
+    showSectionsOneAtATime: false,
+    allowSecondGuardian: null as boolean | null,
   });
 
   useEffect(() => {
@@ -443,6 +459,8 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         isActive: form.isActive,
         isPublic: form.isPublic,
         allowAdditionalPeople: form.allowAdditionalPeople ?? false,
+        showSectionsOneAtATime: form.showSectionsOneAtATime ?? false,
+        allowSecondGuardian: form.allowSecondGuardian ?? null,
       });
     }
   }, [form]);
@@ -452,6 +470,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
   const [editingField, setEditingField] = useState<Partial<FormField> | null>(null);
   const [systemSearch, setSystemSearch] = useState("");
   const [pickerTargetSection, setPickerTargetSection] = useState<SectionKey | null>(null);
+  const [pickerGuardianGroup, setPickerGuardianGroup] = useState<"primary" | "secondary" | null>(null);
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
   const invalidateFields = () =>
@@ -497,6 +516,12 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     const matchesSearch = !q || def.label.toLowerCase().includes(q) || def.key.toLowerCase().includes(q);
     if (!matchesSearch) return false;
     if (pickerTargetSection) {
+      if (pickerTargetSection === "guardian_info" && pickerGuardianGroup === "primary") {
+        return def.category === "guardian" && !isSecondaryGuardianSystemKey(def.key);
+      }
+      if (pickerTargetSection === "guardian_info" && pickerGuardianGroup === "secondary") {
+        return def.category === "guardian" && isSecondaryGuardianSystemKey(def.key);
+      }
       return SECTION_CATEGORY_FILTER[pickerTargetSection].includes(def.category);
     }
     return true;
@@ -517,6 +542,53 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
   })();
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
+
+  const addSecondaryGuardianFields = (keys: string[]) => {
+    const existingKeys = new Set(
+      fields
+        ?.filter((field) => field.systemKey)
+        .map((field) => field.systemKey!) ?? [],
+    );
+    const defs = keys
+      .filter((key) => !existingKeys.has(key))
+      .map((key) => SYSTEM_FIELDS_BY_KEY.get(key))
+      .filter((def): def is SystemFieldDef => !!def);
+
+    defs.forEach((def, index) => {
+      createFormField.mutate({
+        formId,
+        data: {
+          fieldKind: "system",
+          systemKey: def.key,
+          label: def.label,
+          fieldType: def.fieldType as FormFieldInput["fieldType"],
+          required: DEFAULT_SECONDARY_GUARDIAN_KEYS.includes(def.key),
+          sortOrder: (fields?.length ?? 0) + index,
+          placeholder: def.placeholder ?? "",
+          options: def.defaultOptions ?? "",
+          sectionKey: "guardian_info",
+        },
+      });
+    });
+  };
+
+  const setAllowSecondGuardian = (enabled: boolean) => {
+    setFormSettings((prev) => ({ ...prev, allowSecondGuardian: enabled }));
+    if (enabled) addSecondaryGuardianFields(DEFAULT_SECONDARY_GUARDIAN_KEYS);
+    if (!form) return;
+    updateForm.mutate({
+      formId,
+      data: {
+        title: form.title,
+        description: form.description ?? "",
+        isActive: form.isActive,
+        isPublic: form.isPublic,
+        allowAdditionalPeople: form.allowAdditionalPeople ?? false,
+        showSectionsOneAtATime: form.showSectionsOneAtATime ?? false,
+        allowSecondGuardian: enabled,
+      },
+    });
+  };
 
   const handleAddSystemField = (def: SystemFieldDef) => {
     createFormField.mutate({
@@ -617,8 +689,22 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     setModalMode("field-editor");
   };
 
-  const openSystemPicker = (targetSection: SectionKey | null = null) => {
+  const openSecondaryGuardianCustomEditor = () => {
+    setEditingField({
+      fieldKind: "custom",
+      fieldType: "text",
+      required: false,
+      sectionKey: SECONDARY_GUARDIAN_SECTION_KEY,
+    });
+    setModalMode("field-editor");
+  };
+
+  const openSystemPicker = (
+    targetSection: SectionKey | null = null,
+    guardianGroup: "primary" | "secondary" | null = null,
+  ) => {
     setPickerTargetSection(targetSection);
+    setPickerGuardianGroup(guardianGroup);
     setSystemSearch("");
     setModalMode("system-picker");
   };
@@ -710,7 +796,10 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                           size="sm"
                           variant="ghost"
                           className={`h-7 text-xs opacity-70 hover:opacity-100 hover:bg-black/10 ${section.titleClass}`}
-                          onClick={() => openSystemPicker(section.key)}
+                          onClick={() => openSystemPicker(
+                            section.key,
+                            section.key === "guardian_info" ? "primary" : null,
+                          )}
                         >
                           <Sparkles className="w-3 h-3 mr-1" />
                           {section.addSystemLabel}
@@ -738,7 +827,102 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
 
                   {/* Fields */}
                   <div className="p-3 space-y-2 bg-background">
-                    {sectionFields.length === 0 ? (
+                    {section.key === "guardian_info" ? (
+                      (() => {
+                        const primaryGuardianFields = sectionFields.filter((field) => !isSecondaryGuardianField(field));
+                        const secondaryGuardianFields = sectionFields.filter(isSecondaryGuardianField);
+                        const allowSecondGuardian =
+                          formSettings.allowSecondGuardian ?? secondaryGuardianFields.length > 0;
+                        return (
+                          <div className="space-y-3">
+                            {primaryGuardianFields.length === 0 ? (
+                              <p className="text-xs text-muted-foreground text-center py-4 italic">
+                                No primary parent/guardian fields in this section yet.
+                              </p>
+                            ) : (
+                              primaryGuardianFields.map((field, idx) => (
+                                <FieldCard
+                                  key={field.id}
+                                  field={field}
+                                  index={idx}
+                                  total={primaryGuardianFields.length}
+                                  onEdit={() => openFieldEditor(field)}
+                                  onDelete={() => handleDeleteField(field)}
+                                  onMove={(dir) => handleMoveSectionField(field.id, section.key, dir)}
+                                  onInlineUpdate={(updates, onSaved) => handleInlineUpdate(field, updates, onSaved)}
+                                />
+                              ))
+                            )}
+
+                            <div className="rounded-lg border border-border bg-muted/20 p-3">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-foreground">
+                                    Second Parent / Guardian
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Allow families to optionally add another parent or guardian.
+                                  </p>
+                                </div>
+                                <div className="flex shrink-0 items-center gap-2">
+                                  <Label className="text-xs text-muted-foreground">
+                                    Allow second parent/guardian
+                                  </Label>
+                                  <Switch
+                                    checked={allowSecondGuardian}
+                                    onCheckedChange={setAllowSecondGuardian}
+                                    disabled={updateForm.isPending}
+                                  />
+                                </div>
+                              </div>
+                              {allowSecondGuardian && (
+                                <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+                                  <p className="text-xs text-muted-foreground">
+                                    Families will see an Add Second Parent / Guardian button on the registration form.
+                                  </p>
+                                  <div className="flex shrink-0 items-center gap-1.5">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className={`h-7 text-xs opacity-70 hover:opacity-100 hover:bg-black/10 ${section.titleClass}`}
+                                      onClick={() => openSystemPicker("guardian_info", "secondary")}
+                                    >
+                                      <Sparkles className="w-3 h-3 mr-1" />
+                                      Add Secondary Guardian Field
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className={`h-7 text-xs opacity-70 hover:opacity-100 hover:bg-black/10 ${section.titleClass}`}
+                                      onClick={openSecondaryGuardianCustomEditor}
+                                    >
+                                      <Plus className="w-3 h-3 mr-1" />
+                                      Add Custom Question
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                              {allowSecondGuardian && secondaryGuardianFields.length > 0 && (
+                                <div className="mt-3 space-y-2">
+                                  {secondaryGuardianFields.map((field, idx) => (
+                                    <FieldCard
+                                      key={field.id}
+                                      field={field}
+                                      index={idx}
+                                      total={secondaryGuardianFields.length}
+                                      onEdit={() => openFieldEditor(field)}
+                                      onDelete={() => handleDeleteField(field)}
+                                      onMove={(dir) => handleMoveSectionField(field.id, section.key, dir)}
+                                      onInlineUpdate={(updates, onSaved) => handleInlineUpdate(field, updates, onSaved)}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : sectionFields.length === 0 ? (
                       <p className="text-xs text-muted-foreground text-center py-4 italic">
                         No fields in this section yet.
                       </p>
@@ -888,7 +1072,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
               />
             </div>
             {!hideAdditionalPeople && (
-              <div className="flex items-center justify-between py-2">
+              <div className="flex items-center justify-between py-2 border-b border-border">
                 <div>
                   <Label className="text-sm flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 text-muted-foreground" />
@@ -899,6 +1083,21 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                 <Switch
                   checked={formSettings.allowAdditionalPeople}
                   onCheckedChange={(c) => setFormSettings((p) => ({ ...p, allowAdditionalPeople: c }))}
+                />
+              </div>
+            )}
+            {isChildCheckin && (
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <Label className="text-sm flex items-center gap-1.5">
+                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                    One Section at a Time
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Use Next/Back steps on public forms</p>
+                </div>
+                <Switch
+                  checked={formSettings.showSectionsOneAtATime}
+                  onCheckedChange={(c) => setFormSettings((p) => ({ ...p, showSectionsOneAtATime: c }))}
                 />
               </div>
             )}
@@ -923,12 +1122,20 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary" />
-              {pickerTargetSection
+              {pickerTargetSection === "guardian_info" && pickerGuardianGroup === "secondary"
+                ? "Add Secondary Parent / Guardian Field"
+                : pickerTargetSection === "guardian_info" && pickerGuardianGroup === "primary"
+                  ? "Add Parent / Guardian Field"
+                  : pickerTargetSection
                 ? `Add Field — ${SECTIONS.find((s) => s.key === pickerTargetSection)?.title}`
                 : "Add System Field"}
             </DialogTitle>
             <DialogDescription>
-              {pickerTargetSection
+              {pickerTargetSection === "guardian_info" && pickerGuardianGroup === "secondary"
+                ? "These fields appear in their own optional second parent/guardian block on the public form."
+                : pickerTargetSection === "guardian_info" && pickerGuardianGroup === "primary"
+                  ? "These fields appear immediately in the parent/guardian section on the public form."
+                  : pickerTargetSection
                 ? "Showing fields for this section. Fields auto-place into the correct section."
                 : "System fields map to structured database columns. The key is permanent — you can freely rename the label."}
             </DialogDescription>
@@ -1118,6 +1325,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                         {SECTIONS.map((s) => (
                           <SelectItem key={s.key} value={s.key}>{s.title}</SelectItem>
                         ))}
+                        <SelectItem value={SECONDARY_GUARDIAN_SECTION_KEY}>Second Parent / Guardian</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1186,6 +1394,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                         {SECTIONS.map((s) => (
                           <SelectItem key={s.key} value={s.key}>{s.title}</SelectItem>
                         ))}
+                        <SelectItem value={SECONDARY_GUARDIAN_SECTION_KEY}>Second Parent / Guardian</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

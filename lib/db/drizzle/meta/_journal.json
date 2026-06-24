@@ -64,6 +64,20 @@
       "when": 1782051000000,
       "tag": "0008_staff_usernames",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1782315600000,
+      "tag": "0009_form_section_stepper",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782316200000,
+      "tag": "0010_allow_second_guardian_setting",
+      "breakpoints": true
     }
   ]
 }
