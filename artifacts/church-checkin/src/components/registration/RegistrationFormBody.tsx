@@ -56,7 +56,7 @@ export function FieldInput({
   if (field.systemKey === "room_assignment") {
     return (
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
+        <SelectTrigger className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25">
           <SelectValue placeholder="Select a room or group" />
         </SelectTrigger>
         <SelectContent>
@@ -77,7 +77,7 @@ export function FieldInput({
         placeholder={placeholder ?? ""}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="resize-y"
+        className="min-h-24 w-full min-w-0 resize-y rounded-lg border-border bg-white text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/25"
         rows={3}
       />
     );
@@ -86,7 +86,7 @@ export function FieldInput({
   if ((fieldType === "select" || fieldType === "multiselect") && options) {
     return (
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
+        <SelectTrigger className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25">
           <SelectValue placeholder={placeholder ?? "Select an option"} />
         </SelectTrigger>
         <SelectContent>
@@ -110,7 +110,7 @@ export function FieldInput({
         />
         <Label
           htmlFor={`field-${field.id}`}
-          className="text-sm font-normal text-muted-foreground cursor-pointer"
+          className="cursor-pointer text-sm font-normal text-muted-foreground"
         >
           {placeholder ?? label}
         </Label>
@@ -121,10 +121,10 @@ export function FieldInput({
   if (fieldType === "waiver") {
     return (
       <div className="space-y-3">
-        <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-4 text-sm leading-relaxed text-foreground">
+        <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-muted/20 p-4 text-sm leading-relaxed text-foreground">
           {placeholder || "No waiver text has been provided."}
         </div>
-        <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/30">
+        <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-white p-4 shadow-sm transition-colors hover:bg-muted/20">
           <input
             type="checkbox"
             required
@@ -155,8 +155,72 @@ export function FieldInput({
       placeholder={placeholder ?? ""}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-11 text-base"
+      className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/25"
     />
+  );
+}
+
+function RequiredLabel({ field }: { field: FormField }) {
+  return (
+    <Label className="flex items-center gap-1 text-sm font-semibold text-foreground">
+      {field.label}
+      {field.required && <span className="text-destructive">*</span>}
+    </Label>
+  );
+}
+
+function FieldBlock({
+  field,
+  value,
+  onChange,
+  rooms,
+}: {
+  field: FormField;
+  value: string;
+  onChange: (v: string) => void;
+  rooms: Room[];
+}) {
+  return (
+    <div className="min-w-0 space-y-2">
+      <RequiredLabel field={field} />
+      <FieldInput field={field} value={value} onChange={onChange} rooms={rooms} />
+    </div>
+  );
+}
+
+function SectionCard({
+  icon: Icon,
+  title,
+  description,
+  tone = "amber",
+  children,
+}: {
+  icon: typeof User;
+  title: string;
+  description: string;
+  tone?: "amber" | "rose" | "sky" | "indigo";
+  children: React.ReactNode;
+}) {
+  const toneClasses = {
+    amber: "bg-amber-50 text-amber-800",
+    rose: "bg-rose-50 text-rose-700",
+    sky: "bg-sky-50 text-sky-700",
+    indigo: "bg-indigo-50 text-indigo-700",
+  }[tone];
+
+  return (
+    <Card className="w-full max-w-full min-w-0 overflow-hidden rounded-2xl border-card-border bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+      <div className="flex items-start gap-3 border-b border-border/70 px-5 py-5 sm:px-6">
+        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${toneClasses}`}>
+          <Icon className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-wrap text-lg font-serif font-bold leading-6 text-foreground">{title}</h3>
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <CardContent className="p-5 sm:p-6">{children}</CardContent>
+    </Card>
   );
 }
 
@@ -218,36 +282,29 @@ export function RegistrationFormBody({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Parent / Guardian section */}
       {isSectionVisible("guardian_info") && guardianFields.length > 0 && (
-        <Card className="shadow-sm overflow-hidden">
-          <div className="bg-primary px-6 py-4 flex items-center gap-2">
-            <User className="w-5 h-5 text-primary-foreground" />
-            <h3 className="text-lg font-semibold text-primary-foreground">
-              Parent / Guardian Information
-            </h3>
-          </div>
-          <CardContent className="p-6 space-y-5">
+        <SectionCard
+          icon={Users}
+          title="Parent / Guardian Information"
+          description="Tell us who we should contact about this registration."
+        >
+          <div className="space-y-5">
             {primaryGuardianFields.map((field) => (
-              <div key={field.id} className="space-y-1.5">
-                <Label className="text-sm font-medium flex items-center gap-1">
-                  {field.label}
-                  {field.required && <span className="text-destructive">*</span>}
-                </Label>
-                <FieldInput
-                  field={field}
-                  value={guardianAnswers[field.id] ?? ""}
-                  onChange={(v) => onGuardianChange(field.id, v)}
-                  rooms={rooms}
-                />
-              </div>
+              <FieldBlock
+                key={field.id}
+                field={field}
+                value={guardianAnswers[field.id] ?? ""}
+                onChange={(v) => onGuardianChange(field.id, v)}
+                rooms={rooms}
+              />
             ))}
             {allowSecondGuardian && secondaryGuardianFields.length > 0 && !showSecondaryGuardian && (
               <Button
                 type="button"
                 variant="outline"
-                className="w-full border-dashed h-12 text-base font-medium"
+                className="h-auto min-h-12 w-full min-w-0 whitespace-normal rounded-lg border-dashed border-amber-300 bg-amber-50/70 px-3 py-3 text-sm font-semibold leading-5 text-foreground shadow-sm hover:border-primary hover:bg-amber-100/80 sm:text-base"
                 onClick={() => setShowSecondaryGuardian(true)}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -255,10 +312,10 @@ export function RegistrationFormBody({
               </Button>
             )}
             {allowSecondGuardian && secondaryGuardianFields.length > 0 && showSecondaryGuardian && (
-              <div className="space-y-5 rounded-lg border border-dashed border-border bg-muted/20 p-4">
+              <div className="space-y-5 rounded-xl border border-border bg-[#fffcf5] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h4 className="text-sm font-semibold text-foreground">
+                    <h4 className="text-sm font-bold text-foreground">
                       Second Parent / Guardian
                     </h4>
                     <p className="text-xs text-muted-foreground">
@@ -269,15 +326,15 @@ export function RegistrationFormBody({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="text-muted-foreground hover:text-destructive"
+                    className="h-9 rounded-md text-muted-foreground hover:bg-white hover:text-destructive"
                     onClick={removeSecondaryGuardian}
                   >
                     <Trash2 className="w-4 h-4 mr-1" /> Remove
                   </Button>
                 </div>
                 {secondaryGuardianFields.map((field) => (
-                  <div key={field.id} className="space-y-1.5">
-                    <Label className="text-sm font-medium flex items-center gap-1">
+                  <div key={field.id} className="space-y-2">
+                    <Label className="flex items-center gap-1 text-sm font-semibold text-foreground">
                       {field.label.replace(/^Secondary\s+/i, "")}
                       {field.required && <span className="text-destructive">*</span>}
                     </Label>
@@ -291,135 +348,141 @@ export function RegistrationFormBody({
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </SectionCard>
       )}
 
       {/* Per-child sections */}
-      {isSectionVisible("child_info") && childrenAnswers.map((childAnswerMap, idx) => (
-        <Card key={idx} className="shadow-sm overflow-hidden">
-          <div className="bg-secondary px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-secondary-foreground" />
-              <h3 className="text-lg font-semibold text-secondary-foreground">
-                {childrenAnswers.length > 1
-                  ? `${isChildCheckin ? "Child" : "Person"} ${idx + 1}`
-                  : isChildCheckin ? "Child Information" : "Attendee Information"}
-              </h3>
-            </div>
-            {childrenAnswers.length > 1 && (
+      {isSectionVisible("child_info") && (
+        <SectionCard
+          icon={User}
+          title={isChildCheckin ? "Child Information" : "Attendee Information"}
+          description={
+            childrenAnswers.length > 1
+              ? `Provide details about your ${isChildCheckin ? "children" : "attendees"}.`
+              : `Provide details about your ${isChildCheckin ? "child" : "attendee"}.`
+          }
+        >
+          <div className="space-y-5">
+            {childrenAnswers.map((childAnswerMap, idx) => {
+              const showChildCard = childrenAnswers.length > 1;
+              const fields = childFields.length > 0 ? (
+                <div className="space-y-5">
+                  {childFields.map((field) => (
+                    <FieldBlock
+                      key={field.id}
+                      field={field}
+                      value={childAnswerMap[field.id] ?? ""}
+                      onChange={(v) => onChildChange(idx, field.id, v)}
+                      rooms={rooms}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No {isChildCheckin ? "child" : "attendee"}-specific fields configured for this form.
+                </p>
+              );
+
+              if (!showChildCard) return <div key={idx}>{fields}</div>;
+
+              return (
+                <div key={idx} className="overflow-hidden rounded-xl border border-border bg-white">
+                  <div className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-amber-800" />
+                      <h4 className="text-sm font-bold text-foreground">
+                        {isChildCheckin ? "Child" : "Person"} {idx + 1}
+                      </h4>
+                    </div>
+                    {idx > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 rounded-md text-xs text-muted-foreground hover:bg-white hover:text-destructive"
+                        onClick={() => onRemoveChild(idx)}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove
+                      </Button>
+                    )}
+                  </div>
+                  <div className="p-4">{fields}</div>
+                </div>
+              );
+            })}
+
+            {(isChildCheckin || allowAdditionalPeople) && (
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
-                className="text-secondary-foreground hover:text-destructive hover:bg-destructive/10"
-                onClick={() => onRemoveChild(idx)}
+                variant="outline"
+                className="h-auto min-h-12 w-full min-w-0 whitespace-normal rounded-lg border-dashed border-amber-300 bg-amber-50/70 px-3 py-3 text-sm font-semibold leading-5 text-foreground shadow-sm hover:border-primary hover:bg-amber-100/80 sm:text-base"
+                onClick={onAddChild}
               >
-                <Trash2 className="w-4 h-4 mr-1" /> Remove
+                <Plus className="w-4 h-4 mr-2" />
+                {isChildCheckin ? "Add Another Child" : "Add Another Person"}
               </Button>
             )}
           </div>
-          <CardContent className="p-6 space-y-5">
-            {childFields.length > 0 ? (
-              childFields.map((field) => (
-                <div key={field.id} className="space-y-1.5">
-                  <Label className="text-sm font-medium flex items-center gap-1">
-                    {field.label}
-                    {field.required && <span className="text-destructive">*</span>}
-                  </Label>
-                  <FieldInput
-                    field={field}
-                    value={childAnswerMap[field.id] ?? ""}
-                    onChange={(v) => onChildChange(idx, field.id, v)}
-                    rooms={rooms}
-                  />
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No {isChildCheckin ? "child" : "attendee"}-specific fields configured for this form.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-
-      {/* Add another child/person */}
-      {isSectionVisible("child_info") && (isChildCheckin || allowAdditionalPeople) && (
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full border-dashed h-12 text-base font-medium"
-          onClick={onAddChild}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          {isChildCheckin ? "Add Another Child" : "Add Another Person"}
-        </Button>
+        </SectionCard>
       )}
 
       {/* Emergency Contact — shown once, not per-child */}
       {isSectionVisible("emergency_contact") && emergencyFields.length > 0 && (
-        <Card className="shadow-sm overflow-hidden">
-          <div className="bg-rose-50 border-b border-rose-100 px-6 py-4 flex items-center gap-2">
-            <Phone className="w-5 h-5 text-rose-700" />
-            <h3 className="text-lg font-semibold text-rose-900">Emergency Contact Information</h3>
-          </div>
-          <CardContent className="p-6 space-y-5">
+        <SectionCard
+          icon={Phone}
+          title="Emergency Contact Information"
+          description="Who should we contact in case of an emergency?"
+          tone="rose"
+        >
+          <div className="grid gap-5 sm:grid-cols-2">
             {emergencyFields.map((field) => (
-              <div key={field.id} className="space-y-1.5">
-                <Label className="text-sm font-medium flex items-center gap-1">
-                  {field.label}
-                  {field.required && <span className="text-destructive">*</span>}
-                </Label>
-                <FieldInput
-                  field={field}
-                  value={emergencyAnswers[field.id] ?? ""}
-                  onChange={(v) => onEmergencyChange(field.id, v)}
-                  rooms={rooms}
-                />
-              </div>
+              <FieldBlock
+                key={field.id}
+                field={field}
+                value={emergencyAnswers[field.id] ?? ""}
+                onChange={(v) => onEmergencyChange(field.id, v)}
+                rooms={rooms}
+              />
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </SectionCard>
       )}
 
       {/* Additional Questions — shown once, not per-child/person */}
       {isSectionVisible("additional_questions") && additionalFields.length > 0 && (
-        <Card className="shadow-sm overflow-hidden">
-          <div className="bg-muted/60 border-b border-border px-6 py-4 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-muted-foreground" />
-            <h3 className="text-lg font-semibold text-foreground">Additional Questions</h3>
-          </div>
-          <CardContent className="p-6 space-y-5">
+        <SectionCard
+          icon={MessageSquare}
+          title="Additional Questions"
+          description="A few extra details to help us serve you well."
+          tone="sky"
+        >
+          <div className="space-y-5">
             {additionalFields.map((field) => (
-              <div key={field.id} className="space-y-1.5">
-                <Label className="text-sm font-medium flex items-center gap-1">
-                  {field.label}
-                  {field.required && <span className="text-destructive">*</span>}
-                </Label>
-                <FieldInput
-                  field={field}
-                  value={additionalAnswers[field.id] ?? ""}
-                  onChange={(v) => onAdditionalChange(field.id, v)}
-                  rooms={rooms}
-                />
-              </div>
+              <FieldBlock
+                key={field.id}
+                field={field}
+                value={additionalAnswers[field.id] ?? ""}
+                onChange={(v) => onAdditionalChange(field.id, v)}
+                rooms={rooms}
+              />
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </SectionCard>
       )}
 
       {/* Waivers — optional section shown once at the end */}
       {isSectionVisible("waivers") && waiverFields.length > 0 && (
-        <Card className="shadow-sm overflow-hidden">
-          <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-4 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-indigo-700" />
-            <h3 className="text-lg font-semibold text-indigo-900">Waivers</h3>
-          </div>
-          <CardContent className="p-6 space-y-6">
+        <SectionCard
+          icon={FileText}
+          title="Waivers"
+          description="Please review and accept the required agreements."
+          tone="indigo"
+        >
+          <div className="space-y-6">
             {waiverFields.map((field) => (
-              <div key={field.id} className="space-y-1.5">
-                <Label className="text-sm font-medium flex items-center gap-1">
+              <div key={field.id} className="space-y-2">
+                <Label className="flex items-center gap-1 text-sm font-semibold text-foreground">
                   {field.label}
                   <span className="text-destructive">*</span>
                 </Label>
@@ -431,8 +494,8 @@ export function RegistrationFormBody({
                 />
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </SectionCard>
       )}
     </div>
   );

@@ -11,7 +11,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, CheckCircle2, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, Plus } from "lucide-react";
 import {
   type FieldSection,
   RegistrationFormBody,
@@ -59,12 +59,15 @@ export default function PublicRegistrationForm() {
   const hasSecondaryGuardianFields = formFields.some(isSecondaryGuardianField);
   const allowSecondGuardian = form?.allowSecondGuardian ?? hasSecondaryGuardianFields;
   const showSectionStepper = !!form && isChildCheckin && !!form.showSectionsOneAtATime;
-  const sectionMeta: Record<FieldSection, { title: string }> = {
-    guardian_info: { title: "Parent / Guardian" },
-    child_info: { title: isChildCheckin ? "Child Information" : "Attendee Information" },
-    emergency_contact: { title: "Emergency Contact" },
-    additional_questions: { title: "Additional Questions" },
-    waivers: { title: "Waivers" },
+  const sectionMeta: Record<FieldSection, { title: string; shortTitle: string }> = {
+    guardian_info: { title: "Parent / Guardian", shortTitle: "Parent / Guardian" },
+    child_info: {
+      title: isChildCheckin ? "Child Information" : "Attendee Information",
+      shortTitle: isChildCheckin ? "Child Info" : "Attendee Info",
+    },
+    emergency_contact: { title: "Emergency Contact", shortTitle: "Emergency Contact" },
+    additional_questions: { title: "Additional Questions", shortTitle: "Additional Questions" },
+    waivers: { title: "Waivers", shortTitle: "Waivers" },
   };
   const stepSections = ([
     "guardian_info",
@@ -212,23 +215,23 @@ export default function PublicRegistrationForm() {
   };
 
   return (
-    <div className="flex-1 min-h-screen bg-muted/20 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="flex-1 min-h-screen overflow-x-hidden bg-[#fbfaf7] px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
+      <div className="mx-auto w-full max-w-3xl min-w-0 space-y-6">
         {/* Org header */}
-        <div className="text-center space-y-3 mb-8">
+        <div className="text-center">
           {org?.logoUrl ? (
-            <img src={org.logoUrl} alt={org.name} className="h-20 mx-auto object-contain" />
+            <img src={org.logoUrl} alt={org.name} className="mx-auto h-16 object-contain sm:h-20" />
           ) : (
-            <img src={DEFAULT_APP_LOGO} alt="Anchor Events logo" className="h-20 w-20 mx-auto object-contain" />
+            <img src={DEFAULT_APP_LOGO} alt="Anchor Events logo" className="mx-auto h-16 w-16 object-contain sm:h-20 sm:w-20" />
           )}
-          <h1 className="text-3xl font-serif font-bold text-foreground">{org?.name}</h1>
+          <h1 className="mx-auto mt-3 max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl">{org?.name}</h1>
           {form.description && (
-            <p className="text-lg text-muted-foreground max-w-xl mx-auto">{form.description}</p>
+            <p className="mx-auto mt-2 max-w-[calc(100vw-2rem)] break-words text-sm leading-6 text-muted-foreground sm:max-w-xl sm:text-base">{form.description}</p>
           )}
         </div>
 
         {isSubmitted ? (
-          <Card className="shadow-xl overflow-hidden text-center py-14">
+          <Card className="overflow-hidden rounded-2xl border-card-border bg-white py-14 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
             <CardContent className="flex flex-col items-center justify-center space-y-4">
               <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2">
                 <CheckCircle2 className="w-10 h-10" />
@@ -242,7 +245,7 @@ export default function PublicRegistrationForm() {
               <Button
                 size="lg"
                 variant="outline"
-                className="mt-4 gap-2 h-12 text-base"
+                className="mt-4 h-12 gap-2 rounded-lg border-border bg-white px-6 text-base shadow-sm"
                 onClick={handleReset}
               >
                 <Plus className="w-4 h-4" />
@@ -254,32 +257,56 @@ export default function PublicRegistrationForm() {
           <form
             ref={formRef}
             onSubmit={handleSubmit}
-            className="space-y-6"
+            className="min-w-0 space-y-5"
             data-testid="registration-form"
           >
-            <div className="text-center pb-2">
-              <h2 className="text-2xl font-serif font-bold text-foreground">{form.title}</h2>
+            <div className="text-center">
+              <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-xl font-serif font-bold text-foreground sm:text-2xl">{form.title}</h2>
             </div>
 
             {showSectionStepper && stepSections.length > 1 && (
-              <div className="rounded-lg border bg-background px-4 py-3 shadow-sm">
-                <div className="mb-3 flex items-center justify-between text-sm">
-                  <span className="font-medium text-foreground">
-                    {sectionMeta[activeSection].title}
-                  </span>
-                  <span className="text-muted-foreground">
-                    Step {activeSectionIndex + 1} of {stepSections.length}
-                  </span>
-                </div>
-                <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${stepSections.length}, minmax(0, 1fr))` }}>
-                  {stepSections.map((section, index) => (
-                    <div
-                      key={section}
-                      className={`h-2 rounded-full transition-colors ${
-                        index <= activeSectionIndex ? "bg-primary" : "bg-muted"
-                      }`}
-                    />
-                  ))}
+              <div className="min-w-0 overflow-x-auto rounded-2xl border border-card-border bg-white px-3 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.07)] sm:px-5">
+                <div className="grid min-w-[520px] items-start sm:min-w-0" style={{ gridTemplateColumns: `repeat(${stepSections.length}, minmax(0, 1fr))` }}>
+                  {stepSections.map((section, index) => {
+                    const isComplete = index < activeSectionIndex;
+                    const isCurrent = index === activeSectionIndex;
+                    return (
+                      <div key={section} className="relative flex min-w-0 flex-col items-center gap-2 text-center">
+                        {index > 0 && (
+                          <span
+                            className={`absolute left-0 top-4 h-px w-1/2 -translate-x-1/2 ${
+                              index <= activeSectionIndex ? "bg-primary" : "bg-border"
+                            }`}
+                          />
+                        )}
+                        {index < stepSections.length - 1 && (
+                          <span
+                            className={`absolute right-0 top-4 h-px w-1/2 translate-x-1/2 ${
+                              index < activeSectionIndex ? "bg-primary" : "bg-border"
+                            }`}
+                          />
+                        )}
+                        <span
+                          className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold transition-colors ${
+                            isComplete
+                              ? "border-muted bg-muted text-muted-foreground"
+                              : isCurrent
+                                ? "border-primary bg-primary text-primary-foreground shadow-[0_8px_20px_rgba(245,158,11,0.30)]"
+                                : "border-border bg-muted/50 text-muted-foreground"
+                          }`}
+                        >
+                          {isComplete ? <Check className="h-4 w-4" /> : index + 1}
+                        </span>
+                        <span
+                          className={`line-clamp-2 px-0.5 text-[10px] font-semibold leading-tight sm:text-xs ${
+                            isCurrent ? "text-foreground" : "text-muted-foreground"
+                          }`}
+                        >
+                          {sectionMeta[section].shortTitle}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -322,12 +349,12 @@ export default function PublicRegistrationForm() {
             )}
 
             {showSectionStepper && stepSections.length > 1 ? (
-              <div className="flex flex-col-reverse gap-3 sm:flex-row">
+              <div className="grid min-w-0 gap-3 rounded-2xl border border-card-border bg-white p-3 shadow-[0_12px_36px_rgba(15,23,42,0.06)] sm:grid-cols-2">
                 <Button
                   type="button"
                   size="lg"
                   variant="outline"
-                  className="h-12 flex-1"
+                  className="h-12 rounded-lg border-border bg-white font-semibold shadow-sm"
                   onClick={handlePreviousSection}
                   disabled={activeSectionIndex === 0 || isSubmitting}
                 >
@@ -338,7 +365,7 @@ export default function PublicRegistrationForm() {
                   <Button
                     type="submit"
                     size="lg"
-                    className="h-12 flex-1 font-bold"
+                    className="h-12 rounded-lg bg-primary font-bold text-primary-foreground shadow-[0_12px_24px_rgba(245,158,11,0.28)] hover:bg-primary/90"
                     disabled={isSubmitting}
                     data-testid="button-submit-registration"
                   >
@@ -348,7 +375,7 @@ export default function PublicRegistrationForm() {
                   <Button
                     type="button"
                     size="lg"
-                    className="h-12 flex-1 font-bold"
+                    className="h-12 rounded-lg bg-primary font-bold text-primary-foreground shadow-[0_12px_24px_rgba(245,158,11,0.28)] hover:bg-primary/90"
                     onClick={handleNextSection}
                   >
                     Next
@@ -360,7 +387,7 @@ export default function PublicRegistrationForm() {
               <Button
                 type="submit"
                 size="lg"
-                className="w-full h-14 text-lg font-bold"
+                className="h-14 w-full rounded-lg bg-primary text-lg font-bold text-primary-foreground shadow-[0_12px_24px_rgba(245,158,11,0.28)] hover:bg-primary/90"
                 disabled={isSubmitting}
                 data-testid="button-submit-registration"
               >
