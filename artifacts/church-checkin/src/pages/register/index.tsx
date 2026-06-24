@@ -54,6 +54,8 @@ export default function PublicRegistrationForm() {
 
   const formFields: FormField[] = form?.formFields ?? [];
   const org = (form as typeof form & { organization?: { name?: string; logoUrl?: string | null } | null } | undefined)?.organization;
+  const hideOrgLogo = form?.hideOrgLogo ?? false;
+  const hideOrgName = form?.hideOrgName ?? false;
   const isChildCheckin = !form?.registrationType || form.registrationType === "child_checkin";
   const roomAssignmentFieldId = formFields.find((f) => f.systemKey === "room_assignment")?.id;
   const hasSecondaryGuardianFields = formFields.some(isSecondaryGuardianField);
@@ -219,12 +221,16 @@ export default function PublicRegistrationForm() {
       <div className="mx-auto w-full max-w-3xl min-w-0 space-y-6">
         {/* Org header */}
         <div className="text-center">
-          {org?.logoUrl ? (
-            <img src={org.logoUrl} alt={org.name} className="mx-auto h-16 object-contain sm:h-20" />
-          ) : (
-            <img src={DEFAULT_APP_LOGO} alt="Anchor Events logo" className="mx-auto h-16 w-16 object-contain sm:h-20 sm:w-20" />
+          {!hideOrgLogo && (
+            org?.logoUrl ? (
+              <img src={org.logoUrl} alt={org.name} className="mx-auto h-16 object-contain sm:h-20" />
+            ) : (
+              <img src={DEFAULT_APP_LOGO} alt="Anchor Events logo" className="mx-auto h-16 w-16 object-contain sm:h-20 sm:w-20" />
+            )
           )}
-          <h1 className="mx-auto mt-3 max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl">{org?.name}</h1>
+          {!hideOrgName && org?.name && (
+            <h1 className="mx-auto mt-3 max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl">{org.name}</h1>
+          )}
           {form.description && (
             <p className="mx-auto mt-2 max-w-[calc(100vw-2rem)] break-words text-sm leading-6 text-muted-foreground sm:max-w-xl sm:text-base">{form.description}</p>
           )}

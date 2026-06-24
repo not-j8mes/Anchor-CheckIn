@@ -15,4 +15,6 @@ export interface FormInput {
   showSectionsOneAtATime?: boolean;
   /** @nullable */
   allowSecondGuardian?: boolean | null;
+  hideOrgLogo?: boolean;
+  hideOrgName?: boolean;
 }

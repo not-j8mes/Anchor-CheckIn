@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,6 +40,221 @@ export function isSecondaryGuardianField(field: FormField): boolean {
 
 // ─── Field renderer ───────────────────────────────────────────────────────────
 
+const MONTH_OPTIONS = [
+  { value: "01", label: "January" },
+  { value: "02", label: "February" },
+  { value: "03", label: "March" },
+  { value: "04", label: "April" },
+  { value: "05", label: "May" },
+  { value: "06", label: "June" },
+  { value: "07", label: "July" },
+  { value: "08", label: "August" },
+  { value: "09", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
+interface DateParts {
+  month: string;
+  day: string;
+  year: string;
+}
+
+function parseDateParts(value: string): DateParts | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  return { year: match[1], month: match[2], day: match[3] };
+}
+
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+}
+
+function daysInMonth(month: string, year: string): number {
+  const monthNumber = Number(month);
+  if (!monthNumber) return 31;
+  if (monthNumber === 2) {
+    const yearNumber = Number(year);
+    return yearNumber && isLeapYear(yearNumber) ? 29 : 28;
+  }
+  if ([4, 6, 9, 11].includes(monthNumber)) return 30;
+  return 31;
+}
+
+function formatDateParts(parts: DateParts): string {
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+export function DateOfBirthSelect({
+  value,
+  onChange,
+  required,
+  disabled,
+  minYear,
+  maxYear = new Date().getFullYear(),
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  required?: boolean;
+  disabled?: boolean;
+  error?: string;
+  minYear?: number;
+  maxYear?: number;
+}) {
+  const hiddenInputRef = useRef<HTMLInputElement>(null);
+  const [parts, setParts] = useState<DateParts>(() =>
+    parseDateParts(value) ?? { month: "", day: "", year: "" },
+  );
+  const resolvedMinYear = minYear ?? maxYear - 100;
+
+  useEffect(() => {
+    hiddenInputRef.current?.setCustomValidity("");
+    const parsed = parseDateParts(value);
+    if (parsed) {
+      setParts(parsed);
+      return;
+    }
+    setParts((current) => {
+      if (current.month && current.day && current.year) {
+        return { month: "", day: "", year: "" };
+      }
+      return current;
+    });
+  }, [value]);
+
+  const dayOptions = useMemo(() => {
+    const maxDay = daysInMonth(parts.month, parts.year);
+    return Array.from({ length: maxDay }, (_, index) => {
+      const day = index + 1;
+      return { value: String(day).padStart(2, "0"), label: String(day) };
+    });
+  }, [parts.month, parts.year]);
+
+  const yearOptions = useMemo(
+    () =>
+      Array.from({ length: maxYear - resolvedMinYear + 1 }, (_, index) =>
+        String(maxYear - index),
+      ),
+    [maxYear, resolvedMinYear],
+  );
+
+  const updatePart = (key: keyof DateParts, nextValue: string) => {
+    setParts((current) => {
+      const next = { ...current, [key]: nextValue };
+      const maxDay = daysInMonth(next.month, next.year);
+      if (Number(next.day) > maxDay) {
+        next.day = String(maxDay).padStart(2, "0");
+      }
+
+      hiddenInputRef.current?.setCustomValidity("");
+      if (next.month && next.day && next.year) {
+        onChange(formatDateParts(next));
+      } else {
+        onChange("");
+      }
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs leading-5 text-muted-foreground">
+        Choose month, day, and year.
+      </p>
+      <input
+        ref={hiddenInputRef}
+        tabIndex={-1}
+        aria-hidden="true"
+        required={required}
+        value={value}
+        readOnly
+        className="sr-only"
+        onInvalid={(event) => {
+          event.currentTarget.setCustomValidity("Please select the child's full date of birth.");
+        }}
+      />
+      <div className="grid gap-3 sm:grid-cols-[1.3fr_0.8fr_1fr]">
+        <Select
+          value={parts.month}
+          onValueChange={(selected) => updatePart("month", selected)}
+          disabled={disabled}
+        >
+          <SelectTrigger
+            aria-label="Birth month"
+            className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25"
+          >
+            <SelectValue placeholder="Month" />
+          </SelectTrigger>
+          <SelectContent
+            position="popper"
+            side="bottom"
+            sideOffset={6}
+            collisionPadding={16}
+            className="max-h-72 overflow-y-auto"
+          >
+            {MONTH_OPTIONS.map((month) => (
+              <SelectItem key={month.value} value={month.value}>
+                {month.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={parts.day}
+          onValueChange={(selected) => updatePart("day", selected)}
+          disabled={disabled}
+        >
+          <SelectTrigger
+            aria-label="Birth day"
+            className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25"
+          >
+            <SelectValue placeholder="Day" />
+          </SelectTrigger>
+          <SelectContent
+            position="popper"
+            side="bottom"
+            sideOffset={6}
+            collisionPadding={16}
+            className="max-h-72 overflow-y-auto"
+          >
+            {dayOptions.map((day) => (
+              <SelectItem key={day.value} value={day.value}>
+                {day.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={parts.year}
+          onValueChange={(selected) => updatePart("year", selected)}
+          disabled={disabled}
+        >
+          <SelectTrigger
+            aria-label="Birth year"
+            className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25"
+          >
+            <SelectValue placeholder="Year" />
+          </SelectTrigger>
+          <SelectContent
+            position="popper"
+            side="bottom"
+            sideOffset={6}
+            collisionPadding={16}
+            className="max-h-72 overflow-y-auto"
+          >
+            {yearOptions.map((year) => (
+              <SelectItem key={year} value={year}>
+                {year}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
 export function FieldInput({
   field,
   value,
@@ -52,6 +267,16 @@ export function FieldInput({
   rooms?: Room[];
 }) {
   const { fieldType, placeholder, options, required, label } = field;
+
+  if (field.systemKey === "date_of_birth") {
+    return (
+      <DateOfBirthSelect
+        value={value}
+        onChange={onChange}
+        required={required}
+      />
+    );
+  }
 
   if (field.systemKey === "room_assignment") {
     return (

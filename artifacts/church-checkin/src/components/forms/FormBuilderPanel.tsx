@@ -449,6 +449,8 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     allowAdditionalPeople: false,
     showSectionsOneAtATime: false,
     allowSecondGuardian: null as boolean | null,
+    hideOrgLogo: false,
+    hideOrgName: false,
   });
 
   useEffect(() => {
@@ -461,6 +463,8 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         allowAdditionalPeople: form.allowAdditionalPeople ?? false,
         showSectionsOneAtATime: form.showSectionsOneAtATime ?? false,
         allowSecondGuardian: form.allowSecondGuardian ?? null,
+        hideOrgLogo: form.hideOrgLogo ?? false,
+        hideOrgName: form.hideOrgName ?? false,
       });
     }
   }, [form]);
@@ -586,6 +590,8 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         allowAdditionalPeople: form.allowAdditionalPeople ?? false,
         showSectionsOneAtATime: form.showSectionsOneAtATime ?? false,
         allowSecondGuardian: enabled,
+        hideOrgLogo: form.hideOrgLogo ?? false,
+        hideOrgName: form.hideOrgName ?? false,
       },
     });
   };
@@ -1069,6 +1075,26 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
               <Switch
                 checked={formSettings.isPublic}
                 onCheckedChange={(c) => setFormSettings((p) => ({ ...p, isPublic: c }))}
+              />
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-border">
+              <div>
+                <Label className="text-sm">Hide Organization Logo</Label>
+                <p className="text-xs text-muted-foreground">Remove the logo from the public form header</p>
+              </div>
+              <Switch
+                checked={formSettings.hideOrgLogo}
+                onCheckedChange={(c) => setFormSettings((p) => ({ ...p, hideOrgLogo: c }))}
+              />
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-border">
+              <div>
+                <Label className="text-sm">Hide Organization Name</Label>
+                <p className="text-xs text-muted-foreground">Remove the organization name from the public form header</p>
+              </div>
+              <Switch
+                checked={formSettings.hideOrgName}
+                onCheckedChange={(c) => setFormSettings((p) => ({ ...p, hideOrgName: c }))}
               />
             </div>
             {!hideAdditionalPeople && (

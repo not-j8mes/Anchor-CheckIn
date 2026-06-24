@@ -15,6 +15,8 @@ export const formsTable = pgTable("forms", {
   allowAdditionalPeople: boolean("allow_additional_people").notNull().default(false),
   showSectionsOneAtATime: boolean("show_sections_one_at_a_time").notNull().default(false),
   allowSecondGuardian: boolean("allow_second_guardian"),
+  hideOrgLogo: boolean("hide_org_logo").notNull().default(false),
+  hideOrgName: boolean("hide_org_name").notNull().default(false),
   embedSlug: text("embed_slug").notNull().unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

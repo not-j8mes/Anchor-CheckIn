@@ -50,6 +50,8 @@ export interface Form {
   showSectionsOneAtATime?: boolean;
   /** @nullable */
   allowSecondGuardian?: boolean | null;
+  hideOrgLogo?: boolean;
+  hideOrgName?: boolean;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;
@@ -64,6 +66,8 @@ export interface FormInput {
   showSectionsOneAtATime?: boolean;
   /** @nullable */
   allowSecondGuardian?: boolean | null;
+  hideOrgLogo?: boolean;
+  hideOrgName?: boolean;
 }
 
 export type QuestionType = typeof QuestionType[keyof typeof QuestionType];
@@ -151,6 +155,8 @@ export interface FormWithQuestions {
   showSectionsOneAtATime?: boolean;
   /** @nullable */
   allowSecondGuardian?: boolean | null;
+  hideOrgLogo?: boolean;
+  hideOrgName?: boolean;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;

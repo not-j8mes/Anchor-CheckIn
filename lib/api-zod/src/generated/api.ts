@@ -73,6 +73,8 @@ export const ListFormsResponseItem = zod.object({
   "allowAdditionalPeople": zod.boolean().optional(),
   "showSectionsOneAtATime": zod.boolean().optional(),
   "allowSecondGuardian": zod.boolean().nullish(),
+  "hideOrgLogo": zod.boolean().optional(),
+  "hideOrgName": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -90,7 +92,9 @@ export const CreateFormBody = zod.object({
   "isPublic": zod.boolean().optional(),
   "allowAdditionalPeople": zod.boolean().optional(),
   "showSectionsOneAtATime": zod.boolean().optional(),
-  "allowSecondGuardian": zod.boolean().nullish()
+  "allowSecondGuardian": zod.boolean().nullish(),
+  "hideOrgLogo": zod.boolean().optional(),
+  "hideOrgName": zod.boolean().optional()
 })
 
 export const CreateFormResponse = zod.object({
@@ -102,6 +106,8 @@ export const CreateFormResponse = zod.object({
   "allowAdditionalPeople": zod.boolean().optional(),
   "showSectionsOneAtATime": zod.boolean().optional(),
   "allowSecondGuardian": zod.boolean().nullish(),
+  "hideOrgLogo": zod.boolean().optional(),
+  "hideOrgName": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -201,6 +207,8 @@ export const CreateEventResponse = zod.object({
   "allowAdditionalPeople": zod.boolean().optional(),
   "showSectionsOneAtATime": zod.boolean().optional(),
   "allowSecondGuardian": zod.boolean().nullish(),
+  "hideOrgLogo": zod.boolean().optional(),
+  "hideOrgName": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -345,6 +353,8 @@ export const GetEventResponse = zod.object({
   "allowAdditionalPeople": zod.boolean().optional(),
   "showSectionsOneAtATime": zod.boolean().optional(),
   "allowSecondGuardian": zod.boolean().nullish(),
+  "hideOrgLogo": zod.boolean().optional(),
+  "hideOrgName": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -461,6 +471,8 @@ export const GetFormBySlugResponse = zod.object({
   "allowAdditionalPeople": zod.boolean().optional(),
   "showSectionsOneAtATime": zod.boolean().optional(),
   "allowSecondGuardian": zod.boolean().nullish(),
+  "hideOrgLogo": zod.boolean().optional(),
+  "hideOrgName": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -511,6 +523,8 @@ export const GetFormResponse = zod.object({
   "allowAdditionalPeople": zod.boolean().optional(),
   "showSectionsOneAtATime": zod.boolean().optional(),
   "allowSecondGuardian": zod.boolean().nullish(),
+  "hideOrgLogo": zod.boolean().optional(),
+  "hideOrgName": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -559,7 +573,9 @@ export const UpdateFormBody = zod.object({
   "isPublic": zod.boolean().optional(),
   "allowAdditionalPeople": zod.boolean().optional(),
   "showSectionsOneAtATime": zod.boolean().optional(),
-  "allowSecondGuardian": zod.boolean().nullish()
+  "allowSecondGuardian": zod.boolean().nullish(),
+  "hideOrgLogo": zod.boolean().optional(),
+  "hideOrgName": zod.boolean().optional()
 })
 
 export const UpdateFormResponse = zod.object({
@@ -571,6 +587,8 @@ export const UpdateFormResponse = zod.object({
   "allowAdditionalPeople": zod.boolean().optional(),
   "showSectionsOneAtATime": zod.boolean().optional(),
   "allowSecondGuardian": zod.boolean().nullish(),
+  "hideOrgLogo": zod.boolean().optional(),
+  "hideOrgName": zod.boolean().optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()

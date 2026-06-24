@@ -4887,6 +4887,8 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
     isActive: event.form?.isActive ?? true,
     isPublic: event.form?.isPublic ?? false,
     showSectionsOneAtATime: event.form?.showSectionsOneAtATime ?? false,
+    hideOrgLogo: event.form?.hideOrgLogo ?? false,
+    hideOrgName: event.form?.hideOrgName ?? false,
   });
 
   const updateForm = useUpdateForm({
@@ -5020,6 +5022,26 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
                   <Switch
                     checked={formSettings.isPublic}
                     onCheckedChange={(v) => setFormSettings((p) => ({ ...p, isPublic: v }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between py-0.5">
+                  <div>
+                    <Label className="text-sm font-medium">Hide organization logo</Label>
+                    <p className="text-xs text-muted-foreground">Do not show the logo at the top of the public form</p>
+                  </div>
+                  <Switch
+                    checked={formSettings.hideOrgLogo}
+                    onCheckedChange={(v) => setFormSettings((p) => ({ ...p, hideOrgLogo: v }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between py-0.5">
+                  <div>
+                    <Label className="text-sm font-medium">Hide organization name</Label>
+                    <p className="text-xs text-muted-foreground">Do not show the organization name at the top of the public form</p>
+                  </div>
+                  <Switch
+                    checked={formSettings.hideOrgName}
+                    onCheckedChange={(v) => setFormSettings((p) => ({ ...p, hideOrgName: v }))}
                   />
                 </div>
                 {isChildCheckin && (

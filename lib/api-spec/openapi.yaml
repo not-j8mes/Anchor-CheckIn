@@ -1278,6 +1278,10 @@ components:
           type: boolean
         allowSecondGuardian:
           type: ["boolean", "null"]
+        hideOrgLogo:
+          type: boolean
+        hideOrgName:
+          type: boolean
         embedSlug:
           type: string
         submissionCount:
@@ -1303,6 +1307,10 @@ components:
           type: boolean
         allowSecondGuardian:
           type: ["boolean", "null"]
+        hideOrgLogo:
+          type: boolean
+        hideOrgName:
+          type: boolean
 
     FormWithQuestions:
       type: object
@@ -1324,6 +1332,10 @@ components:
           type: boolean
         allowSecondGuardian:
           type: ["boolean", "null"]
+        hideOrgLogo:
+          type: boolean
+        hideOrgName:
+          type: boolean
         embedSlug:
           type: string
         submissionCount:

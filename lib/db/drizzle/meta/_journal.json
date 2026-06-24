@@ -78,6 +78,13 @@
       "when": 1782316200000,
       "tag": "0010_allow_second_guardian_setting",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1782324000000,
+      "tag": "0011_form_brand_visibility",
+      "breakpoints": true
     }
   ]
 }

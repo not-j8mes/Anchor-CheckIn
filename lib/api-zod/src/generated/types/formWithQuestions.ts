@@ -19,6 +19,8 @@ export interface FormWithQuestions {
   showSectionsOneAtATime?: boolean;
   /** @nullable */
   allowSecondGuardian?: boolean | null;
+  hideOrgLogo?: boolean;
+  hideOrgName?: boolean;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;
