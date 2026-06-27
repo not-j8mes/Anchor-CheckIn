@@ -200,6 +200,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventSession"
 
+  /events/{eventId}/registrants/email:
+    post:
+      operationId: emailEventRegistrants
+      tags: [events]
+      summary: Email all unique registrant contacts for an event
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventRegistrantEmailInput"
+      responses:
+        "200":
+          description: Email delivery summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventRegistrantEmailResult"
+
   /events/{eventId}:
     get:
       operationId: getEvent
@@ -2225,6 +2250,41 @@ components:
           oneOf:
             - $ref: "#/components/schemas/FormWithQuestions"
             - type: "null"
+
+    EventRegistrantEmailInput:
+      type: object
+      required: [subject, message]
+      properties:
+        subject:
+          type: string
+        message:
+          type: string
+
+    EventRegistrantEmailFailure:
+      type: object
+      required: [email, error]
+      properties:
+        email:
+          type: string
+        error:
+          type: string
+
+    EventRegistrantEmailResult:
+      type: object
+      required: [recipientCount, sentCount, skippedCount, failedCount, failures]
+      properties:
+        recipientCount:
+          type: integer
+        sentCount:
+          type: integer
+        skippedCount:
+          type: integer
+        failedCount:
+          type: integer
+        failures:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventRegistrantEmailFailure"
 
     CreateEventInput:
       type: object

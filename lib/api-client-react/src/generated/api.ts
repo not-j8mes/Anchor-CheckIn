@@ -38,6 +38,8 @@ import type {
   Event,
   EventCategory,
   EventCheckin,
+  EventRegistrantEmailInput,
+  EventRegistrantEmailResult,
   EventSession,
   EventWithForm,
   Form,
@@ -1044,6 +1046,76 @@ export const useDeleteEvent = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteEventMutationOptions(options));
+    }
+
+export const getEmailEventRegistrantsUrl = (eventId: number,) => {
+
+
+
+
+  return `/api/events/${eventId}/registrants/email`
+}
+
+/**
+ * @summary Email all unique registrant contacts for an event
+ */
+export const emailEventRegistrants = async (eventId: number, eventRegistrantEmailInput: EventRegistrantEmailInput, options?: RequestInit): Promise<EventRegistrantEmailResult> => {
+
+  return customFetch<EventRegistrantEmailResult>(getEmailEventRegistrantsUrl(eventId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(eventRegistrantEmailInput)
+  }
+);}
+
+
+
+
+export const getEmailEventRegistrantsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof emailEventRegistrants>>, TError,{eventId: number;data: BodyType<EventRegistrantEmailInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof emailEventRegistrants>>, TError,{eventId: number;data: BodyType<EventRegistrantEmailInput>}, TContext> => {
+
+const mutationKey = ['emailEventRegistrants'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof emailEventRegistrants>>, {eventId: number;data: BodyType<EventRegistrantEmailInput>}> = (props) => {
+          const {eventId,data} = props ?? {};
+
+          return  emailEventRegistrants(eventId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EmailEventRegistrantsMutationResult = NonNullable<Awaited<ReturnType<typeof emailEventRegistrants>>>
+    export type EmailEventRegistrantsMutationBody = BodyType<EventRegistrantEmailInput>
+    export type EmailEventRegistrantsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Email all unique registrant contacts for an event
+ */
+export const useEmailEventRegistrants = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof emailEventRegistrants>>, TError,{eventId: number;data: BodyType<EventRegistrantEmailInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof emailEventRegistrants>>,
+        TError,
+        {eventId: number;data: BodyType<EventRegistrantEmailInput>},
+        TContext
+      > => {
+      return useMutation(getEmailEventRegistrantsMutationOptions(options));
     }
 
 export const getGetFormBySlugUrl = (embedSlug: string,) => {
@@ -4336,7 +4408,6 @@ export function useGetCheckinsByDay<TData = Awaited<ReturnType<typeof getCheckin
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
-
 
 
 

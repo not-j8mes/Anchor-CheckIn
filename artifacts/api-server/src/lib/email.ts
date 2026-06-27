@@ -27,6 +27,8 @@ export type RegistrationConfirmationEmailInput = {
   replyTo?: string | null;
 };
 
+export type EventRegistrantEmailInput = RegistrationConfirmationEmailInput;
+
 let testTransport: EmailTransport | null = null;
 
 export function setEmailTransportForTests(transport: EmailTransport | null) {
@@ -123,7 +125,14 @@ function renderTemplate(template: string, values: Record<string, string>): strin
   return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key: string) => values[key] ?? "");
 }
 
-function buildEmail(input: RegistrationConfirmationEmailInput): EmailPayload | null {
+function buildEmail(
+  input: RegistrationConfirmationEmailInput,
+  defaults?: {
+    subjectTemplate?: string;
+    messageTemplate?: string;
+    footerText?: string;
+  },
+): EmailPayload | null {
   const apiKey = process.env["RESEND_API_KEY"]?.trim();
   const from = normalizeEmail(process.env["EMAIL_FROM"]);
   const to = normalizeEmail(input.to);
@@ -147,14 +156,21 @@ function buildEmail(input: RegistrationConfirmationEmailInput): EmailPayload | n
     appBaseUrl: appBaseUrl ?? "",
   };
   const subject = renderTemplate(
-    input.subjectTemplate?.trim() || "Registration confirmed: {{eventName}}",
+    input.subjectTemplate?.trim() ||
+      defaults?.subjectTemplate ||
+      "Registration confirmed: {{eventName}}",
     templateValues,
   );
   const message = renderTemplate(
-    input.messageTemplate?.trim() || "Your registration for {{eventName}} has been received.",
+    input.messageTemplate?.trim() ||
+      defaults?.messageTemplate ||
+      "Your registration for {{eventName}} has been received.",
     templateValues,
   );
   const plainMessage = stripFormatting(message);
+  const footerText =
+    defaults?.footerText ??
+    "Thanks. We have your registration and will follow up if anything else is needed.";
 
   const lines = [
     plainMessage,
@@ -166,7 +182,7 @@ function buildEmail(input: RegistrationConfirmationEmailInput): EmailPayload | n
     participantNames.length > 0 ? `Registered participants: ${formatNameList(participantNames)}` : null,
     appBaseUrl ? `Website: ${appBaseUrl}` : null,
     "",
-    "Thanks. We have your registration and will follow up if anything else is needed.",
+    footerText,
   ].filter((line): line is string => line !== null);
 
   const details = [
@@ -189,7 +205,7 @@ function buildEmail(input: RegistrationConfirmationEmailInput): EmailPayload | n
         `<tr><td style=\"padding: 4px 16px 4px 0; color: #4b5563;\">${escapeHtml(label)}</td><td style=\"padding: 4px 0;\">${escapeHtml(value)}</td></tr>`,
     ),
     "</table>",
-    "<p>Thanks. We have your registration and will follow up if anything else is needed.</p>",
+    `<p>${escapeHtml(footerText)}</p>`,
     "</body>",
     "</html>",
   ].join("");
@@ -206,6 +222,19 @@ function buildEmail(input: RegistrationConfirmationEmailInput): EmailPayload | n
 
 export async function sendRegistrationConfirmationEmail(input: RegistrationConfirmationEmailInput) {
   const payload = buildEmail(input);
+  return sendEmailPayload(payload);
+}
+
+export async function sendEventRegistrantEmail(input: EventRegistrantEmailInput) {
+  const payload = buildEmail(input, {
+    subjectTemplate: "Update for {{eventName}}",
+    messageTemplate: "Here is an update about {{eventName}}.",
+    footerText: "Thanks.",
+  });
+  return sendEmailPayload(payload);
+}
+
+async function sendEmailPayload(payload: EmailPayload | null) {
   if (!payload) return { skipped: true };
 
   const transport = testTransport ?? {

@@ -24,6 +24,7 @@ import {
   useUpdateRegistrationFamily,
   useUpdateCheckin,
   useDeleteEvent,
+  useEmailEventRegistrants,
   useListEventCategories,
   useCreateEventCategory,
   useBulkCheckout,
@@ -154,6 +155,9 @@ const DEFAULT_CONFIRMATION_EMAIL_MESSAGE =
   "Your registration for {{eventName}} has been received.";
 const DEFAULT_REGISTRATION_COMPLETE_MESSAGE =
   "Thank you for registering. We look forward to seeing you!";
+const DEFAULT_EVENT_UPDATE_EMAIL_SUBJECT = "Update for {{eventName}}";
+const DEFAULT_EVENT_UPDATE_EMAIL_MESSAGE =
+  "Here is an update about {{eventName}}.";
 
 const BULK_CHECKOUT_REASONS = Object.entries(BULK_CHECKOUT_REASON_LABELS).map(
   ([value, label]) => ({ value, label }),
@@ -1409,7 +1413,15 @@ function ChildrenTabContent({
   const [selectedFamily, setSelectedFamily] =
     useState<RegistrationFamilyGroup | null>(null);
   const [addRegOpen, setAddRegOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState(
+    DEFAULT_EVENT_UPDATE_EMAIL_SUBJECT,
+  );
+  const [emailMessage, setEmailMessage] = useState(
+    DEFAULT_EVENT_UPDATE_EMAIL_MESSAGE,
+  );
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: registrations = [], isLoading } = useListRegistrations(
     formId ?? 0,
@@ -1432,6 +1444,49 @@ function ChildrenTabContent({
     () => registrations.filter((r) => r.allergies || r.specialNeeds).length,
     [registrations],
   );
+  const uniqueEmailRecipientCount = useMemo(() => {
+    const emails = new Set<string>();
+    for (const registration of registrations) {
+      const email = registration.guardianEmail?.trim().toLowerCase();
+      if (email && email.includes("@")) emails.add(email);
+    }
+    return emails.size;
+  }, [registrations]);
+  const emailEventRegistrants = useEmailEventRegistrants({
+    mutation: {
+      onSuccess: (result) => {
+        setEmailDialogOpen(false);
+        const skippedNotice =
+          result.skippedCount > 0
+            ? ` ${result.skippedCount} skipped because email is not configured.`
+            : "";
+        const failedNotice =
+          result.failedCount > 0 ? ` ${result.failedCount} failed.` : "";
+        toast({
+          title: `Sent ${result.sentCount} email${result.sentCount === 1 ? "" : "s"}`,
+          description: `${result.recipientCount} unique recipient${result.recipientCount === 1 ? "" : "s"}.${skippedNotice}${failedNotice}`.trim(),
+          variant: result.failedCount > 0 ? "destructive" : undefined,
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Email failed to send",
+          description: "Please check your email settings and try again.",
+          variant: "destructive",
+        });
+      },
+    },
+  });
+
+  const handleSendRegistrantEmail = () => {
+    emailEventRegistrants.mutate({
+      eventId,
+      data: {
+        subject: emailSubject,
+        message: emailMessage,
+      },
+    });
+  };
 
   const filtered = useMemo(() => {
     let result = registrations;
@@ -1543,8 +1598,19 @@ function ChildrenTabContent({
             Search and manage everyone registered for this event.
           </p>
         </div>
-        {onExportCsv && (
-          <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEmailDialogOpen(true)}
+            disabled={uniqueEmailRecipientCount === 0}
+            className="gap-1.5"
+          >
+            <Mail className="w-4 h-4" />
+            <span className="hidden sm:inline">Email Registrants</span>
+            <span className="sm:hidden">Email</span>
+          </Button>
+          {onExportCsv && (
             <Button
               variant="ghost"
               size="sm"
@@ -1559,8 +1625,8 @@ function ChildrenTabContent({
               )}
               <span className="hidden sm:inline">Export CSV</span>
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Search + Add */}
@@ -1957,6 +2023,75 @@ function ChildrenTabContent({
         open={addRegOpen}
         onOpenChange={setAddRegOpen}
       />
+
+      <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Email Registrants</DialogTitle>
+            <DialogDescription>
+              Send one email to each unique primary contact email. Parents with
+              multiple children registered will only receive one email.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              {uniqueEmailRecipientCount} unique recipient
+              {uniqueEmailRecipientCount === 1 ? "" : "s"} with an email
+              address.
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="event-email-subject">Subject</Label>
+              <Input
+                id="event-email-subject"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="event-email-message">Message</Label>
+              <Textarea
+                id="event-email-message"
+                rows={8}
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Available: {"{{eventName}}"}, {"{{organizationName}}"},{" "}
+              {"{{eventDate}}"}, {"{{primaryContactName}}"},{" "}
+              {"{{participantNames}}"}
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEmailDialogOpen(false)}
+              disabled={emailEventRegistrants.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSendRegistrantEmail}
+              disabled={
+                emailEventRegistrants.isPending ||
+                uniqueEmailRecipientCount === 0 ||
+                !emailSubject.trim() ||
+                !emailMessage.trim()
+              }
+              className="gap-2"
+            >
+              {emailEventRegistrants.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              )}
+              Send Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

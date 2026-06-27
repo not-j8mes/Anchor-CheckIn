@@ -799,6 +799,24 @@ export interface EventWithForm {
   form?: FormWithQuestions | null;
 }
 
+export interface EventRegistrantEmailInput {
+  subject: string;
+  message: string;
+}
+
+export interface EventRegistrantEmailFailure {
+  email: string;
+  error: string;
+}
+
+export interface EventRegistrantEmailResult {
+  recipientCount: number;
+  sentCount: number;
+  skippedCount: number;
+  failedCount: number;
+  failures: EventRegistrantEmailFailure[];
+}
+
 export interface CreateEventInput {
   name: string;
   description?: string;

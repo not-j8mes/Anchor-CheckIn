@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { and, eq, sql, desc, inArray, asc } from "drizzle-orm";
-import { db, eventsTable, formsTable, questionsTable, formFieldsTable, registrationsTable, checkinsTable, registrationCustomAnswersTable, eventSessionsTable } from "@workspace/db";
+import { db, eventsTable, formsTable, questionsTable, formFieldsTable, registrationsTable, checkinsTable, registrationCustomAnswersTable, eventSessionsTable, organizationsTable } from "@workspace/db";
 import { randomBytes } from "crypto";
 import { createEventSessions, ensureEventDateSessions } from "./event-sessions";
 import { requireAuthContext, requireOrganizationRole } from "../lib/auth";
+import { sendEventRegistrantEmail } from "../lib/email";
 
 const router = Router();
 
@@ -412,6 +413,165 @@ router.get("/events/:eventId/registrations/export", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// ─── POST /events/:eventId/registrants/email ─────────────────────────────────
+// Sends one event update/follow-up email per unique primary contact email.
+// Child registrations often create one row per child, so recipients are
+// deduped by normalized guardianEmail before sending.
+
+router.post(
+  "/events/:eventId/registrants/email",
+  requireOrganizationRole("owner", "admin"),
+  async (req, res) => {
+    const eventId = parseInt(String(req.params.eventId), 10);
+    if (isNaN(eventId)) {
+      res.status(400).json({ error: "Invalid eventId" });
+      return;
+    }
+
+    const subject =
+      typeof req.body?.subject === "string" ? req.body.subject.trim() : "";
+    const message =
+      typeof req.body?.message === "string" ? req.body.message.trim() : "";
+    if (!subject || subject.length > 200 || !message || message.length > 10000) {
+      res.status(400).json({ error: "Invalid input" });
+      return;
+    }
+
+    try {
+      const auth = requireAuthContext(req);
+      const [event] = await db
+        .select()
+        .from(eventsTable)
+        .where(
+          and(
+            eq(eventsTable.id, eventId),
+            eq(eventsTable.organizationId, auth.organizationId),
+          ),
+        )
+        .limit(1);
+
+      if (!event) {
+        res.status(404).json({ error: "Event not found" });
+        return;
+      }
+      if (!event.formId) {
+        res.json({
+          recipientCount: 0,
+          sentCount: 0,
+          skippedCount: 0,
+          failedCount: 0,
+          failures: [],
+        });
+        return;
+      }
+
+      const [organization] = await db
+        .select()
+        .from(organizationsTable)
+        .where(eq(organizationsTable.id, auth.organizationId))
+        .limit(1);
+
+      const registrations = await db
+        .select({
+          id: registrationsTable.id,
+          childFirstName: registrationsTable.childFirstName,
+          childLastName: registrationsTable.childLastName,
+          guardianName: registrationsTable.guardianName,
+          guardianEmail: registrationsTable.guardianEmail,
+        })
+        .from(registrationsTable)
+        .where(
+          and(
+            eq(registrationsTable.formId, event.formId),
+            eq(registrationsTable.organizationId, auth.organizationId),
+          ),
+        )
+        .orderBy(asc(registrationsTable.createdAt));
+
+      const recipients = new Map<
+        string,
+        {
+          email: string;
+          primaryContactName: string | null;
+          participantNames: string[];
+        }
+      >();
+
+      for (const registration of registrations) {
+        const email = registration.guardianEmail?.trim();
+        if (!email || !email.includes("@")) continue;
+
+        const key = email.toLowerCase();
+        const participantName = [
+          registration.childFirstName,
+          registration.childLastName,
+        ]
+          .filter(Boolean)
+          .join(" ");
+
+        const existing =
+          recipients.get(key) ??
+          {
+            email,
+            primaryContactName: registration.guardianName?.trim() || null,
+            participantNames: [],
+          };
+
+        if (!existing.primaryContactName && registration.guardianName?.trim()) {
+          existing.primaryContactName = registration.guardianName.trim();
+        }
+        if (participantName && !existing.participantNames.includes(participantName)) {
+          existing.participantNames.push(participantName);
+        }
+        recipients.set(key, existing);
+      }
+
+      const failures: Array<{ email: string; error: string }> = [];
+      let sentCount = 0;
+      let skippedCount = 0;
+
+      for (const recipient of recipients.values()) {
+        try {
+          const result = await sendEventRegistrantEmail({
+            to: recipient.email,
+            organizationName: organization?.name ?? "Anchor Events",
+            eventName: event.name,
+            eventDate: event.startDate ?? null,
+            eventEndDate: event.endDate ?? null,
+            eventScheduleType: event.scheduleType ?? null,
+            primaryContactName: recipient.primaryContactName,
+            participantNames: recipient.participantNames,
+            subjectTemplate: subject,
+            messageTemplate: message,
+            replyTo: null,
+          });
+
+          if (result.skipped) skippedCount += 1;
+          else sentCount += 1;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Unknown error";
+          failures.push({ email: recipient.email, error: message });
+          req.log.error(
+            { err, eventId, organizationId: auth.organizationId, email: recipient.email },
+            "Failed to send event registrant email",
+          );
+        }
+      }
+
+      res.json({
+        recipientCount: recipients.size,
+        sentCount,
+        skippedCount,
+        failedCount: failures.length,
+        failures,
+      });
+    } catch (err) {
+      req.log.error({ err, eventId }, "Failed to email event registrants");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 router.get("/events/:eventId", async (req, res) => {
   const eventId = parseInt(req.params.eventId, 10);
