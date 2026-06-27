@@ -326,7 +326,7 @@ export default function PublicRegistrationForm() {
     ? "mx-auto mt-2 max-w-[calc(100vw-2rem)] break-words text-xl font-serif font-bold text-foreground sm:text-2xl"
     : "mx-auto mt-3 max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl";
   const primaryRegistrationButtonClassName =
-    "rounded-lg border border-primary-foreground/70 bg-primary font-bold text-primary-foreground shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)] focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
+    "rounded-xl border-[1.5px] border-slate-900/80 bg-primary font-bold text-primary-foreground shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-px hover:bg-[hsl(38_90%_46%)] hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)] focus-visible:ring-2 focus-visible:ring-slate-900/35 focus-visible:ring-offset-2";
 
   return (
     <div className={pageClassName}>
@@ -388,12 +388,12 @@ export default function PublicRegistrationForm() {
               )}
               <Button
                 size="lg"
-                className={`h-14 min-w-56 px-8 text-lg ${primaryRegistrationButtonClassName}`}
+                className={`min-h-[60px] w-full max-w-[390px] justify-center gap-3 px-8 text-lg sm:text-xl ${primaryRegistrationButtonClassName}`}
                 onClick={() => setHasStartedRegistration(true)}
                 data-testid="button-start-registration"
               >
                 Start Registration
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="h-5 w-5" />
               </Button>
             </CardContent>
           </Card>
@@ -518,7 +518,7 @@ export default function PublicRegistrationForm() {
                   <Button
                     type="submit"
                     size="lg"
-                    className={`h-12 ${primaryRegistrationButtonClassName}`}
+                    className={`min-h-[58px] justify-center gap-2 text-base sm:text-lg ${primaryRegistrationButtonClassName}`}
                     disabled={isSubmitting}
                     data-testid="button-submit-registration"
                   >
@@ -528,11 +528,11 @@ export default function PublicRegistrationForm() {
                   <Button
                     type="button"
                     size="lg"
-                    className={`h-12 ${primaryRegistrationButtonClassName}`}
+                    className={`min-h-[58px] justify-center gap-2 text-base sm:text-lg ${primaryRegistrationButtonClassName}`}
                     onClick={handleNextSection}
                   >
                     Next
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    <ArrowRight className="h-4 w-4" />
                   </Button>
                 )}
               </div>
@@ -540,7 +540,7 @@ export default function PublicRegistrationForm() {
               <Button
                 type="submit"
                 size="lg"
-                className={`h-14 w-full text-lg ${primaryRegistrationButtonClassName}`}
+                className={`min-h-[60px] w-full justify-center text-lg sm:text-xl ${primaryRegistrationButtonClassName}`}
                 disabled={isSubmitting}
                 data-testid="button-submit-registration"
               >
