@@ -23,6 +23,7 @@ import { formattedTextMarkupToHtml } from "@/components/forms/FormattedTextEdito
 
 const DEFAULT_REGISTRATION_COMPLETE_MESSAGE =
   "Thank you for registering. We look forward to seeing you!";
+const IFRAME_HEIGHT_MESSAGE_TYPE = "ANCHOR_EVENTS_IFRAME_HEIGHT";
 
 function HeaderTextContent({ text }: { text: string }) {
   const paragraphs = text.split(/\n{2,}/);
@@ -66,6 +67,7 @@ export default function PublicRegistrationForm() {
   const params = useParams<{ embedSlug: string }>();
   const slug = params.embedSlug;
   const formRef = useRef<HTMLFormElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const isEmbedded =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("embed") === "true";
@@ -155,12 +157,68 @@ export default function PublicRegistrationForm() {
     };
   }, [isEmbedded]);
 
+  useEffect(() => {
+    if (!isEmbedded) return;
+
+    let animationFrame = 0;
+    const timeouts: number[] = [];
+
+    const postHeight = () => {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = window.requestAnimationFrame(() => {
+        const page = pageRef.current;
+        const height = page
+          ? Math.ceil(Math.max(page.scrollHeight, page.getBoundingClientRect().height))
+          : Math.max(
+              document.body.scrollHeight,
+              document.documentElement.scrollHeight,
+            );
+
+        window.parent?.postMessage(
+          { type: IFRAME_HEIGHT_MESSAGE_TYPE, height },
+          "*",
+        );
+      });
+    };
+
+    postHeight();
+    [0, 100, 300, 1000].forEach((delay) => {
+      timeouts.push(window.setTimeout(postHeight, delay));
+    });
+
+    const resizeObserver =
+      "ResizeObserver" in window ? new ResizeObserver(postHeight) : null;
+    resizeObserver?.observe(document.documentElement);
+    resizeObserver?.observe(document.body);
+    if (pageRef.current) resizeObserver?.observe(pageRef.current);
+
+    const mutationObserver = new MutationObserver(postHeight);
+    if (pageRef.current) {
+      mutationObserver.observe(pageRef.current, {
+        attributes: true,
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+    }
+
+    window.addEventListener("resize", postHeight);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      timeouts.forEach((timeout) => window.clearTimeout(timeout));
+      resizeObserver?.disconnect();
+      mutationObserver.disconnect();
+      window.removeEventListener("resize", postHeight);
+    };
+  }, [form?.id, formLoading, isEmbedded]);
+
   if (formLoading) {
     return (
       <div
         className={
           isEmbedded
-            ? "public-form-page public-form-page--embedded min-h-screen flex items-center justify-center bg-white"
+            ? "public-form-page public-form-page--embedded min-h-0 flex items-center justify-center bg-white p-4"
             : "public-form-page min-h-screen flex items-center justify-center bg-white"
         }
       >
@@ -174,7 +232,7 @@ export default function PublicRegistrationForm() {
       <div
         className={
           isEmbedded
-            ? "public-form-page public-form-page--embedded flex-1 min-h-screen bg-white flex flex-col items-center justify-center p-4 text-center"
+            ? "public-form-page public-form-page--embedded flex-1 min-h-0 bg-white flex flex-col items-center justify-center p-4 text-center"
             : "public-form-page flex-1 min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center"
         }
       >
@@ -321,7 +379,7 @@ export default function PublicRegistrationForm() {
   };
 
   const pageClassName = isEmbedded
-    ? "public-form-page public-form-page--embedded flex-1 min-h-screen overflow-x-hidden bg-white px-2 py-2 sm:px-4 sm:py-5"
+    ? "public-form-page public-form-page--embedded flex-1 min-h-0 overflow-x-hidden bg-white px-2 py-2 sm:px-4 sm:py-5"
     : "public-form-page flex-1 min-h-screen overflow-x-hidden bg-white px-3 py-4 sm:px-6 sm:py-10 lg:px-8";
   const contentClassName = isEmbedded
     ? "mx-auto w-full max-w-3xl min-w-0 space-y-3 sm:space-y-4"
@@ -339,7 +397,7 @@ export default function PublicRegistrationForm() {
     "rounded-xl border-[1.5px] border-slate-900/80 bg-primary font-bold text-primary-foreground shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-px hover:bg-[hsl(38_90%_46%)] hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)] focus-visible:ring-2 focus-visible:ring-slate-900/35 focus-visible:ring-offset-2";
 
   return (
-    <div className={pageClassName}>
+    <div ref={pageRef} className={pageClassName}>
       <div className={contentClassName}>
         {/* Org header */}
         <div className="text-center">

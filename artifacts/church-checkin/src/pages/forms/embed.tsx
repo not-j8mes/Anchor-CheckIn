@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Copy, ExternalLink, Code } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { buildRegistrationEmbedCode } from "@/lib/embedCode";
 
 export default function FormEmbed() {
   const params = useParams<{ id: string }>();
@@ -22,7 +23,7 @@ export default function FormEmbed() {
 
   const publicUrl = `${window.location.origin}/register/${form.embedSlug}`;
   const embedUrl = `${publicUrl}?embed=true`;
-  const iframeCode = `<iframe src="${embedUrl}" width="100%" height="800" frameborder="0" style="border:none; border-radius:12px;"></iframe>`;
+  const iframeCode = buildRegistrationEmbedCode(embedUrl);
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">

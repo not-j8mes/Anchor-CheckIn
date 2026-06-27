@@ -143,6 +143,7 @@ import {
 import { cn } from "@/lib/utils";
 import { RoomsTabContent } from "./detail/RoomsTabContent";
 import { getEventRegistrationsExport } from "./detail/registrationExport";
+import { buildRegistrationEmbedCode } from "@/lib/embedCode";
 
 const BULK_CHECKOUT_REASON_LABELS: Record<string, string> = {
   end_of_event: "End of event",
@@ -5730,7 +5731,7 @@ function EventDashboardSection({
 
   const copyEmbedCode = () => {
     if (!embeddedRegistrationUrl) return;
-    const code = `<iframe src="${embeddedRegistrationUrl}" width="100%" height="800" frameborder="0" style="border:none;"></iframe>`;
+    const code = buildRegistrationEmbedCode(embeddedRegistrationUrl);
     navigator.clipboard.writeText(code);
     toast({ title: "Embed code copied!" });
   };
@@ -6635,7 +6636,7 @@ function RegistrationFormSection({
     : null;
 
   const embedCode = embeddedRegistrationUrl
-    ? `<iframe src="${embeddedRegistrationUrl}" width="100%" height="800" frameborder="0" style="border:none;"></iframe>`
+    ? buildRegistrationEmbedCode(embeddedRegistrationUrl)
     : null;
 
   const copyUrl = () => {
