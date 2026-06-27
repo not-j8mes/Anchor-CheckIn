@@ -21,7 +21,8 @@ export default function FormEmbed() {
   if (!form) return <div className="p-10">Form not found</div>;
 
   const publicUrl = `${window.location.origin}/register/${form.embedSlug}`;
-  const iframeCode = `<iframe src="${publicUrl}" width="100%" height="800" frameborder="0" style="border:none; border-radius:12px;"></iframe>`;
+  const embedUrl = `${publicUrl}?embed=true`;
+  const iframeCode = `<iframe src="${embedUrl}" width="100%" height="800" frameborder="0" style="border:none; border-radius:12px;"></iframe>`;
 
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto w-full space-y-8">
@@ -93,7 +94,7 @@ export default function FormEmbed() {
               <span className="text-muted-foreground flex items-center gap-2"><div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" /> Loading preview...</span>
             </div>
             <iframe 
-              src={publicUrl} 
+              src={embedUrl}
               className="w-full h-full relative z-10 border-0 bg-transparent"
               title="Form Preview"
             />

@@ -5723,10 +5723,13 @@ function EventDashboardSection({
   const registrationUrl = event.formEmbedSlug
     ? `${window.location.origin}/register/${event.formEmbedSlug}`
     : null;
+  const embeddedRegistrationUrl = registrationUrl
+    ? `${registrationUrl}?embed=true`
+    : null;
 
   const copyEmbedCode = () => {
-    if (!registrationUrl) return;
-    const code = `<iframe src="${registrationUrl}" width="100%" height="800" frameborder="0" style="border:none;"></iframe>`;
+    if (!embeddedRegistrationUrl) return;
+    const code = `<iframe src="${embeddedRegistrationUrl}" width="100%" height="800" frameborder="0" style="border:none;"></iframe>`;
     navigator.clipboard.writeText(code);
     toast({ title: "Embed code copied!" });
   };
@@ -6626,9 +6629,12 @@ function RegistrationFormSection({
   const registrationUrl = event.formEmbedSlug
     ? `${window.location.origin}/register/${event.formEmbedSlug}`
     : null;
+  const embeddedRegistrationUrl = registrationUrl
+    ? `${registrationUrl}?embed=true`
+    : null;
 
-  const embedCode = registrationUrl
-    ? `<iframe src="${registrationUrl}" width="100%" height="800" frameborder="0" style="border:none;"></iframe>`
+  const embedCode = embeddedRegistrationUrl
+    ? `<iframe src="${embeddedRegistrationUrl}" width="100%" height="800" frameborder="0" style="border:none;"></iframe>`
     : null;
 
   const copyUrl = () => {

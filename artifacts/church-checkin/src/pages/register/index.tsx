@@ -56,6 +56,9 @@ export default function PublicRegistrationForm() {
   const params = useParams<{ embedSlug: string }>();
   const slug = params.embedSlug;
   const formRef = useRef<HTMLFormElement>(null);
+  const isEmbedded =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("embed") === "true";
 
   const { data: form, isLoading: formLoading } = useQuery({
     queryKey: getGetFormBySlugQueryKey(slug),
@@ -130,9 +133,27 @@ export default function PublicRegistrationForm() {
     setHasStartedRegistration(!(form.requireStartButton ?? false));
   }, [form?.id, form?.requireStartButton]);
 
+  useEffect(() => {
+    if (!isEmbedded) return;
+
+    document.documentElement.classList.add("public-form-document--embedded");
+    document.body.classList.add("public-form-body--embedded");
+
+    return () => {
+      document.documentElement.classList.remove("public-form-document--embedded");
+      document.body.classList.remove("public-form-body--embedded");
+    };
+  }, [isEmbedded]);
+
   if (formLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/20">
+      <div
+        className={
+          isEmbedded
+            ? "public-form-page public-form-page--embedded min-h-screen flex items-center justify-center bg-white"
+            : "public-form-page min-h-screen flex items-center justify-center bg-muted/20"
+        }
+      >
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent" />
       </div>
     );
@@ -140,7 +161,13 @@ export default function PublicRegistrationForm() {
 
   if (!form || !form.isActive) {
     return (
-      <div className="flex-1 min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
+      <div
+        className={
+          isEmbedded
+            ? "public-form-page public-form-page--embedded flex-1 min-h-screen bg-white flex flex-col items-center justify-center p-4 text-center"
+            : "public-form-page flex-1 min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center"
+        }
+      >
         <h1 className="text-2xl font-bold font-serif mb-2">Form Unavailable</h1>
         <p className="text-muted-foreground">
           This registration form is currently closed or does not exist.
@@ -283,20 +310,36 @@ export default function PublicRegistrationForm() {
     setHasStartedRegistration(!(form?.requireStartButton ?? false));
   };
 
+  const pageClassName = isEmbedded
+    ? "public-form-page public-form-page--embedded flex-1 min-h-screen overflow-x-hidden bg-white px-3 py-3 sm:px-4 sm:py-5"
+    : "public-form-page flex-1 min-h-screen overflow-x-hidden bg-[#fbfaf7] px-4 py-6 sm:px-6 sm:py-10 lg:px-8";
+  const contentClassName = isEmbedded
+    ? "mx-auto w-full max-w-3xl min-w-0 space-y-4"
+    : "mx-auto w-full max-w-3xl min-w-0 space-y-6";
+  const logoClassName = isEmbedded
+    ? "mx-auto h-12 object-contain sm:h-14"
+    : "mx-auto h-16 object-contain sm:h-20";
+  const defaultLogoClassName = isEmbedded
+    ? "mx-auto h-12 w-12 object-contain sm:h-14 sm:w-14"
+    : "mx-auto h-16 w-16 object-contain sm:h-20 sm:w-20";
+  const orgNameClassName = isEmbedded
+    ? "mx-auto mt-2 max-w-[calc(100vw-2rem)] break-words text-xl font-serif font-bold text-foreground sm:text-2xl"
+    : "mx-auto mt-3 max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl";
+
   return (
-    <div className="flex-1 min-h-screen overflow-x-hidden bg-[#fbfaf7] px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
-      <div className="mx-auto w-full max-w-3xl min-w-0 space-y-6">
+    <div className={pageClassName}>
+      <div className={contentClassName}>
         {/* Org header */}
         <div className="text-center">
           {!hideOrgLogo && (
             org?.logoUrl ? (
-              <img src={org.logoUrl} alt={org.name} className="mx-auto h-16 object-contain sm:h-20" />
+              <img src={org.logoUrl} alt={org.name} className={logoClassName} />
             ) : (
-              <img src={DEFAULT_APP_LOGO} alt="Anchor Events logo" className="mx-auto h-16 w-16 object-contain sm:h-20 sm:w-20" />
+              <img src={DEFAULT_APP_LOGO} alt="Anchor Events logo" className={defaultLogoClassName} />
             )
           )}
           {!hideOrgName && org?.name && (
-            <h1 className="mx-auto mt-3 max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl">{org.name}</h1>
+            <h1 className={orgNameClassName}>{org.name}</h1>
           )}
         </div>
 
