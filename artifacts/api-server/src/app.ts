@@ -17,27 +17,57 @@ const allowedOrigins = parseAllowedOrigins(process.env["CORS_ORIGIN"]);
 const jsonBodyLimit = process.env["JSON_BODY_LIMIT"] || "1mb";
 
 app.disable("x-powered-by");
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        baseUri: ["'self'"],
-        fontSrc: ["'self'", "data:"],
-        formAction: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:"],
-        objectSrc: ["'none'"],
-        scriptSrc: ["'self'"],
-        scriptSrcAttr: ["'none'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        upgradeInsecureRequests:
-          process.env["NODE_ENV"] === "production" ? [] : null,
-      },
+
+function getBaseContentSecurityPolicyDirectives() {
+  return {
+    defaultSrc: ["'self'"],
+    baseUri: ["'self'"],
+    fontSrc: ["'self'", "data:"],
+    formAction: ["'self'"],
+    imgSrc: ["'self'", "data:", "https:"],
+    objectSrc: ["'none'"],
+    scriptSrc: ["'self'"],
+    scriptSrcAttr: ["'none'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    upgradeInsecureRequests:
+      process.env["NODE_ENV"] === "production" ? [] : null,
+  };
+}
+
+const defaultSecurityHeaders = helmet({
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      ...getBaseContentSecurityPolicyDirectives(),
+      frameAncestors: ["'self'"],
     },
-    crossOriginEmbedderPolicy: false,
-    frameguard: false,
-  }),
-);
+  },
+  crossOriginEmbedderPolicy: false,
+});
+
+const embeddablePublicFormSecurityHeaders = helmet({
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: getBaseContentSecurityPolicyDirectives(),
+  },
+  crossOriginEmbedderPolicy: false,
+  frameguard: false,
+});
+
+function isEmbeddablePublicFormPage(req: express.Request): boolean {
+  return (
+    (req.method === "GET" || req.method === "HEAD") &&
+    /^\/register\/[^/]+\/?$/.test(req.path)
+  );
+}
+
+app.use((req, res, next) => {
+  const securityHeaders = isEmbeddablePublicFormPage(req)
+    ? embeddablePublicFormSecurityHeaders
+    : defaultSecurityHeaders;
+
+  securityHeaders(req, res, next);
+});
 
 app.use(
   pinoHttp({
