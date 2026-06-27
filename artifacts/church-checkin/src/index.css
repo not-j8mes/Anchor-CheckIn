@@ -143,9 +143,15 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
-  html.public-form-document--embedded,
-  body.public-form-body--embedded {
-    background: #ffffff;
+  html.public-form-document--embedded {
+    --background: 0 0% 100%;
+    background: #ffffff !important;
+  }
+  body.public-form-body--embedded,
+  body.public-form-body--embedded #root,
+  body.public-form-body--embedded .public-form-page,
+  body.public-form-body--embedded .public-form-page--embedded {
+    background: #ffffff !important;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif;

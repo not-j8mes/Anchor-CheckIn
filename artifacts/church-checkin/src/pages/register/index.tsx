@@ -492,6 +492,7 @@ export default function PublicRegistrationForm() {
                 setChildrenAnswers((prev) => prev.filter((_, i) => i !== index))
               }
               visibleSections={showSectionStepper && activeSection ? [activeSection] : undefined}
+              embedded={isEmbedded}
             />
 
             {submitError && (

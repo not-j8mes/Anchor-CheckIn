@@ -468,6 +468,7 @@ export interface RegistrationFormBodyProps {
   onAddChild: () => void;
   onRemoveChild: (index: number) => void;
   visibleSections?: FieldSection[];
+  embedded?: boolean;
 }
 
 export function RegistrationFormBody({
@@ -487,6 +488,7 @@ export function RegistrationFormBody({
   onAddChild,
   onRemoveChild,
   visibleSections,
+  embedded = false,
 }: RegistrationFormBodyProps) {
   const guardianFields = formFields.filter((f) => getFieldSection(f) === "guardian_info");
   const primaryGuardianFields = guardianFields.filter((field) => !isSecondaryGuardianField(field));
@@ -500,6 +502,9 @@ export function RegistrationFormBody({
   const waiverFields = formFields.filter((f) => getFieldSection(f) === "waivers");
   const isSectionVisible = (section: FieldSection) =>
     !visibleSections || visibleSections.includes(section);
+  const nestedShellClassName = embedded
+    ? "space-y-5 rounded-xl border border-border bg-white p-4"
+    : "space-y-5 rounded-xl border border-border bg-[#fffcf5] p-4";
 
   const removeSecondaryGuardian = () => {
     secondaryGuardianFields.forEach((field) => onGuardianChange(field.id, ""));
@@ -537,7 +542,7 @@ export function RegistrationFormBody({
               </Button>
             )}
             {allowSecondGuardian && secondaryGuardianFields.length > 0 && showSecondaryGuardian && (
-              <div className="space-y-5 rounded-xl border border-border bg-[#fffcf5] p-4">
+              <div className={nestedShellClassName}>
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-bold text-foreground">
