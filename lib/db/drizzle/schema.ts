@@ -52,6 +52,7 @@ export const forms = pgTable("forms", {
 	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
 	allowAdditionalPeople: boolean("allow_additional_people").default(false).notNull(),
 	showSectionsOneAtATime: boolean("show_sections_one_at_a_time").default(false).notNull(),
+	requireStartButton: boolean("require_start_button").default(false).notNull(),
 	allowSecondGuardian: boolean("allow_second_guardian"),
 	hideOrgLogo: boolean("hide_org_logo").default(false).notNull(),
 	hideOrgName: boolean("hide_org_name").default(false).notNull(),

@@ -17,6 +17,7 @@ export interface FormWithQuestions {
   isPublic: boolean;
   allowAdditionalPeople?: boolean;
   showSectionsOneAtATime?: boolean;
+  requireStartButton?: boolean;
   /** @nullable */
   allowSecondGuardian?: boolean | null;
   hideOrgLogo?: boolean;

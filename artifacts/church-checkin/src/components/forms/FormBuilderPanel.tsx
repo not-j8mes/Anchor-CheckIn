@@ -452,6 +452,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     isPublic: true,
     allowAdditionalPeople: false,
     showSectionsOneAtATime: false,
+    requireStartButton: false,
     allowSecondGuardian: null as boolean | null,
     hideOrgLogo: false,
     hideOrgName: false,
@@ -469,6 +470,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         isPublic: form.isPublic,
         allowAdditionalPeople: form.allowAdditionalPeople ?? false,
         showSectionsOneAtATime: form.showSectionsOneAtATime ?? false,
+        requireStartButton: form.requireStartButton ?? false,
         allowSecondGuardian: form.allowSecondGuardian ?? null,
         hideOrgLogo: form.hideOrgLogo ?? false,
         hideOrgName: form.hideOrgName ?? false,
@@ -599,6 +601,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         isPublic: form.isPublic,
         allowAdditionalPeople: form.allowAdditionalPeople ?? false,
         showSectionsOneAtATime: form.showSectionsOneAtATime ?? false,
+        requireStartButton: form.requireStartButton ?? false,
         allowSecondGuardian: enabled,
         hideOrgLogo: form.hideOrgLogo ?? false,
         hideOrgName: form.hideOrgName ?? false,
@@ -1140,6 +1143,16 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                 />
               </div>
             )}
+            <div className="flex items-center justify-between py-2 border-t border-border">
+              <div>
+                <Label className="text-sm">Start Registration Button</Label>
+                <p className="text-xs text-muted-foreground">Show a start screen before the public form</p>
+              </div>
+              <Switch
+                checked={formSettings.requireStartButton}
+                onCheckedChange={(c) => setFormSettings((p) => ({ ...p, requireStartButton: c }))}
+              />
+            </div>
             <div className="space-y-3 border-t border-border pt-4">
               <div className="flex items-center justify-between gap-3">
                 <div>

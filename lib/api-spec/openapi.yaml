@@ -1276,6 +1276,8 @@ components:
           type: boolean
         showSectionsOneAtATime:
           type: boolean
+        requireStartButton:
+          type: boolean
         allowSecondGuardian:
           type: ["boolean", "null"]
         hideOrgLogo:
@@ -1311,6 +1313,8 @@ components:
           type: boolean
         showSectionsOneAtATime:
           type: boolean
+        requireStartButton:
+          type: boolean
         allowSecondGuardian:
           type: ["boolean", "null"]
         hideOrgLogo:
@@ -1341,6 +1345,8 @@ components:
         allowAdditionalPeople:
           type: boolean
         showSectionsOneAtATime:
+          type: boolean
+        requireStartButton:
           type: boolean
         allowSecondGuardian:
           type: ["boolean", "null"]

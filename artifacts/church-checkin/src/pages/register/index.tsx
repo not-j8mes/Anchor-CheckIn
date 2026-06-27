@@ -40,6 +40,7 @@ export default function PublicRegistrationForm() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasStartedRegistration, setHasStartedRegistration] = useState(false);
   const [activeSectionIndex, setActiveSectionIndex] = useState(0);
 
   const submitRegistration = useSubmitRegistration();
@@ -86,6 +87,11 @@ export default function PublicRegistrationForm() {
   useEffect(() => {
     setActiveSectionIndex((index) => Math.min(index, Math.max(stepSections.length - 1, 0)));
   }, [stepSections.length]);
+
+  useEffect(() => {
+    if (!form) return;
+    setHasStartedRegistration(!(form.requireStartButton ?? false));
+  }, [form?.id, form?.requireStartButton]);
 
   if (formLoading) {
     return (
@@ -237,6 +243,7 @@ export default function PublicRegistrationForm() {
     setAdditionalAnswers({});
     setSubmitError(null);
     setActiveSectionIndex(0);
+    setHasStartedRegistration(!(form?.requireStartButton ?? false));
   };
 
   return (
@@ -279,6 +286,23 @@ export default function PublicRegistrationForm() {
               >
                 <Plus className="w-4 h-4" />
                 {isChildCheckin ? "Register Another Child" : "Register Another Person"}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : !hasStartedRegistration ? (
+          <Card className="overflow-hidden rounded-2xl border-card-border bg-white py-14 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+            <CardContent className="flex flex-col items-center justify-center space-y-5">
+              <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl">
+                {form.title}
+              </h2>
+              <Button
+                size="lg"
+                className="h-14 min-w-56 rounded-lg bg-primary px-8 text-lg font-bold text-primary-foreground shadow-[0_12px_24px_rgba(245,158,11,0.28)] hover:bg-primary/90"
+                onClick={() => setHasStartedRegistration(true)}
+                data-testid="button-start-registration"
+              >
+                Start Registration
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </CardContent>
           </Card>

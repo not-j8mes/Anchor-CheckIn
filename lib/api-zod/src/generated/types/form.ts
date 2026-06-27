@@ -15,6 +15,7 @@ export interface Form {
   isPublic: boolean;
   allowAdditionalPeople?: boolean;
   showSectionsOneAtATime?: boolean;
+  requireStartButton?: boolean;
   /** @nullable */
   allowSecondGuardian?: boolean | null;
   hideOrgLogo?: boolean;

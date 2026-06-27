@@ -4890,6 +4890,7 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
     isActive: event.form?.isActive ?? true,
     isPublic: event.form?.isPublic ?? false,
     showSectionsOneAtATime: event.form?.showSectionsOneAtATime ?? false,
+    requireStartButton: event.form?.requireStartButton ?? false,
     hideOrgLogo: event.form?.hideOrgLogo ?? false,
     hideOrgName: event.form?.hideOrgName ?? false,
     confirmationEmailEnabled: event.form?.confirmationEmailEnabled ?? true,
@@ -5062,6 +5063,16 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
                     />
                   </div>
                 )}
+                <div className="flex items-center justify-between py-0.5">
+                  <div>
+                    <Label className="text-sm font-medium">Start registration button</Label>
+                    <p className="text-xs text-muted-foreground">Show a start screen before the public form</p>
+                  </div>
+                  <Switch
+                    checked={formSettings.requireStartButton}
+                    onCheckedChange={(v) => setFormSettings((p) => ({ ...p, requireStartButton: v }))}
+                  />
+                </div>
                 <div className="space-y-3 border-t border-border pt-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>

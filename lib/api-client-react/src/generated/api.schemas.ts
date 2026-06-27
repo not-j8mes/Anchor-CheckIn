@@ -48,6 +48,7 @@ export interface Form {
   isPublic: boolean;
   allowAdditionalPeople?: boolean;
   showSectionsOneAtATime?: boolean;
+  requireStartButton?: boolean;
   /** @nullable */
   allowSecondGuardian?: boolean | null;
   hideOrgLogo?: boolean;
@@ -69,6 +70,7 @@ export interface FormInput {
   isPublic?: boolean;
   allowAdditionalPeople?: boolean;
   showSectionsOneAtATime?: boolean;
+  requireStartButton?: boolean;
   /** @nullable */
   allowSecondGuardian?: boolean | null;
   hideOrgLogo?: boolean;
@@ -163,6 +165,7 @@ export interface FormWithQuestions {
   isPublic: boolean;
   allowAdditionalPeople?: boolean;
   showSectionsOneAtATime?: boolean;
+  requireStartButton?: boolean;
   /** @nullable */
   allowSecondGuardian?: boolean | null;
   hideOrgLogo?: boolean;
