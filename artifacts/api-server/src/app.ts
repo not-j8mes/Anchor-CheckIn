@@ -25,7 +25,6 @@ app.use(
         baseUri: ["'self'"],
         fontSrc: ["'self'", "data:"],
         formAction: ["'self'"],
-        frameAncestors: ["'self'"],
         imgSrc: ["'self'", "data:", "https:"],
         objectSrc: ["'none'"],
         scriptSrc: ["'self'"],
@@ -36,6 +35,7 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false,
+    frameguard: false,
   }),
 );
 
