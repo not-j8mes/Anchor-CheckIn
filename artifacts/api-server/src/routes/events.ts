@@ -5,8 +5,10 @@ import { randomBytes } from "crypto";
 import { createEventSessions, ensureEventDateSessions } from "./event-sessions";
 import { requireAuthContext, requireOrganizationRole } from "../lib/auth";
 import { sendEventRegistrantEmail } from "../lib/email";
+import { eventRegistrantEmailRateLimiter } from "../lib/rateLimits";
 
 const router = Router();
+const MAX_EVENT_EMAIL_RECIPIENTS = 500;
 
 const DEFAULT_QUESTIONS = [
   { label: "Child's First Name", type: "text", required: true, order: 0, isChildField: true, fieldKey: "childFirstName", placeholder: "Enter first name" },
@@ -421,6 +423,7 @@ router.get("/events/:eventId/registrations/export", async (req, res) => {
 
 router.post(
   "/events/:eventId/registrants/email",
+  eventRegistrantEmailRateLimiter,
   requireOrganizationRole("owner", "admin"),
   async (req, res) => {
     const eventId = parseInt(String(req.params.eventId), 10);
@@ -440,6 +443,16 @@ router.post(
 
     try {
       const auth = requireAuthContext(req);
+      req.log.info(
+        {
+          eventId,
+          organizationId: auth.organizationId,
+          userId: auth.userId,
+          subjectLength: subject.length,
+          messageLength: message.length,
+        },
+        "Event registrant email requested",
+      );
       const [event] = await db
         .select()
         .from(eventsTable)
@@ -527,6 +540,25 @@ router.post(
         recipients.set(key, existing);
       }
 
+      if (recipients.size > MAX_EVENT_EMAIL_RECIPIENTS) {
+        req.log.warn(
+          {
+            eventId,
+            organizationId: auth.organizationId,
+            userId: auth.userId,
+            recipientCount: recipients.size,
+            maxRecipients: MAX_EVENT_EMAIL_RECIPIENTS,
+          },
+          "Event registrant email blocked by recipient cap",
+        );
+        res.status(400).json({
+          error: `Too many recipients. The current limit is ${MAX_EVENT_EMAIL_RECIPIENTS}.`,
+          recipientCount: recipients.size,
+          maxRecipients: MAX_EVENT_EMAIL_RECIPIENTS,
+        });
+        return;
+      }
+
       const failures: Array<{ email: string; error: string }> = [];
       let sentCount = 0;
       let skippedCount = 0;
@@ -558,6 +590,19 @@ router.post(
           );
         }
       }
+
+      req.log.info(
+        {
+          eventId,
+          organizationId: auth.organizationId,
+          userId: auth.userId,
+          recipientCount: recipients.size,
+          sentCount,
+          skippedCount,
+          failedCount: failures.length,
+        },
+        "Event registrant email completed",
+      );
 
       res.json({
         recipientCount: recipients.size,

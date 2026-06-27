@@ -299,7 +299,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FormWithQuestions"
+                $ref: "#/components/schemas/PublicFormWithQuestions"
         "404":
           description: Not found
 
@@ -1403,6 +1403,64 @@ components:
           type: ["integer", "null"]
         roomAssignmentMode:
           type: ["string", "null"]
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        formFields:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormField"
+
+    PublicFormWithQuestions:
+      type: object
+      required: [id, title, isActive, isPublic, questions]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        isPublic:
+          type: boolean
+        allowAdditionalPeople:
+          type: boolean
+        showSectionsOneAtATime:
+          type: boolean
+        requireStartButton:
+          type: boolean
+        allowSecondGuardian:
+          type: ["boolean", "null"]
+        hideOrgLogo:
+          type: boolean
+        hideOrgName:
+          type: boolean
+        registrationCompleteMessage:
+          type: ["string", "null"]
+        registrationType:
+          type: ["string", "null"]
+        eventId:
+          type: ["integer", "null"]
+        roomAssignmentMode:
+          type: ["string", "null"]
+        organization:
+          oneOf:
+            - type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                logoUrl:
+                  type: ["string", "null"]
+                headerText:
+                  type: ["string", "null"]
+                website:
+                  type: ["string", "null"]
+            - type: "null"
         questions:
           type: array
           items:

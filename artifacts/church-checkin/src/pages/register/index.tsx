@@ -23,6 +23,35 @@ import { DEFAULT_APP_LOGO } from "@/lib/branding";
 const DEFAULT_REGISTRATION_COMPLETE_MESSAGE =
   "Thank you for registering. We look forward to seeing you!";
 
+function HeaderTextContent({ text }: { text: string }) {
+  const paragraphs = text.split(/\n{2,}/);
+  return (
+    <div className="space-y-3">
+      {paragraphs.map((paragraph, i) => {
+        const lines = paragraph.split("\n");
+        const nonEmptyLines = lines.filter((l) => l.trim() !== "");
+        const isBulletList =
+          nonEmptyLines.length > 0 &&
+          nonEmptyLines.every((l) => l.trimStart().startsWith("- "));
+        if (isBulletList) {
+          return (
+            <ul key={i} className="list-disc pl-5 space-y-1 text-slate-700 text-sm sm:text-base leading-relaxed">
+              {nonEmptyLines.map((line, j) => (
+                <li key={j}>{line.trimStart().slice(2)}</li>
+              ))}
+            </ul>
+          );
+        }
+        return (
+          <p key={i} className="whitespace-pre-line text-slate-700 text-sm sm:text-base leading-relaxed">
+            {paragraph.trim()}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function PublicRegistrationForm() {
   const params = useParams<{ embedSlug: string }>();
   const slug = params.embedSlug;
@@ -269,21 +298,24 @@ export default function PublicRegistrationForm() {
           {!hideOrgName && org?.name && (
             <h1 className="mx-auto mt-3 max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl">{org.name}</h1>
           )}
-          {form.description && (
-            <p className="mx-auto mt-2 max-w-[calc(100vw-2rem)] break-words text-sm leading-6 text-muted-foreground sm:max-w-xl sm:text-base">{form.description}</p>
-          )}
         </div>
 
         {isSubmitted ? (
-          <Card className="overflow-hidden rounded-2xl border-card-border bg-white py-14 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
-            <CardContent className="flex flex-col items-center justify-center space-y-4">
+          <Card className="overflow-hidden rounded-2xl border-card-border bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+            <CardContent className="flex flex-col items-center justify-center space-y-4 px-6 py-10 sm:px-10 sm:py-14">
               <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
-              <h2 className="text-3xl font-serif font-bold">Registration Complete!</h2>
-              <p className="text-muted-foreground text-lg max-w-md">
-                {completeMessage}
-              </p>
+              <h2 className="text-3xl font-serif font-bold text-center">Registration Complete!</h2>
+              {completeMessage.includes("\n") ? (
+                <div className="w-full rounded-xl border border-slate-100 bg-slate-50 px-5 py-4 text-left">
+                  <HeaderTextContent text={completeMessage} />
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-base max-w-md text-center">
+                  {completeMessage}
+                </p>
+              )}
               <Button
                 size="lg"
                 variant="outline"
@@ -296,11 +328,19 @@ export default function PublicRegistrationForm() {
             </CardContent>
           </Card>
         ) : !hasStartedRegistration ? (
-          <Card className="overflow-hidden rounded-2xl border-card-border bg-white py-14 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
-            <CardContent className="flex flex-col items-center justify-center space-y-5">
-              <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl">
+          <Card className="overflow-hidden rounded-2xl border-card-border bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+            <CardContent className="flex flex-col items-center justify-center space-y-5 px-6 py-10 sm:px-10 sm:py-14">
+              <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-center text-2xl font-serif font-bold text-foreground sm:text-3xl">
                 {form.title}
               </h2>
+              {form.description && (
+                <>
+                  <div className="w-full border-t border-slate-100" />
+                  <div className="w-full">
+                    <HeaderTextContent text={form.description} />
+                  </div>
+                </>
+              )}
               <Button
                 size="lg"
                 className="h-14 min-w-56 rounded-lg bg-primary px-8 text-lg font-bold text-primary-foreground shadow-[0_12px_24px_rgba(245,158,11,0.28)] hover:bg-primary/90"
@@ -319,9 +359,17 @@ export default function PublicRegistrationForm() {
             className="min-w-0 space-y-5"
             data-testid="registration-form"
           >
-            <div className="text-center">
-              <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-xl font-serif font-bold text-foreground sm:text-2xl">{form.title}</h2>
-            </div>
+            {form.description ? (
+              <div className="rounded-2xl border border-card-border bg-white px-6 py-5 shadow-[0_12px_36px_rgba(15,23,42,0.07)] space-y-4">
+                <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-center text-xl font-serif font-bold text-foreground sm:text-2xl">{form.title}</h2>
+                <div className="border-t border-slate-100" />
+                <HeaderTextContent text={form.description} />
+              </div>
+            ) : (
+              <div className="text-center">
+                <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-xl font-serif font-bold text-foreground sm:text-2xl">{form.title}</h2>
+              </div>
+            )}
 
             {showSectionStepper && stepSections.length > 1 && (
               <div className="min-w-0 overflow-x-auto rounded-2xl border border-card-border bg-white px-3 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.07)] sm:px-5">

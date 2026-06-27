@@ -69,10 +69,9 @@ router.get("/forms/by-slug/:embedSlug", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
-    const [questions, formFields, [{ count }], linkedEvent, organization] = await Promise.all([
+    const [questions, formFields, linkedEvent, organization] = await Promise.all([
       db.select().from(questionsTable).where(eq(questionsTable.formId, form[0].id)).orderBy(asc(questionsTable.order)),
       db.select().from(formFieldsTable).where(eq(formFieldsTable.formId, form[0].id)).orderBy(asc(formFieldsTable.sortOrder)),
-      db.select({ count: sql<number>`count(*)::int` }).from(registrationsTable).where(eq(registrationsTable.formId, form[0].id)),
       db.select({ registrationType: eventsTable.registrationType, eventId: eventsTable.id, roomAssignmentMode: eventsTable.roomAssignmentMode }).from(eventsTable).where(eq(eventsTable.formId, form[0].id)).limit(1),
       form[0].organizationId
         ? db
@@ -91,7 +90,26 @@ router.get("/forms/by-slug/:embedSlug", async (req, res) => {
     const registrationType = linkedEvent[0]?.registrationType ?? null;
     const eventId = linkedEvent[0]?.eventId ?? null;
     const roomAssignmentMode = linkedEvent[0]?.roomAssignmentMode ?? null;
-    res.json({ ...form[0], submissionCount: count, questions, formFields, registrationType, eventId, roomAssignmentMode, organization: organization[0] ?? null });
+    res.json({
+      id: form[0].id,
+      title: form[0].title,
+      description: form[0].description,
+      isActive: form[0].isActive,
+      isPublic: form[0].isPublic,
+      allowAdditionalPeople: form[0].allowAdditionalPeople,
+      showSectionsOneAtATime: form[0].showSectionsOneAtATime,
+      requireStartButton: form[0].requireStartButton,
+      allowSecondGuardian: form[0].allowSecondGuardian,
+      hideOrgLogo: form[0].hideOrgLogo,
+      hideOrgName: form[0].hideOrgName,
+      registrationCompleteMessage: form[0].registrationCompleteMessage,
+      questions,
+      formFields,
+      registrationType,
+      eventId,
+      roomAssignmentMode,
+      organization: organization[0] ?? null,
+    });
   } catch (err) {
     req.log.error({ err }, "Failed to get form by slug");
     res.status(500).json({ error: "Internal server error" });

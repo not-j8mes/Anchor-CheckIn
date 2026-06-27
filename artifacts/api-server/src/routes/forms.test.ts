@@ -241,6 +241,16 @@ const PRIVATE_ORG_FIELDS = [
   "printing_mode",
 ];
 
+const PRIVATE_PUBLIC_FORM_FIELDS = [
+  "organizationId",
+  "confirmationEmailEnabled",
+  "confirmationEmailSubject",
+  "confirmationEmailMessage",
+  "embedSlug",
+  "submissionCount",
+  "createdAt",
+];
+
 describe("GET /api/forms/by-slug/:embedSlug — public org field safety", () => {
   it("returns 404 for a non-existent slug", async () => {
     const result = await getJson("/api/forms/by-slug/000000000000");
@@ -266,6 +276,22 @@ describe("GET /api/forms/by-slug/:embedSlug — public org field safety", () => 
     for (const field of PRIVATE_ORG_FIELDS) {
       assert.ok(
         !(field in org),
+        `private field "${field}" must not appear in the public /forms/by-slug response`,
+      );
+    }
+  });
+
+  it("form object does not include internal settings or email templates", async () => {
+    const embedSlug = await getPublicFormSlug();
+    if (!embedSlug) return;
+
+    const result = await getJson(`/api/forms/by-slug/${embedSlug}`);
+    assert.equal(result.status, 200);
+
+    const body = result.body as Record<string, unknown>;
+    for (const field of PRIVATE_PUBLIC_FORM_FIELDS) {
+      assert.ok(
+        !(field in body),
         `private field "${field}" must not appear in the public /forms/by-slug response`,
       );
     }

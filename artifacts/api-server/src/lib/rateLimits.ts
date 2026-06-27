@@ -24,3 +24,11 @@ export const publicRegistrationRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many registration attempts. Please try again later." },
 });
+
+export const eventRegistrantEmailRateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many registrant email attempts. Please try again later." },
+});
