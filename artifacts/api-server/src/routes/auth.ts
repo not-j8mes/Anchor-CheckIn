@@ -13,6 +13,7 @@ import {
   setSessionCookie,
 } from "../lib/auth";
 import { verifyPassword } from "../lib/passwords";
+import { loginRateLimiter } from "../lib/rateLimits";
 
 const router = Router();
 
@@ -20,14 +21,18 @@ function normalizeIdentifier(value: unknown): string {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-router.post("/auth/login", async (req, res) => {
-  const identifier = normalizeIdentifier(req.body?.identifier ?? req.body?.email);
+router.post("/auth/login", loginRateLimiter, async (req, res) => {
+  const identifier = normalizeIdentifier(
+    req.body?.identifier ?? req.body?.email,
+  );
   const password =
     typeof req.body?.password === "string" ? req.body.password : "";
   const staySignedIn = req.body?.staySignedIn === true;
 
   if (!identifier || !password) {
-    res.status(400).json({ error: "Email or username and password are required" });
+    res
+      .status(400)
+      .json({ error: "Email or username and password are required" });
     return;
   }
 
@@ -35,7 +40,12 @@ router.post("/auth/login", async (req, res) => {
     const [user] = await db
       .select()
       .from(usersTable)
-      .where(or(eq(usersTable.email, identifier), eq(usersTable.username, identifier)))
+      .where(
+        or(
+          eq(usersTable.email, identifier),
+          eq(usersTable.username, identifier),
+        ),
+      )
       .limit(1);
 
     if (!user || !verifyPassword(password, user.passwordHash)) {
