@@ -325,6 +325,8 @@ export default function PublicRegistrationForm() {
   const orgNameClassName = isEmbedded
     ? "mx-auto mt-2 max-w-[calc(100vw-2rem)] break-words text-xl font-serif font-bold text-foreground sm:text-2xl"
     : "mx-auto mt-3 max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl";
+  const primaryRegistrationButtonClassName =
+    "rounded-lg border border-primary-foreground/70 bg-primary font-bold text-primary-foreground shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-px hover:bg-primary/90 hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)] focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
 
   return (
     <div className={pageClassName}>
@@ -386,7 +388,7 @@ export default function PublicRegistrationForm() {
               )}
               <Button
                 size="lg"
-                className="h-14 min-w-56 rounded-lg bg-primary px-8 text-lg font-bold text-primary-foreground shadow-[0_12px_24px_rgba(245,158,11,0.28)] hover:bg-primary/90"
+                className={`h-14 min-w-56 px-8 text-lg ${primaryRegistrationButtonClassName}`}
                 onClick={() => setHasStartedRegistration(true)}
                 data-testid="button-start-registration"
               >
@@ -516,7 +518,7 @@ export default function PublicRegistrationForm() {
                   <Button
                     type="submit"
                     size="lg"
-                    className="h-12 rounded-lg bg-primary font-bold text-primary-foreground shadow-[0_12px_24px_rgba(245,158,11,0.28)] hover:bg-primary/90"
+                    className={`h-12 ${primaryRegistrationButtonClassName}`}
                     disabled={isSubmitting}
                     data-testid="button-submit-registration"
                   >
@@ -526,7 +528,7 @@ export default function PublicRegistrationForm() {
                   <Button
                     type="button"
                     size="lg"
-                    className="h-12 rounded-lg bg-primary font-bold text-primary-foreground shadow-[0_12px_24px_rgba(245,158,11,0.28)] hover:bg-primary/90"
+                    className={`h-12 ${primaryRegistrationButtonClassName}`}
                     onClick={handleNextSection}
                   >
                     Next
@@ -538,7 +540,7 @@ export default function PublicRegistrationForm() {
               <Button
                 type="submit"
                 size="lg"
-                className="h-14 w-full rounded-lg bg-primary text-lg font-bold text-primary-foreground shadow-[0_12px_24px_rgba(245,158,11,0.28)] hover:bg-primary/90"
+                className={`h-14 w-full text-lg ${primaryRegistrationButtonClassName}`}
                 disabled={isSubmitting}
                 data-testid="button-submit-registration"
               >
