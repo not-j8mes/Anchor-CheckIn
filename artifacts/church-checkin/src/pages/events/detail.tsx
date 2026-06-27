@@ -4884,6 +4884,70 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
     toast({ title: "Embed code copied!" });
   };
 
+  const initialFormSettings = useMemo(
+    () => ({
+      title: event.form?.title ?? event.formTitle ?? "",
+      description: event.form?.description ?? "",
+      isActive: event.form?.isActive ?? true,
+      isPublic: event.form?.isPublic ?? false,
+      showSectionsOneAtATime: event.form?.showSectionsOneAtATime ?? false,
+      requireStartButton: event.form?.requireStartButton ?? false,
+      hideOrgLogo: event.form?.hideOrgLogo ?? false,
+      hideOrgName: event.form?.hideOrgName ?? false,
+      confirmationEmailEnabled: event.form?.confirmationEmailEnabled ?? true,
+      confirmationEmailSubject:
+        event.form?.confirmationEmailSubject ?? DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
+      confirmationEmailMessage:
+        event.form?.confirmationEmailMessage ?? DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
+    }),
+    [event.form, event.formTitle],
+  );
+
+  const [formSettings, setFormSettings] = useState(initialFormSettings);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const lastSavedSettingsRef = useRef(JSON.stringify(initialFormSettings));
+  const previousFormIdRef = useRef(event.formId);
+
+  useEffect(() => {
+    if (previousFormIdRef.current === event.formId) return;
+    previousFormIdRef.current = event.formId;
+    setFormSettings(initialFormSettings);
+    lastSavedSettingsRef.current = JSON.stringify(initialFormSettings);
+    setSaveStatus("idle");
+  }, [event.formId, initialFormSettings]);
+
+  const updateForm = useUpdateForm({
+    mutation: {
+      onMutate: () => setSaveStatus("saving"),
+      onSuccess: (_updated, variables) => {
+        lastSavedSettingsRef.current = JSON.stringify(variables.data);
+        setSaveStatus("saved");
+        if (event.formId) {
+          queryClient.invalidateQueries({ queryKey: getGetFormQueryKey(event.formId) });
+          queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+        }
+      },
+      onError: () => {
+        setSaveStatus("error");
+        toast({ title: "Failed to save settings", variant: "destructive" });
+      },
+    },
+  });
+
+  useEffect(() => {
+    if (!event.formId) return;
+    const serializedSettings = JSON.stringify(formSettings);
+    if (serializedSettings === lastSavedSettingsRef.current) return;
+
+    setSaveStatus("saving");
+    const saveTimer = window.setTimeout(() => {
+      updateForm.mutate({ formId: event.formId!, data: formSettings });
+    }, 650);
+
+    return () => window.clearTimeout(saveTimer);
+  }, [event.formId, formSettings, updateForm]);
+
+  /*
   const [formSettings, setFormSettings] = useState({
     title: event.form?.title ?? event.formTitle ?? "",
     description: event.form?.description ?? "",
@@ -4910,6 +4974,7 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
       onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
     },
   });
+  */
 
   return (
     <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
@@ -4992,7 +5057,18 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
           <div className="space-y-5 max-w-2xl">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">Form Settings</CardTitle>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-base">Form Settings</CardTitle>
+                  <span className="text-xs text-muted-foreground" aria-live="polite">
+                    {saveStatus === "saving"
+                      ? "Saving..."
+                      : saveStatus === "saved"
+                        ? "Saved"
+                        : saveStatus === "error"
+                          ? "Save failed"
+                          : ""}
+                  </span>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
@@ -5107,16 +5183,6 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
                   )}
                 </div>
               </CardContent>
-              <CardFooter className="border-t border-border pt-4">
-                <Button
-                  disabled={updateForm.isPending || !event.formId}
-                  onClick={() => {
-                    if (event.formId) updateForm.mutate({ formId: event.formId, data: formSettings });
-                  }}
-                >
-                  {updateForm.isPending ? "Saving…" : "Save Settings"}
-                </Button>
-              </CardFooter>
             </Card>
           </div>
         </TabsContent>
