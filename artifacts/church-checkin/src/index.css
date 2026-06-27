@@ -147,6 +147,9 @@
     --background: 0 0% 100%;
     background: #ffffff !important;
   }
+  .public-form-page {
+    background: #ffffff;
+  }
   body.public-form-body--embedded,
   body.public-form-body--embedded #root,
   body.public-form-body--embedded .public-form-page,

@@ -151,7 +151,7 @@ export default function PublicRegistrationForm() {
         className={
           isEmbedded
             ? "public-form-page public-form-page--embedded min-h-screen flex items-center justify-center bg-white"
-            : "public-form-page min-h-screen flex items-center justify-center bg-muted/20"
+            : "public-form-page min-h-screen flex items-center justify-center bg-white"
         }
       >
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent" />
@@ -165,7 +165,7 @@ export default function PublicRegistrationForm() {
         className={
           isEmbedded
             ? "public-form-page public-form-page--embedded flex-1 min-h-screen bg-white flex flex-col items-center justify-center p-4 text-center"
-            : "public-form-page flex-1 min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center"
+            : "public-form-page flex-1 min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center"
         }
       >
         <h1 className="text-2xl font-bold font-serif mb-2">Form Unavailable</h1>
@@ -312,7 +312,7 @@ export default function PublicRegistrationForm() {
 
   const pageClassName = isEmbedded
     ? "public-form-page public-form-page--embedded flex-1 min-h-screen overflow-x-hidden bg-white px-3 py-3 sm:px-4 sm:py-5"
-    : "public-form-page flex-1 min-h-screen overflow-x-hidden bg-[#fbfaf7] px-4 py-6 sm:px-6 sm:py-10 lg:px-8";
+    : "public-form-page flex-1 min-h-screen overflow-x-hidden bg-white px-4 py-6 sm:px-6 sm:py-10 lg:px-8";
   const contentClassName = isEmbedded
     ? "mx-auto w-full max-w-3xl min-w-0 space-y-4"
     : "mx-auto w-full max-w-3xl min-w-0 space-y-6";
