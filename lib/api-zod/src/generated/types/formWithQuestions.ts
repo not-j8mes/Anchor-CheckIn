@@ -21,6 +21,11 @@ export interface FormWithQuestions {
   allowSecondGuardian?: boolean | null;
   hideOrgLogo?: boolean;
   hideOrgName?: boolean;
+  confirmationEmailEnabled?: boolean;
+  /** @nullable */
+  confirmationEmailSubject?: string | null;
+  /** @nullable */
+  confirmationEmailMessage?: string | null;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;

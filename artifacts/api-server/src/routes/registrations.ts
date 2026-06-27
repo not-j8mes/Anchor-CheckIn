@@ -17,6 +17,7 @@ import {
   emergencyContactsTable,
   answersTable,
   checkinsTable,
+  organizationsTable,
 } from "@workspace/db";
 import type { FormField } from "@workspace/db";
 import {
@@ -26,10 +27,57 @@ import {
   GetRegistrationParams,
 } from "@workspace/api-zod";
 import { requireAuthContext } from "../lib/auth";
+import { sendRegistrationConfirmationEmail } from "../lib/email";
 
 const router = Router();
 
 class InvalidRegistrationGroupError extends Error {}
+
+function compactName(...parts: Array<string | null | undefined>): string | null {
+  const name = parts.map((part) => part?.trim()).filter(Boolean).join(" ");
+  return name || null;
+}
+
+function findSubmittedValue(
+  formFields: Array<Pick<FormField, "id" | "systemKey" | "label">>,
+  valueByFieldId: Map<number, string>,
+  keysOrLabels: string[],
+): string | null {
+  const normalizedTargets = keysOrLabels.map((target) => target.trim().toLowerCase());
+  for (const field of formFields) {
+    const fieldKey = field.systemKey?.trim().toLowerCase();
+    const fieldLabel = field.label.trim().toLowerCase();
+    if (!normalizedTargets.includes(fieldKey ?? "") && !normalizedTargets.includes(fieldLabel)) {
+      continue;
+    }
+    const value = valueByFieldId.get(field.id)?.trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+function getConfirmationRecipient(
+  registrationType: string | null | undefined,
+  formFields: FormField[],
+  valueByFieldId: Map<number, string>,
+  fallbackEmail?: string | null,
+): string | null {
+  const individualEmail = findSubmittedValue(formFields, valueByFieldId, [
+    "participant_email",
+    "registrant email",
+    "email",
+  ]);
+  const guardianEmail = findSubmittedValue(formFields, valueByFieldId, [
+    "guardian_email",
+    "parent / guardian email",
+    "parent/guardian email",
+  ]);
+
+  if (registrationType === "individual") {
+    return individualEmail ?? guardianEmail ?? fallbackEmail ?? null;
+  }
+  return guardianEmail ?? individualEmail ?? fallbackEmail ?? null;
+}
 
 async function syncSecondaryGuardianForParticipant(
   txOrDb: Pick<typeof db, "select" | "insert" | "update" | "delete">,
@@ -255,7 +303,11 @@ router.post("/forms/:formId/register", async (req, res) => {
     return;
   }
 
-  const { fields: submittedFields } = parsed.data;
+  const {
+    fields: submittedFields,
+    suppressConfirmationEmail = false,
+    confirmationParticipantNames = [],
+  } = parsed.data;
   const submittedRoom = (req.body as { room?: string }).room || null;
   const incomingGroupId = (req.body as { registrationGroupId?: number }).registrationGroupId ?? null;
 
@@ -551,6 +603,62 @@ router.post("/forms/:formId/register", async (req, res) => {
 
       return registration;
     });
+
+    const [savedEvent, organization] = await Promise.all([
+      eventId
+        ? db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1)
+        : Promise.resolve([]),
+      organizationId
+        ? db.select().from(organizationsTable).where(eq(organizationsTable.id, organizationId)).limit(1)
+        : Promise.resolve([]),
+    ]);
+
+    const loadedEvent = savedEvent[0] ?? event ?? null;
+    const loadedOrganization = organization[0] ?? null;
+    const primaryContactName =
+      compactName(guardianCols["first_name"], guardianCols["last_name"]) ||
+      registration.guardianName ||
+      null;
+    const participantName = compactName(participantCols["first_name"], participantCols["last_name"]);
+    const participantNamesForEmail =
+      confirmationParticipantNames.map((name) => name.trim()).filter(Boolean);
+    const recipientEmail = getConfirmationRecipient(
+      loadedEvent?.registrationType,
+      formFields,
+      valueByFieldId,
+      registration.guardianEmail,
+    );
+
+    if (form.confirmationEmailEnabled && !suppressConfirmationEmail) {
+      try {
+        await sendRegistrationConfirmationEmail({
+          to: recipientEmail,
+          organizationName: loadedOrganization?.name ?? "Anchor Events",
+          eventName: loadedEvent?.name ?? form.title,
+          eventDate: loadedEvent?.startDate ?? null,
+          eventEndDate: loadedEvent?.endDate ?? null,
+          eventScheduleType: loadedEvent?.scheduleType ?? null,
+          primaryContactName,
+          participantNames: participantNamesForEmail.length > 0
+            ? participantNamesForEmail
+            : participantName ? [participantName] : [],
+          subjectTemplate: form.confirmationEmailSubject,
+          messageTemplate: form.confirmationEmailMessage,
+          replyTo: null,
+        });
+      } catch (err) {
+        req.log.error(
+          {
+            err,
+            formId,
+            eventId,
+            organizationId,
+            registrationId: registration.id,
+          },
+          "Failed to send registration confirmation email",
+        );
+      }
+    }
 
     res.status(201).json(registration);
   } catch (err) {

@@ -63,8 +63,10 @@ import {
   RefreshCw,
   Phone,
   FileText,
+  Mail,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ConfirmationEmailMessageEditor } from "@/components/forms/ConfirmationEmailMessageEditor";
 import {
   SYSTEM_FIELDS,
   SYSTEM_FIELD_CATEGORIES,
@@ -82,6 +84,8 @@ const DEFAULT_SECONDARY_GUARDIAN_KEYS = [
   "secondary_guardian_first_name",
   "secondary_guardian_last_name",
 ];
+const DEFAULT_CONFIRMATION_EMAIL_SUBJECT = "Registration confirmed: {{eventName}}";
+const DEFAULT_CONFIRMATION_EMAIL_MESSAGE = "Your registration for {{eventName}} has been received.";
 
 interface SectionDef {
   key: SectionKey;
@@ -451,6 +455,9 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     allowSecondGuardian: null as boolean | null,
     hideOrgLogo: false,
     hideOrgName: false,
+    confirmationEmailEnabled: true,
+    confirmationEmailSubject: DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
+    confirmationEmailMessage: DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
   });
 
   useEffect(() => {
@@ -465,6 +472,9 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         allowSecondGuardian: form.allowSecondGuardian ?? null,
         hideOrgLogo: form.hideOrgLogo ?? false,
         hideOrgName: form.hideOrgName ?? false,
+        confirmationEmailEnabled: form.confirmationEmailEnabled ?? true,
+        confirmationEmailSubject: form.confirmationEmailSubject ?? DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
+        confirmationEmailMessage: form.confirmationEmailMessage ?? DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
       });
     }
   }, [form]);
@@ -592,6 +602,9 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         allowSecondGuardian: enabled,
         hideOrgLogo: form.hideOrgLogo ?? false,
         hideOrgName: form.hideOrgName ?? false,
+        confirmationEmailEnabled: form.confirmationEmailEnabled ?? true,
+        confirmationEmailSubject: form.confirmationEmailSubject ?? DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
+        confirmationEmailMessage: form.confirmationEmailMessage ?? DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
       },
     });
   };
@@ -1127,6 +1140,41 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                 />
               </div>
             )}
+            <div className="space-y-3 border-t border-border pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <Label className="text-sm flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                    Confirmation Email
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Send after successful registration</p>
+                </div>
+                <Switch
+                  checked={formSettings.confirmationEmailEnabled}
+                  onCheckedChange={(c) => setFormSettings((p) => ({ ...p, confirmationEmailEnabled: c }))}
+                />
+              </div>
+              {formSettings.confirmationEmailEnabled && (
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fb-email-subject">Subject</Label>
+                    <Input
+                      id="fb-email-subject"
+                      value={formSettings.confirmationEmailSubject}
+                      onChange={(e) => setFormSettings((p) => ({ ...p, confirmationEmailSubject: e.target.value }))}
+                    />
+                  </div>
+                  <ConfirmationEmailMessageEditor
+                    id="fb-email-message"
+                    value={formSettings.confirmationEmailMessage}
+                    onChange={(value) => setFormSettings((p) => ({ ...p, confirmationEmailMessage: value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Available: {"{{eventName}}"}, {"{{organizationName}}"}, {"{{eventDate}}"}, {"{{primaryContactName}}"}, {"{{participantNames}}"}
+                  </p>
+                </div>
+              )}
+            </div>
           </CardContent>
           <CardFooter>
             <Button

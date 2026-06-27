@@ -75,6 +75,9 @@ export const ListFormsResponseItem = zod.object({
   "allowSecondGuardian": zod.boolean().nullish(),
   "hideOrgLogo": zod.boolean().optional(),
   "hideOrgName": zod.boolean().optional(),
+  "confirmationEmailEnabled": zod.boolean().optional(),
+  "confirmationEmailSubject": zod.string().nullish(),
+  "confirmationEmailMessage": zod.string().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -94,7 +97,10 @@ export const CreateFormBody = zod.object({
   "showSectionsOneAtATime": zod.boolean().optional(),
   "allowSecondGuardian": zod.boolean().nullish(),
   "hideOrgLogo": zod.boolean().optional(),
-  "hideOrgName": zod.boolean().optional()
+  "hideOrgName": zod.boolean().optional(),
+  "confirmationEmailEnabled": zod.boolean().optional(),
+  "confirmationEmailSubject": zod.string().nullish(),
+  "confirmationEmailMessage": zod.string().nullish()
 })
 
 export const CreateFormResponse = zod.object({
@@ -108,6 +114,9 @@ export const CreateFormResponse = zod.object({
   "allowSecondGuardian": zod.boolean().nullish(),
   "hideOrgLogo": zod.boolean().optional(),
   "hideOrgName": zod.boolean().optional(),
+  "confirmationEmailEnabled": zod.boolean().optional(),
+  "confirmationEmailSubject": zod.string().nullish(),
+  "confirmationEmailMessage": zod.string().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -209,6 +218,9 @@ export const CreateEventResponse = zod.object({
   "allowSecondGuardian": zod.boolean().nullish(),
   "hideOrgLogo": zod.boolean().optional(),
   "hideOrgName": zod.boolean().optional(),
+  "confirmationEmailEnabled": zod.boolean().optional(),
+  "confirmationEmailSubject": zod.string().nullish(),
+  "confirmationEmailMessage": zod.string().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -355,6 +367,9 @@ export const GetEventResponse = zod.object({
   "allowSecondGuardian": zod.boolean().nullish(),
   "hideOrgLogo": zod.boolean().optional(),
   "hideOrgName": zod.boolean().optional(),
+  "confirmationEmailEnabled": zod.boolean().optional(),
+  "confirmationEmailSubject": zod.string().nullish(),
+  "confirmationEmailMessage": zod.string().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -473,6 +488,9 @@ export const GetFormBySlugResponse = zod.object({
   "allowSecondGuardian": zod.boolean().nullish(),
   "hideOrgLogo": zod.boolean().optional(),
   "hideOrgName": zod.boolean().optional(),
+  "confirmationEmailEnabled": zod.boolean().optional(),
+  "confirmationEmailSubject": zod.string().nullish(),
+  "confirmationEmailMessage": zod.string().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -525,6 +543,9 @@ export const GetFormResponse = zod.object({
   "allowSecondGuardian": zod.boolean().nullish(),
   "hideOrgLogo": zod.boolean().optional(),
   "hideOrgName": zod.boolean().optional(),
+  "confirmationEmailEnabled": zod.boolean().optional(),
+  "confirmationEmailSubject": zod.string().nullish(),
+  "confirmationEmailMessage": zod.string().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -575,7 +596,10 @@ export const UpdateFormBody = zod.object({
   "showSectionsOneAtATime": zod.boolean().optional(),
   "allowSecondGuardian": zod.boolean().nullish(),
   "hideOrgLogo": zod.boolean().optional(),
-  "hideOrgName": zod.boolean().optional()
+  "hideOrgName": zod.boolean().optional(),
+  "confirmationEmailEnabled": zod.boolean().optional(),
+  "confirmationEmailSubject": zod.string().nullish(),
+  "confirmationEmailMessage": zod.string().nullish()
 })
 
 export const UpdateFormResponse = zod.object({
@@ -589,6 +613,9 @@ export const UpdateFormResponse = zod.object({
   "allowSecondGuardian": zod.boolean().nullish(),
   "hideOrgLogo": zod.boolean().optional(),
   "hideOrgName": zod.boolean().optional(),
+  "confirmationEmailEnabled": zod.boolean().optional(),
+  "confirmationEmailSubject": zod.string().nullish(),
+  "confirmationEmailMessage": zod.string().nullish(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -872,7 +899,9 @@ export const SubmitRegistrationBody = zod.object({
   "value": zod.string().describe('The submitted value (always a string; checkboxes use \"true\"\/\"false\").')
 })).describe('One entry per form field submitted. System fields are routed to the appropriate participant\/guardian\/emergency_contact columns server-side. Custom question answers are stored in registration_custom_answers.\n'),
   "room": zod.string().optional().describe('Room name chosen by the registrant (used when roomAssignmentMode is registrant_chooses)'),
-  "registrationGroupId": zod.number().optional().describe('Optional. Assign this registration to an existing registration group (family session). If omitted, a new group is created automatically.\n')
+  "registrationGroupId": zod.number().optional().describe('Optional. Assign this registration to an existing registration group (family session). If omitted, a new group is created automatically.\n'),
+  "suppressConfirmationEmail": zod.boolean().optional().describe('Skip the confirmation email for this row when a multi-person public submission sends one email at the end.'),
+  "confirmationParticipantNames": zod.array(zod.string()).optional().describe('Participant names included in this exact public form submission for confirmation email templates.')
 })
 
 export const SubmitRegistrationResponse = zod.object({

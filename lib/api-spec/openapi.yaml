@@ -1282,6 +1282,12 @@ components:
           type: boolean
         hideOrgName:
           type: boolean
+        confirmationEmailEnabled:
+          type: boolean
+        confirmationEmailSubject:
+          type: ["string", "null"]
+        confirmationEmailMessage:
+          type: ["string", "null"]
         embedSlug:
           type: string
         submissionCount:
@@ -1311,6 +1317,12 @@ components:
           type: boolean
         hideOrgName:
           type: boolean
+        confirmationEmailEnabled:
+          type: boolean
+        confirmationEmailSubject:
+          type: ["string", "null"]
+        confirmationEmailMessage:
+          type: ["string", "null"]
 
     FormWithQuestions:
       type: object
@@ -1336,6 +1348,12 @@ components:
           type: boolean
         hideOrgName:
           type: boolean
+        confirmationEmailEnabled:
+          type: boolean
+        confirmationEmailSubject:
+          type: ["string", "null"]
+        confirmationEmailMessage:
+          type: ["string", "null"]
         embedSlug:
           type: string
         submissionCount:
@@ -1674,6 +1692,14 @@ components:
           description: >
             Optional. Assign this registration to an existing registration group
             (family session). If omitted, a new group is created automatically.
+        suppressConfirmationEmail:
+          type: boolean
+          description: Skip the confirmation email for this row when a multi-person public submission sends one email at the end.
+        confirmationParticipantNames:
+          type: array
+          description: Participant names included in this exact public form submission for confirmation email templates.
+          items:
+            type: string
 
     UpdateRoomInput:
       type: object

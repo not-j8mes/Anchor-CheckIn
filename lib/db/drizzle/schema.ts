@@ -55,6 +55,9 @@ export const forms = pgTable("forms", {
 	allowSecondGuardian: boolean("allow_second_guardian"),
 	hideOrgLogo: boolean("hide_org_logo").default(false).notNull(),
 	hideOrgName: boolean("hide_org_name").default(false).notNull(),
+	confirmationEmailEnabled: boolean("confirmation_email_enabled").default(true).notNull(),
+	confirmationEmailSubject: text("confirmation_email_subject"),
+	confirmationEmailMessage: text("confirmation_email_message"),
 }, (table) => [
 	unique("forms_embed_slug_unique").on(table.embedSlug),
 ]);

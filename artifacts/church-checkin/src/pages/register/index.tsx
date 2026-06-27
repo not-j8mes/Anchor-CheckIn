@@ -144,6 +144,18 @@ export default function PublicRegistrationForm() {
     return null;
   };
 
+  const getChildParticipantName = (childAnswerMap: Record<number, string>) => {
+    const firstNameField = formFields.find((field) =>
+      field.systemKey === "child_first_name" || field.systemKey === "participant_first_name",
+    );
+    const lastNameField = formFields.find((field) =>
+      field.systemKey === "child_last_name" || field.systemKey === "participant_last_name",
+    );
+    const firstName = firstNameField ? childAnswerMap[firstNameField.id]?.trim() : "";
+    const lastName = lastNameField ? childAnswerMap[lastNameField.id]?.trim() : "";
+    return [firstName, lastName].filter(Boolean).join(" ");
+  };
+
   const handleNextSection = () => {
     if (!formRef.current?.reportValidity()) return;
     setSubmitError(null);
@@ -173,7 +185,11 @@ export default function PublicRegistrationForm() {
     setIsSubmitting(true);
 
     try {
-      for (const childAnswerMap of childrenAnswers) {
+      const confirmationParticipantNames = childrenAnswers
+        .map(getChildParticipantName)
+        .filter(Boolean);
+
+      for (const [index, childAnswerMap] of childrenAnswers.entries()) {
         const fields: { fieldId: number; value: string }[] = [];
 
         for (const f of formFields.filter((f) => getFieldSection(f) === "guardian_info")) {
@@ -195,7 +211,14 @@ export default function PublicRegistrationForm() {
 
         await submitRegistration.mutateAsync({
           formId: form.id,
-          data: { fields, ...(selectedRoom ? { room: selectedRoom } : {}) },
+          data: {
+            fields,
+            ...(selectedRoom ? { room: selectedRoom } : {}),
+            suppressConfirmationEmail: index < childrenAnswers.length - 1,
+            ...(index === childrenAnswers.length - 1 && confirmationParticipantNames.length > 0
+              ? { confirmationParticipantNames }
+              : {}),
+          },
         });
       }
       setIsSubmitted(true);

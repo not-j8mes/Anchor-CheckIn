@@ -17,4 +17,9 @@ export interface FormInput {
   allowSecondGuardian?: boolean | null;
   hideOrgLogo?: boolean;
   hideOrgName?: boolean;
+  confirmationEmailEnabled?: boolean;
+  /** @nullable */
+  confirmationEmailSubject?: string | null;
+  /** @nullable */
+  confirmationEmailMessage?: string | null;
 }

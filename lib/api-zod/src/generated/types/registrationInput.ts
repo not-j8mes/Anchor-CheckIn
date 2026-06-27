@@ -14,4 +14,8 @@ export interface RegistrationInput {
   room?: string;
   /** Optional. Assign this registration to an existing registration group (family session). If omitted, a new group is created automatically. */
   registrationGroupId?: number;
+  /** Skip the confirmation email for this row when a multi-person public submission sends one email at the end. */
+  suppressConfirmationEmail?: boolean;
+  /** Participant names included in this exact public form submission for confirmation email templates. */
+  confirmationParticipantNames?: string[];
 }

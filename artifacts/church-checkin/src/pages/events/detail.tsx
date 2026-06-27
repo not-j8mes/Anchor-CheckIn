@@ -110,6 +110,7 @@ import { printLabels as printLabelDirectly } from "@/lib/label-renderer";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { FormBuilderPanel } from "@/components/forms/FormBuilderPanel";
+import { ConfirmationEmailMessageEditor } from "@/components/forms/ConfirmationEmailMessageEditor";
 import {
   RegistrationFormBody,
   getFieldSection,
@@ -125,6 +126,8 @@ const BULK_CHECKOUT_REASON_LABELS: Record<string, string> = {
   emergency_closure: "Emergency closure",
   other: "Other",
 };
+const DEFAULT_CONFIRMATION_EMAIL_SUBJECT = "Registration confirmed: {{eventName}}";
+const DEFAULT_CONFIRMATION_EMAIL_MESSAGE = "Your registration for {{eventName}} has been received.";
 
 const BULK_CHECKOUT_REASONS = Object.entries(BULK_CHECKOUT_REASON_LABELS).map(
   ([value, label]) => ({ value, label }),
@@ -4889,6 +4892,9 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
     showSectionsOneAtATime: event.form?.showSectionsOneAtATime ?? false,
     hideOrgLogo: event.form?.hideOrgLogo ?? false,
     hideOrgName: event.form?.hideOrgName ?? false,
+    confirmationEmailEnabled: event.form?.confirmationEmailEnabled ?? true,
+    confirmationEmailSubject: event.form?.confirmationEmailSubject ?? DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
+    confirmationEmailMessage: event.form?.confirmationEmailMessage ?? DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
   });
 
   const updateForm = useUpdateForm({
@@ -5056,6 +5062,39 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
                     />
                   </div>
                 )}
+                <div className="space-y-3 border-t border-border pt-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <Label className="text-sm font-medium flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                        Confirmation Email
+                      </Label>
+                      <p className="text-xs text-muted-foreground">Send after successful registration</p>
+                    </div>
+                    <Switch
+                      checked={formSettings.confirmationEmailEnabled}
+                      onCheckedChange={(v) => setFormSettings((p) => ({ ...p, confirmationEmailEnabled: v }))}
+                    />
+                  </div>
+                  {formSettings.confirmationEmailEnabled && (
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <Label>Subject</Label>
+                        <Input
+                          value={formSettings.confirmationEmailSubject}
+                          onChange={(e) => setFormSettings((p) => ({ ...p, confirmationEmailSubject: e.target.value }))}
+                        />
+                      </div>
+                      <ConfirmationEmailMessageEditor
+                        value={formSettings.confirmationEmailMessage}
+                        onChange={(value) => setFormSettings((p) => ({ ...p, confirmationEmailMessage: value }))}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Available: {"{{eventName}}"}, {"{{organizationName}}"}, {"{{eventDate}}"}, {"{{primaryContactName}}"}, {"{{participantNames}}"}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
               <CardFooter className="border-t border-border pt-4">
                 <Button
