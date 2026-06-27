@@ -25,6 +25,8 @@ export interface Form {
   confirmationEmailSubject?: string | null;
   /** @nullable */
   confirmationEmailMessage?: string | null;
+  /** @nullable */
+  registrationCompleteMessage?: string | null;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;

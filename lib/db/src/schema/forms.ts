@@ -21,6 +21,7 @@ export const formsTable = pgTable("forms", {
   confirmationEmailEnabled: boolean("confirmation_email_enabled").notNull().default(true),
   confirmationEmailSubject: text("confirmation_email_subject"),
   confirmationEmailMessage: text("confirmation_email_message"),
+  registrationCompleteMessage: text("registration_complete_message"),
   embedSlug: text("embed_slug").notNull().unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

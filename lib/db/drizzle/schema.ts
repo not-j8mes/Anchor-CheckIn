@@ -59,6 +59,7 @@ export const forms = pgTable("forms", {
 	confirmationEmailEnabled: boolean("confirmation_email_enabled").default(true).notNull(),
 	confirmationEmailSubject: text("confirmation_email_subject"),
 	confirmationEmailMessage: text("confirmation_email_message"),
+	registrationCompleteMessage: text("registration_complete_message"),
 }, (table) => [
 	unique("forms_embed_slug_unique").on(table.embedSlug),
 ]);

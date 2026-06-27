@@ -1290,6 +1290,8 @@ components:
           type: ["string", "null"]
         confirmationEmailMessage:
           type: ["string", "null"]
+        registrationCompleteMessage:
+          type: ["string", "null"]
         embedSlug:
           type: string
         submissionCount:
@@ -1327,6 +1329,8 @@ components:
           type: ["string", "null"]
         confirmationEmailMessage:
           type: ["string", "null"]
+        registrationCompleteMessage:
+          type: ["string", "null"]
 
     FormWithQuestions:
       type: object
@@ -1359,6 +1363,8 @@ components:
         confirmationEmailSubject:
           type: ["string", "null"]
         confirmationEmailMessage:
+          type: ["string", "null"]
+        registrationCompleteMessage:
           type: ["string", "null"]
         embedSlug:
           type: string

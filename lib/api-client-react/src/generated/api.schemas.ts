@@ -58,6 +58,8 @@ export interface Form {
   confirmationEmailSubject?: string | null;
   /** @nullable */
   confirmationEmailMessage?: string | null;
+  /** @nullable */
+  registrationCompleteMessage?: string | null;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;
@@ -80,6 +82,8 @@ export interface FormInput {
   confirmationEmailSubject?: string | null;
   /** @nullable */
   confirmationEmailMessage?: string | null;
+  /** @nullable */
+  registrationCompleteMessage?: string | null;
 }
 
 export type QuestionType = typeof QuestionType[keyof typeof QuestionType];
@@ -175,6 +179,8 @@ export interface FormWithQuestions {
   confirmationEmailSubject?: string | null;
   /** @nullable */
   confirmationEmailMessage?: string | null;
+  /** @nullable */
+  registrationCompleteMessage?: string | null;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;
@@ -972,4 +978,3 @@ eventId?: number;
 export type GetCheckinsByDayParams = {
 eventId?: number;
 };
-

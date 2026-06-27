@@ -49,16 +49,39 @@ import {
   type FormField,
 } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   ArrowLeft,
   Calendar,
@@ -119,15 +142,18 @@ import { cn } from "@/lib/utils";
 import { RoomsTabContent } from "./detail/RoomsTabContent";
 import { getEventRegistrationsExport } from "./detail/registrationExport";
 
-
 const BULK_CHECKOUT_REASON_LABELS: Record<string, string> = {
   end_of_event: "End of event",
   forgot_individual: "Forgot to check out individually",
   emergency_closure: "Emergency closure",
   other: "Other",
 };
-const DEFAULT_CONFIRMATION_EMAIL_SUBJECT = "Registration confirmed: {{eventName}}";
-const DEFAULT_CONFIRMATION_EMAIL_MESSAGE = "Your registration for {{eventName}} has been received.";
+const DEFAULT_CONFIRMATION_EMAIL_SUBJECT =
+  "Registration confirmed: {{eventName}}";
+const DEFAULT_CONFIRMATION_EMAIL_MESSAGE =
+  "Your registration for {{eventName}} has been received.";
+const DEFAULT_REGISTRATION_COMPLETE_MESSAGE =
+  "Thank you for registering. We look forward to seeing you!";
 
 const BULK_CHECKOUT_REASONS = Object.entries(BULK_CHECKOUT_REASON_LABELS).map(
   ([value, label]) => ({ value, label }),
@@ -145,21 +171,43 @@ function getLocalDateDayOfWeek(dateKey: string): number {
 }
 
 function statusBadge(status: string) {
-  if (status === "active") return <Badge className="bg-green-100 text-green-800 border-green-200">Active</Badge>;
-  if (status === "upcoming") return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Upcoming</Badge>;
-  if (status === "completed") return <Badge variant="secondary">Completed</Badge>;
+  if (status === "active")
+    return (
+      <Badge className="bg-green-100 text-green-800 border-green-200">
+        Active
+      </Badge>
+    );
+  if (status === "upcoming")
+    return (
+      <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+        Upcoming
+      </Badge>
+    );
+  if (status === "completed")
+    return <Badge variant="secondary">Completed</Badge>;
   return <Badge variant="outline">{status}</Badge>;
 }
 
 // ─── Children tab ──────────────────────────────────────────────────────────────
 
-function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; open: boolean; onOpenChange: (v: boolean) => void }) {
+function EventEditChildDialog({
+  child,
+  open,
+  onOpenChange,
+}: {
+  child: Child;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { id: eventIdStr } = useParams<{ id: string }>();
   const _editChildEventId = parseInt(eventIdStr || "0", 10);
   const { data: rooms } = useListRooms(_editChildEventId, {
-    query: { enabled: !!_editChildEventId, queryKey: getListRoomsQueryKey(_editChildEventId) },
+    query: {
+      enabled: !!_editChildEventId,
+      queryKey: getListRoomsQueryKey(_editChildEventId),
+    },
   });
 
   const guardianParts = (child.guardianName ?? "").trim().split(/\s+/);
@@ -177,7 +225,10 @@ function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; ope
     room: child.room ?? "",
   });
 
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((p) => ({ ...p, [field]: e.target.value }));
+  const set =
+    (field: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((p) => ({ ...p, [field]: e.target.value }));
 
   const updateRegistration = useUpdateRegistration({
     mutation: {
@@ -186,7 +237,8 @@ function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; ope
         toast({ title: "Record updated" });
         onOpenChange(false);
       },
-      onError: () => toast({ title: "Failed to save changes", variant: "destructive" }),
+      onError: () =>
+        toast({ title: "Failed to save changes", variant: "destructive" }),
     },
   });
 
@@ -211,50 +263,157 @@ function EventEditChildDialog({ child, open, onOpenChange }: { child: Child; ope
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!updateRegistration.isPending) onOpenChange(v); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!updateRegistration.isPending) onOpenChange(v);
+      }}
+    >
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-serif">Edit — {child.firstName} {child.lastName}</DialogTitle>
+          <DialogTitle className="text-xl font-serif">
+            Edit — {child.firstName} {child.lastName}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5 pt-2">
           <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Child</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Child
+            </p>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>First Name</Label><Input value={form.childFirstName} onChange={set("childFirstName")} /></div>
-              <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.childLastName} onChange={set("childLastName")} /></div>
+              <div className="space-y-1.5">
+                <Label>First Name</Label>
+                <Input
+                  value={form.childFirstName}
+                  onChange={set("childFirstName")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Last Name</Label>
+                <Input
+                  value={form.childLastName}
+                  onChange={set("childLastName")}
+                />
+              </div>
             </div>
-            <div className="space-y-1.5"><Label>Date of Birth</Label><Input type="date" value={form.childDateOfBirth} onChange={set("childDateOfBirth")} /></div>
-            <div className="space-y-1.5"><Label>Allergies</Label><Textarea value={form.allergies} onChange={set("allergies")} placeholder="e.g. peanuts, latex" rows={2} /></div>
-            <div className="space-y-1.5"><Label>Medical Notes</Label><Textarea value={form.medicalNotes} onChange={set("medicalNotes")} placeholder="Any diagnoses, medications, or medical considerations…" rows={2} /></div>
-            <div className="space-y-1.5"><Label>Special Needs / Accommodations</Label><Textarea value={form.specialNeeds} onChange={set("specialNeeds")} placeholder="Describe any special needs or accommodations required…" rows={2} /></div>
+            <div className="space-y-1.5">
+              <Label>Date of Birth</Label>
+              <Input
+                type="date"
+                value={form.childDateOfBirth}
+                onChange={set("childDateOfBirth")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Allergies</Label>
+              <Textarea
+                value={form.allergies}
+                onChange={set("allergies")}
+                placeholder="e.g. peanuts, latex"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Medical Notes</Label>
+              <Textarea
+                value={form.medicalNotes}
+                onChange={set("medicalNotes")}
+                placeholder="Any diagnoses, medications, or medical considerations…"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Special Needs / Accommodations</Label>
+              <Textarea
+                value={form.specialNeeds}
+                onChange={set("specialNeeds")}
+                placeholder="Describe any special needs or accommodations required…"
+                rows={2}
+              />
+            </div>
             <div className="space-y-1.5">
               <Label>Room</Label>
               {rooms && rooms.length > 0 ? (
-                <Select value={form.room || "__none__"} onValueChange={(v) => setForm((p) => ({ ...p, room: v === "__none__" ? "" : v }))}>
-                  <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <Select
+                  value={form.room || "__none__"}
+                  onValueChange={(v) =>
+                    setForm((p) => ({ ...p, room: v === "__none__" ? "" : v }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Unassigned</SelectItem>
-                    {rooms.map((r) => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
+                    {rooms.map((r) => (
+                      <SelectItem key={r.id} value={r.name}>
+                        {r.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               ) : (
-                <Input value={form.room} onChange={set("room")} placeholder="Room name" />
+                <Input
+                  value={form.room}
+                  onChange={set("room")}
+                  placeholder="Room name"
+                />
               )}
             </div>
           </div>
           <div className="space-y-3 pt-1 border-t border-border">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">Guardian</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-2">
+              Guardian
+            </p>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>First Name</Label><Input value={form.guardianFirstName} onChange={set("guardianFirstName")} /></div>
-              <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.guardianLastName} onChange={set("guardianLastName")} /></div>
+              <div className="space-y-1.5">
+                <Label>First Name</Label>
+                <Input
+                  value={form.guardianFirstName}
+                  onChange={set("guardianFirstName")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Last Name</Label>
+                <Input
+                  value={form.guardianLastName}
+                  onChange={set("guardianLastName")}
+                />
+              </div>
             </div>
-            <div className="space-y-1.5"><Label>Phone</Label><Input type="tel" value={form.guardianPhone} onChange={set("guardianPhone")} /></div>
-            <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.guardianEmail} onChange={set("guardianEmail")} /></div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input
+                type="tel"
+                value={form.guardianPhone}
+                onChange={set("guardianPhone")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={form.guardianEmail}
+                onChange={set("guardianEmail")}
+              />
+            </div>
           </div>
           <DialogFooter className="pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={updateRegistration.isPending} className="gap-2">
-              {updateRegistration.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={updateRegistration.isPending}
+              className="gap-2"
+            >
+              {updateRegistration.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              )}
               Save Changes
             </Button>
           </DialogFooter>
@@ -292,13 +451,24 @@ function ManualRegistrationDialog({
   const formFields: FormField[] = form?.formFields ?? [];
 
   const { data: rooms = [] } = useListRooms(eventId, {
-    query: { enabled: open && !!eventId, queryKey: getListRoomsQueryKey(eventId) },
+    query: {
+      enabled: open && !!eventId,
+      queryKey: getListRoomsQueryKey(eventId),
+    },
   });
 
-  const [guardianAnswers, setGuardianAnswers] = useState<Record<number, string>>({});
-  const [childrenAnswers, setChildrenAnswers] = useState<Record<number, string>[]>([{}]);
-  const [emergencyAnswers, setEmergencyAnswers] = useState<Record<number, string>>({});
-  const [additionalAnswers, setAdditionalAnswers] = useState<Record<number, string>>({});
+  const [guardianAnswers, setGuardianAnswers] = useState<
+    Record<number, string>
+  >({});
+  const [childrenAnswers, setChildrenAnswers] = useState<
+    Record<number, string>[]
+  >([{}]);
+  const [emergencyAnswers, setEmergencyAnswers] = useState<
+    Record<number, string>
+  >({});
+  const [additionalAnswers, setAdditionalAnswers] = useState<
+    Record<number, string>
+  >({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const submitReg = useSubmitRegistration();
@@ -310,7 +480,9 @@ function ManualRegistrationDialog({
     setAdditionalAnswers({});
   };
 
-  const roomAssignmentFieldId = formFields.find((f) => f.systemKey === "room_assignment")?.id;
+  const roomAssignmentFieldId = formFields.find(
+    (f) => f.systemKey === "room_assignment",
+  )?.id;
 
   const resolvedFormId = form?.id ?? formId;
 
@@ -321,16 +493,24 @@ function ManualRegistrationDialog({
     try {
       for (const childAnswerMap of childrenAnswers) {
         const fields: { fieldId: number; value: string }[] = [];
-        for (const f of formFields.filter((f) => getFieldSection(f) === "guardian_info")) {
+        for (const f of formFields.filter(
+          (f) => getFieldSection(f) === "guardian_info",
+        )) {
           fields.push({ fieldId: f.id, value: guardianAnswers[f.id] ?? "" });
         }
-        for (const f of formFields.filter((f) => getFieldSection(f) === "child_info")) {
+        for (const f of formFields.filter(
+          (f) => getFieldSection(f) === "child_info",
+        )) {
           fields.push({ fieldId: f.id, value: childAnswerMap[f.id] ?? "" });
         }
-        for (const f of formFields.filter((f) => getFieldSection(f) === "emergency_contact")) {
+        for (const f of formFields.filter(
+          (f) => getFieldSection(f) === "emergency_contact",
+        )) {
           fields.push({ fieldId: f.id, value: emergencyAnswers[f.id] ?? "" });
         }
-        for (const f of formFields.filter((f) => ["additional_questions", "waivers"].includes(getFieldSection(f)))) {
+        for (const f of formFields.filter((f) =>
+          ["additional_questions", "waivers"].includes(getFieldSection(f)),
+        )) {
           fields.push({ fieldId: f.id, value: additionalAnswers[f.id] ?? "" });
         }
         const selectedRoom = roomAssignmentFieldId
@@ -341,14 +521,24 @@ function ManualRegistrationDialog({
           data: { fields, ...(selectedRoom ? { room: selectedRoom } : {}) },
         });
       }
-      queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(resolvedFormId) });
-      queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
-      queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey({ eventId }) });
+      queryClient.invalidateQueries({
+        queryKey: getListRegistrationsQueryKey(resolvedFormId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: getListEventCheckinsQueryKey(eventId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: getListChildrenQueryKey({ eventId }),
+      });
       const count = childrenAnswers.length;
       toast({
         title: isChildCheckin
-          ? count > 1 ? `${count} children added successfully.` : "Child added successfully."
-          : count > 1 ? `${count} registrants added successfully.` : "Registrant added successfully.",
+          ? count > 1
+            ? `${count} children added successfully.`
+            : "Child added successfully."
+          : count > 1
+            ? `${count} registrants added successfully.`
+            : "Registrant added successfully.",
       });
       onOpenChange(false);
       resetForm();
@@ -362,7 +552,12 @@ function ManualRegistrationDialog({
   return (
     <Dialog
       open={open}
-      onOpenChange={(v) => { if (!isSubmitting) { onOpenChange(v); if (!v) resetForm(); } }}
+      onOpenChange={(v) => {
+        if (!isSubmitting) {
+          onOpenChange(v);
+          if (!v) resetForm();
+        }
+      }}
     >
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -411,7 +606,14 @@ function ManualRegistrationDialog({
               }
             />
             <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => { onOpenChange(false); resetForm(); }}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  onOpenChange(false);
+                  resetForm();
+                }}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting} className="gap-2">
@@ -455,31 +657,54 @@ function RegistrationDetailSheet({
   const [deleteConfirm, setDeleteConfirm] = useState("");
 
   const { data: rooms } = useListRooms(eventId, {
-    query: { enabled: open && !!eventId, queryKey: getListRoomsQueryKey(eventId) },
+    query: {
+      enabled: open && !!eventId,
+      queryKey: getListRoomsQueryKey(eventId),
+    },
   });
 
   const deleteRegistration = useDeleteRegistration({
     mutation: {
       onSuccess: () => {
-        if (formId) queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(formId) });
-        queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey({ eventId }) });
+        if (formId)
+          queryClient.invalidateQueries({
+            queryKey: getListRegistrationsQueryKey(formId),
+          });
+        queryClient.invalidateQueries({
+          queryKey: getListChildrenQueryKey({ eventId }),
+        });
         toast({ title: "Registration deleted" });
         setDeleteOpen(false);
         onOpenChange(false);
       },
-      onError: (err) => toast({ title: "Failed to delete registration", description: err instanceof Error ? err.message : String(err), variant: "destructive" }),
+      onError: (err) =>
+        toast({
+          title: "Failed to delete registration",
+          description: err instanceof Error ? err.message : String(err),
+          variant: "destructive",
+        }),
     },
   });
 
   const updateRoom = useUpdateRegistrationRoom({
     mutation: {
       onSuccess: (updated) => {
-        if (formId) queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(formId) });
-        queryClient.invalidateQueries({ queryKey: [`/api/registrations/${reg.id}`] });
-        toast({ title: updated.room ? `Room set to ${updated.room}` : "Room cleared" });
+        if (formId)
+          queryClient.invalidateQueries({
+            queryKey: getListRegistrationsQueryKey(formId),
+          });
+        queryClient.invalidateQueries({
+          queryKey: [`/api/registrations/${reg.id}`],
+        });
+        toast({
+          title: updated.room ? `Room set to ${updated.room}` : "Room cleared",
+        });
         setAssigningRoom(false);
       },
-      onError: () => { toast({ title: "Failed to assign room", variant: "destructive" }); setAssigningRoom(false); },
+      onError: () => {
+        toast({ title: "Failed to assign room", variant: "destructive" });
+        setAssigningRoom(false);
+      },
     },
   });
 
@@ -490,7 +715,9 @@ function RegistrationDetailSheet({
   const handleEditClose = (v: boolean) => {
     setEditOpen(v);
     if (!v && formId) {
-      queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(formId) });
+      queryClient.invalidateQueries({
+        queryKey: getListRegistrationsQueryKey(formId),
+      });
     }
   };
 
@@ -502,24 +729,28 @@ function RegistrationDetailSheet({
         const m = today.getMonth() - birth.getMonth();
         if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) years--;
         if (years === 0) {
-          const months = (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+          const months =
+            (today.getFullYear() - birth.getFullYear()) * 12 +
+            (today.getMonth() - birth.getMonth());
           return `${Math.max(0, months)} mo`;
         }
         return `${years} yr`;
       })()
     : null;
 
-
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
-          <SheetTitle className="sr-only">{reg.childFirstName} {reg.childLastName}</SheetTitle>
+          <SheetTitle className="sr-only">
+            {reg.childFirstName} {reg.childLastName}
+          </SheetTitle>
 
           {/* Header */}
           <div className="flex items-start gap-3 px-5 pt-5 pb-4 pr-14 border-b shrink-0">
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-lg shrink-0">
-              {reg.childFirstName[0]}{reg.childLastName[0]}
+              {reg.childFirstName[0]}
+              {reg.childLastName[0]}
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-xl font-bold font-serif truncate">
@@ -530,7 +761,9 @@ function RegistrationDetailSheet({
               </p>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {reg.room && (
-                  <Badge variant="outline" className="text-xs">{reg.room}</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {reg.room}
+                  </Badge>
                 )}
                 {reg.allergies && (
                   <Badge className="text-xs bg-red-100 text-red-800 border-none hover:bg-red-100 gap-1">
@@ -551,12 +784,20 @@ function RegistrationDetailSheet({
             {/* Child / participant info */}
             <section className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                {isChildCheckin ? "Child Information" : "Participant Information"}
+                {isChildCheckin
+                  ? "Child Information"
+                  : "Participant Information"}
               </p>
               {age && (
                 <div className="flex justify-between text-sm py-1.5 border-b border-border/50">
                   <span className="text-muted-foreground">Date of Birth</span>
-                  <span>{format(new Date(reg.childDateOfBirth! + "T00:00:00"), "MMM d, yyyy")} · {age}</span>
+                  <span>
+                    {format(
+                      new Date(reg.childDateOfBirth! + "T00:00:00"),
+                      "MMM d, yyyy",
+                    )}{" "}
+                    · {age}
+                  </span>
                 </div>
               )}
               {isChildCheckin && rooms && rooms.length > 0 && (
@@ -567,7 +808,10 @@ function RegistrationDetailSheet({
                     disabled={assigningRoom || updateRoom.isPending}
                     onValueChange={(v) => {
                       setAssigningRoom(true);
-                      updateRoom.mutate({ registrationId: reg.id, data: { room: v === "__none__" ? null : v } });
+                      updateRoom.mutate({
+                        registrationId: reg.id,
+                        data: { room: v === "__none__" ? null : v },
+                      });
                     }}
                   >
                     <SelectTrigger className="h-7 w-auto min-w-28 text-xs border-dashed">
@@ -575,9 +819,13 @@ function RegistrationDetailSheet({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">Unassigned</SelectItem>
-                      {rooms.filter((r) => r.isActive).map((r) => (
-                        <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
-                      ))}
+                      {rooms
+                        .filter((r) => r.isActive)
+                        .map((r) => (
+                          <SelectItem key={r.id} value={r.name}>
+                            {r.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -591,17 +839,25 @@ function RegistrationDetailSheet({
               {reg.allergies && (
                 <div className="space-y-1 py-1">
                   <p className="text-xs text-muted-foreground">Allergies</p>
-                  <p className="text-sm bg-red-50 text-red-900 rounded-md px-3 py-2">{reg.allergies}</p>
+                  <p className="text-sm bg-red-50 text-red-900 rounded-md px-3 py-2">
+                    {reg.allergies}
+                  </p>
                 </div>
               )}
               {reg.specialNeeds && (
                 <div className="space-y-1 py-1">
-                  <p className="text-xs text-muted-foreground">Special Needs / Accommodations</p>
-                  <p className="text-sm bg-amber-50 text-amber-900 rounded-md px-3 py-2">{reg.specialNeeds}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Special Needs / Accommodations
+                  </p>
+                  <p className="text-sm bg-amber-50 text-amber-900 rounded-md px-3 py-2">
+                    {reg.specialNeeds}
+                  </p>
                 </div>
               )}
               {!age && !reg.room && !reg.allergies && !reg.specialNeeds && (
-                <p className="text-sm text-muted-foreground">No additional details on record.</p>
+                <p className="text-sm text-muted-foreground">
+                  No additional details on record.
+                </p>
               )}
             </section>
 
@@ -620,13 +876,23 @@ function RegistrationDetailSheet({
                 {reg.guardianPhone && (
                   <div className="flex items-center gap-2.5 text-sm">
                     <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <a href={`tel:${reg.guardianPhone}`} className="hover:underline">{reg.guardianPhone}</a>
+                    <a
+                      href={`tel:${reg.guardianPhone}`}
+                      className="hover:underline"
+                    >
+                      {reg.guardianPhone}
+                    </a>
                   </div>
                 )}
                 {reg.guardianEmail && (
                   <div className="flex items-center gap-2.5 text-sm">
                     <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <a href={`mailto:${reg.guardianEmail}`} className="hover:underline truncate">{reg.guardianEmail}</a>
+                    <a
+                      href={`mailto:${reg.guardianEmail}`}
+                      className="hover:underline truncate"
+                    >
+                      {reg.guardianEmail}
+                    </a>
                   </div>
                 )}
               </section>
@@ -635,10 +901,17 @@ function RegistrationDetailSheet({
             {/* Custom answers */}
             {(regDetail?.customAnswers?.length ?? 0) > 0 && (
               <section className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Additional Information</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Additional Information
+                </p>
                 {regDetail!.customAnswers.map((a) => (
-                  <div key={a.id} className="py-1.5 border-b border-border/50 last:border-0">
-                    <p className="text-xs text-muted-foreground">{a.fieldLabel}</p>
+                  <div
+                    key={a.id}
+                    className="py-1.5 border-b border-border/50 last:border-0"
+                  >
+                    <p className="text-xs text-muted-foreground">
+                      {a.fieldLabel}
+                    </p>
                     <p className="text-sm mt-0.5">{a.value}</p>
                   </div>
                 ))}
@@ -648,13 +921,20 @@ function RegistrationDetailSheet({
 
           {/* Footer */}
           <div className="border-t p-4 shrink-0 flex gap-2">
-            <Button variant="outline" className="flex-1 gap-2" onClick={() => setEditOpen(true)}>
+            <Button
+              variant="outline"
+              className="flex-1 gap-2"
+              onClick={() => setEditOpen(true)}
+            >
               <Pencil className="w-4 h-4" /> Edit
             </Button>
             <Button
               variant="outline"
               className="gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-              onClick={() => { setDeleteConfirm(""); setDeleteOpen(true); }}
+              onClick={() => {
+                setDeleteConfirm("");
+                setDeleteOpen(true);
+              }}
             >
               <Trash2 className="w-4 h-4" /> Delete
             </Button>
@@ -671,7 +951,12 @@ function RegistrationDetailSheet({
         isChildCheckin={isChildCheckin}
       />
 
-      <Dialog open={deleteOpen} onOpenChange={(v) => { if (!deleteRegistration.isPending) setDeleteOpen(v); }}>
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(v) => {
+          if (!deleteRegistration.isPending) setDeleteOpen(v);
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
@@ -681,11 +966,16 @@ function RegistrationDetailSheet({
           <div className="space-y-4 py-1">
             <p className="text-sm text-muted-foreground">
               This will permanently delete the registration for{" "}
-              <span className="font-semibold text-foreground">{reg.childFirstName} {reg.childLastName}</span>.
-              This action cannot be undone.
+              <span className="font-semibold text-foreground">
+                {reg.childFirstName} {reg.childLastName}
+              </span>
+              . This action cannot be undone.
             </p>
             <div className="space-y-1.5">
-              <Label className="text-sm">Type <span className="font-mono font-bold">DELETE</span> to confirm</Label>
+              <Label className="text-sm">
+                Type <span className="font-mono font-bold">DELETE</span> to
+                confirm
+              </Label>
               <Input
                 value={deleteConfirm}
                 onChange={(e) => setDeleteConfirm(e.target.value)}
@@ -695,16 +985,26 @@ function RegistrationDetailSheet({
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleteRegistration.isPending}>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleteRegistration.isPending}
+            >
               Cancel
             </Button>
             <Button
               variant="destructive"
-              disabled={deleteConfirm !== "DELETE" || deleteRegistration.isPending}
-              onClick={() => deleteRegistration.mutate({ registrationId: reg.id })}
+              disabled={
+                deleteConfirm !== "DELETE" || deleteRegistration.isPending
+              }
+              onClick={() =>
+                deleteRegistration.mutate({ registrationId: reg.id })
+              }
               className="gap-2"
             >
-              {deleteRegistration.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {deleteRegistration.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              )}
               Delete Registration
             </Button>
           </DialogFooter>
@@ -733,19 +1033,24 @@ function getRegistrationFamilyLastName(reg: Registration): string {
 }
 
 function getRegistrationFamilyKey(reg: Registration): string {
-  if (reg.registrationGroupId != null) return `group-${reg.registrationGroupId}`;
+  if (reg.registrationGroupId != null)
+    return `group-${reg.registrationGroupId}`;
 
-  const guardianId = (reg as Registration & { guardianId?: number | null }).guardianId;
+  const guardianId = (reg as Registration & { guardianId?: number | null })
+    .guardianId;
   if (guardianId != null) return `guardian-id-${guardianId}`;
 
   const guardianName = (reg.guardianName ?? "").trim().toLowerCase();
   const guardianPhone = (reg.guardianPhone ?? "").replace(/\D/g, "");
-  if (guardianName || guardianPhone) return `guardian-${guardianName}-${guardianPhone}`;
+  if (guardianName || guardianPhone)
+    return `guardian-${guardianName}-${guardianPhone}`;
 
   return `registration-${reg.id}`;
 }
 
-function groupRegistrationsByFamily(registrations: Registration[]): RegistrationFamilyGroup[] {
+function groupRegistrationsByFamily(
+  registrations: Registration[],
+): RegistrationFamilyGroup[] {
   const grouped = new Map<string, Registration[]>();
 
   for (const reg of registrations) {
@@ -769,7 +1074,10 @@ function groupRegistrationsByFamily(registrations: Registration[]): Registration
   });
 }
 
-function splitRegistrationName(name: string | null | undefined): { firstName: string; lastName: string } {
+function splitRegistrationName(name: string | null | undefined): {
+  firstName: string;
+  lastName: string;
+} {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
   return {
     firstName: parts[0] ?? "",
@@ -835,8 +1143,9 @@ function RegistrationFamilyDetailsDialog({
 
   if (!family || !first) return null;
 
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const set =
+    (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
+      setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
   const handleSave = async () => {
     try {
@@ -851,10 +1160,12 @@ function RegistrationFamilyDetailsDialog({
           secondaryGuardianLastName: form.secondaryGuardianLastName.trim(),
           secondaryGuardianPhone: form.secondaryGuardianPhone.trim(),
           secondaryGuardianEmail: form.secondaryGuardianEmail.trim(),
-          secondaryGuardianRelationship: form.secondaryGuardianRelationship.trim(),
+          secondaryGuardianRelationship:
+            form.secondaryGuardianRelationship.trim(),
           emergencyContactName: form.emergencyContactName.trim(),
           emergencyContactPhone: form.emergencyContactPhone.trim(),
-          emergencyContactRelationship: form.emergencyContactRelationship.trim(),
+          emergencyContactRelationship:
+            form.emergencyContactRelationship.trim(),
         },
       });
       toast({ title: "Family details saved" });
@@ -866,40 +1177,131 @@ function RegistrationFamilyDetailsDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => { if (!saving) onOpenChange(nextOpen); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!saving) onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent className="sm:max-w-3xl flex max-h-[90vh] flex-col p-0 gap-0 overflow-hidden">
         <DialogHeader className="border-b px-6 py-5">
-          <DialogTitle className="text-xl font-serif">View Family — {family.familyName}</DialogTitle>
+          <DialogTitle className="text-xl font-serif">
+            View Family — {family.familyName}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Primary Parent/Guardian</h3>
+            <h3 className="text-sm font-semibold text-foreground">
+              Primary Parent/Guardian
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>First Name</Label><Input value={form.guardianFirstName} onChange={set("guardianFirstName")} /></div>
-              <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.guardianLastName} onChange={set("guardianLastName")} /></div>
-              <div className="space-y-1.5"><Label>Phone</Label><Input type="tel" value={form.guardianPhone} onChange={set("guardianPhone")} /></div>
-              <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.guardianEmail} onChange={set("guardianEmail")} /></div>
+              <div className="space-y-1.5">
+                <Label>First Name</Label>
+                <Input
+                  value={form.guardianFirstName}
+                  onChange={set("guardianFirstName")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Last Name</Label>
+                <Input
+                  value={form.guardianLastName}
+                  onChange={set("guardianLastName")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input
+                  type="tel"
+                  value={form.guardianPhone}
+                  onChange={set("guardianPhone")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={form.guardianEmail}
+                  onChange={set("guardianEmail")}
+                />
+              </div>
             </div>
           </section>
 
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Secondary Parent/Guardian</h3>
+            <h3 className="text-sm font-semibold text-foreground">
+              Secondary Parent/Guardian
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>First Name</Label><Input value={form.secondaryGuardianFirstName} onChange={set("secondaryGuardianFirstName")} /></div>
-              <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.secondaryGuardianLastName} onChange={set("secondaryGuardianLastName")} /></div>
-              <div className="space-y-1.5"><Label>Phone</Label><Input type="tel" value={form.secondaryGuardianPhone} onChange={set("secondaryGuardianPhone")} /></div>
-              <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.secondaryGuardianEmail} onChange={set("secondaryGuardianEmail")} /></div>
-              <div className="space-y-1.5 sm:col-span-2"><Label>Relationship</Label><Input value={form.secondaryGuardianRelationship} onChange={set("secondaryGuardianRelationship")} placeholder="Optional" /></div>
+              <div className="space-y-1.5">
+                <Label>First Name</Label>
+                <Input
+                  value={form.secondaryGuardianFirstName}
+                  onChange={set("secondaryGuardianFirstName")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Last Name</Label>
+                <Input
+                  value={form.secondaryGuardianLastName}
+                  onChange={set("secondaryGuardianLastName")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input
+                  type="tel"
+                  value={form.secondaryGuardianPhone}
+                  onChange={set("secondaryGuardianPhone")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={form.secondaryGuardianEmail}
+                  onChange={set("secondaryGuardianEmail")}
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Relationship</Label>
+                <Input
+                  value={form.secondaryGuardianRelationship}
+                  onChange={set("secondaryGuardianRelationship")}
+                  placeholder="Optional"
+                />
+              </div>
             </div>
           </section>
 
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Emergency Contact</h3>
+            <h3 className="text-sm font-semibold text-foreground">
+              Emergency Contact
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>Name</Label><Input value={form.emergencyContactName} onChange={set("emergencyContactName")} /></div>
-              <div className="space-y-1.5"><Label>Phone</Label><Input type="tel" value={form.emergencyContactPhone} onChange={set("emergencyContactPhone")} /></div>
-              <div className="space-y-1.5 sm:col-span-2"><Label>Relationship</Label><Input value={form.emergencyContactRelationship} onChange={set("emergencyContactRelationship")} /></div>
+              <div className="space-y-1.5">
+                <Label>Name</Label>
+                <Input
+                  value={form.emergencyContactName}
+                  onChange={set("emergencyContactName")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input
+                  type="tel"
+                  value={form.emergencyContactPhone}
+                  onChange={set("emergencyContactPhone")}
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>Relationship</Label>
+                <Input
+                  value={form.emergencyContactRelationship}
+                  onChange={set("emergencyContactRelationship")}
+                />
+              </div>
             </div>
           </section>
 
@@ -907,18 +1309,35 @@ function RegistrationFamilyDetailsDialog({
             <h3 className="text-sm font-semibold text-foreground">Children</h3>
             <div className="space-y-2">
               {family.children.map((reg) => (
-                <Card key={reg.id} className="group cursor-pointer transition-all hover:bg-muted/40 hover:shadow-sm" onClick={() => onViewChild(reg)}>
+                <Card
+                  key={reg.id}
+                  className="group cursor-pointer transition-all hover:bg-muted/40 hover:shadow-sm"
+                  onClick={() => onViewChild(reg)}
+                >
                   <CardContent className="px-4 py-3.5 flex items-start gap-4">
                     <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5">
-                      {reg.childFirstName[0]}{reg.childLastName[0]}
+                      {reg.childFirstName[0]}
+                      {reg.childLastName[0]}
                     </div>
                     <div className="flex-1 min-w-0 space-y-1">
                       <div className="flex items-center flex-wrap gap-2">
-                        <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
-                        {reg.room && <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">{reg.room}</Badge>}
-                        {reg.allergies && <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">Allergy</Badge>}
+                        <span className="font-semibold text-base leading-tight">
+                          {reg.childFirstName} {reg.childLastName}
+                        </span>
+                        {reg.room && (
+                          <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">
+                            {reg.room}
+                          </Badge>
+                        )}
+                        {reg.allergies && (
+                          <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
+                            Allergy
+                          </Badge>
+                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground">Registered {format(new Date(reg.createdAt), "MMM d")}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Registered {format(new Date(reg.createdAt), "MMM d")}
+                      </p>
                     </div>
                     <Button
                       type="button"
@@ -941,8 +1360,20 @@ function RegistrationFamilyDetailsDialog({
         </div>
 
         <DialogFooter className="border-t px-6 py-4 gap-2">
-          <Button type="button" variant="outline" disabled={saving} onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="button" disabled={saving} onClick={handleSave} className="gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={saving}
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={saving}
+            onClick={handleSave}
+            className="gap-2"
+          >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             Save Family Details
           </Button>
@@ -971,25 +1402,35 @@ function ChildrenTabContent({
   const [roomFilter, setRoomFilter] = useState("all");
   const [alertsOnly, setAlertsOnly] = useState(false);
   const [sort, setSort] = useState<RegistrationsSort>("date");
-  const [viewMode, setViewMode] = useState<RegistrationsViewMode>("individuals");
+  const [viewMode, setViewMode] =
+    useState<RegistrationsViewMode>("individuals");
   const [selectedReg, setSelectedReg] = useState<Registration | null>(null);
   const [editingReg, setEditingReg] = useState<Registration | null>(null);
-  const [selectedFamily, setSelectedFamily] = useState<RegistrationFamilyGroup | null>(null);
+  const [selectedFamily, setSelectedFamily] =
+    useState<RegistrationFamilyGroup | null>(null);
   const [addRegOpen, setAddRegOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: registrations = [], isLoading } = useListRegistrations(formId ?? 0, {
-    query: { enabled: !!formId, queryKey: getListRegistrationsQueryKey(formId ?? 0) },
-  });
+  const { data: registrations = [], isLoading } = useListRegistrations(
+    formId ?? 0,
+    {
+      query: {
+        enabled: !!formId,
+        queryKey: getListRegistrationsQueryKey(formId ?? 0),
+      },
+    },
+  );
 
   const rooms = useMemo(() => {
-    const set = new Set(registrations.map((r) => r.room).filter((r): r is string => !!r));
+    const set = new Set(
+      registrations.map((r) => r.room).filter((r): r is string => !!r),
+    );
     return Array.from(set).sort();
   }, [registrations]);
 
   const alertCount = useMemo(
     () => registrations.filter((r) => r.allergies || r.specialNeeds).length,
-    [registrations]
+    [registrations],
   );
 
   const filtered = useMemo(() => {
@@ -1009,22 +1450,28 @@ function ChildrenTabContent({
           (r.room ?? "").toLowerCase().includes(q) ||
           (r.allergies ?? "").toLowerCase().includes(q) ||
           (r.specialNeeds ?? "").toLowerCase().includes(q) ||
-          (r.medicalNotes ?? "").toLowerCase().includes(q)
+          (r.medicalNotes ?? "").toLowerCase().includes(q),
       );
     }
-    if (roomFilter !== "all") result = result.filter((r) => r.room === roomFilter);
-    if (alertsOnly) result = result.filter((r) => r.allergies || r.specialNeeds);
+    if (roomFilter !== "all")
+      result = result.filter((r) => r.room === roomFilter);
+    if (alertsOnly)
+      result = result.filter((r) => r.allergies || r.specialNeeds);
     result = [...result].sort((a, b) => {
       if (sort === "name") {
-        return `${a.childLastName} ${a.childFirstName}`.localeCompare(`${b.childLastName} ${b.childFirstName}`);
+        return `${a.childLastName} ${a.childFirstName}`.localeCompare(
+          `${b.childLastName} ${b.childFirstName}`,
+        );
       }
       if (sort === "family") {
-        return `${getRegistrationFamilyLastName(a)} ${a.guardianName ?? ""} ${a.childLastName} ${a.childFirstName}`
-          .localeCompare(`${getRegistrationFamilyLastName(b)} ${b.guardianName ?? ""} ${b.childLastName} ${b.childFirstName}`);
+        return `${getRegistrationFamilyLastName(a)} ${a.guardianName ?? ""} ${a.childLastName} ${a.childFirstName}`.localeCompare(
+          `${getRegistrationFamilyLastName(b)} ${b.guardianName ?? ""} ${b.childLastName} ${b.childFirstName}`,
+        );
       }
       if (sort === "room") {
-        return `${a.room ?? ""} ${a.childLastName} ${a.childFirstName}`
-          .localeCompare(`${b.room ?? ""} ${b.childLastName} ${b.childFirstName}`);
+        return `${a.room ?? ""} ${a.childLastName} ${a.childFirstName}`.localeCompare(
+          `${b.room ?? ""} ${b.childLastName} ${b.childFirstName}`,
+        );
       }
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
@@ -1036,29 +1483,41 @@ function ChildrenTabContent({
       ...group,
       children: [...group.children].sort((a, b) => {
         if (sort === "room") {
-          return `${a.room ?? ""} ${a.childLastName} ${a.childFirstName}`
-            .localeCompare(`${b.room ?? ""} ${b.childLastName} ${b.childFirstName}`);
+          return `${a.room ?? ""} ${a.childLastName} ${a.childFirstName}`.localeCompare(
+            `${b.room ?? ""} ${b.childLastName} ${b.childFirstName}`,
+          );
         }
         if (sort === "date") {
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          return (
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
         }
-        return `${a.childLastName} ${a.childFirstName}`.localeCompare(`${b.childLastName} ${b.childFirstName}`);
+        return `${a.childLastName} ${a.childFirstName}`.localeCompare(
+          `${b.childLastName} ${b.childFirstName}`,
+        );
       }),
     }));
 
     return groups.sort((a, b) => {
       if (sort === "date") {
-        const newestA = Math.max(...a.children.map((child) => new Date(child.createdAt).getTime()));
-        const newestB = Math.max(...b.children.map((child) => new Date(child.createdAt).getTime()));
+        const newestA = Math.max(
+          ...a.children.map((child) => new Date(child.createdAt).getTime()),
+        );
+        const newestB = Math.max(
+          ...b.children.map((child) => new Date(child.createdAt).getTime()),
+        );
         return newestB - newestA;
       }
       if (sort === "room") {
         const roomA = a.children[0]?.room ?? "";
         const roomB = b.children[0]?.room ?? "";
-        return `${roomA} ${a.familyName}`.localeCompare(`${roomB} ${b.familyName}`);
+        return `${roomA} ${a.familyName}`.localeCompare(
+          `${roomB} ${b.familyName}`,
+        );
       }
-      return `${getRegistrationFamilyLastName(a.children[0]!)} ${a.guardianName}`
-        .localeCompare(`${getRegistrationFamilyLastName(b.children[0]!)} ${b.guardianName}`);
+      return `${getRegistrationFamilyLastName(a.children[0]!)} ${a.guardianName}`.localeCompare(
+        `${getRegistrationFamilyLastName(b.children[0]!)} ${b.guardianName}`,
+      );
     });
   }, [filtered, sort]);
 
@@ -1067,8 +1526,12 @@ function ChildrenTabContent({
     setSort(mode === "families" ? "family" : "date");
   };
   const visibleRegistrantLabel = isChildCheckin
-    ? filtered.length === 1 ? "child" : "children"
-    : filtered.length === 1 ? "registrant" : "registrants";
+    ? filtered.length === 1
+      ? "child"
+      : "children"
+    : filtered.length === 1
+      ? "registrant"
+      : "registrants";
 
   return (
     <div className="space-y-5">
@@ -1089,7 +1552,11 @@ function ChildrenTabContent({
               disabled={isExporting}
               className="text-muted-foreground hover:text-foreground gap-1.5"
             >
-              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
               <span className="hidden sm:inline">Export CSV</span>
             </Button>
           </div>
@@ -1102,14 +1569,23 @@ function ChildrenTabContent({
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
           <Input
             className="pl-11 h-12 text-base"
-            placeholder={isChildCheckin ? "Search by name, guardian, phone, or room…" : "Search by name or contact…"}
+            placeholder={
+              isChildCheckin
+                ? "Search by name, guardian, phone, or room…"
+                : "Search by name or contact…"
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button className="shrink-0 gap-2 h-12 px-5 text-base font-semibold" onClick={() => setAddRegOpen(true)}>
+        <Button
+          className="shrink-0 gap-2 h-12 px-5 text-base font-semibold"
+          onClick={() => setAddRegOpen(true)}
+        >
           <Plus className="w-5 h-5" />
-          <span className="hidden sm:inline">{isChildCheckin ? "Add Child" : "Add Registrant"}</span>
+          <span className="hidden sm:inline">
+            {isChildCheckin ? "Add Child" : "Add Registrant"}
+          </span>
           <span className="sm:hidden">Add</span>
         </Button>
       </div>
@@ -1117,24 +1593,26 @@ function ChildrenTabContent({
       {/* Filter row */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="inline-flex h-9 rounded-md border border-border bg-background p-0.5">
-          {(["individuals", "families"] as RegistrationsViewMode[]).map((mode) => {
-            const active = viewMode === mode;
-            return (
-              <button
-                key={mode}
-                type="button"
-                className={cn(
-                  "h-8 rounded-[5px] px-3 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-                onClick={() => handleViewModeChange(mode)}
-              >
-                {mode === "individuals" ? "Individuals" : "Families"}
-              </button>
-            );
-          })}
+          {(["individuals", "families"] as RegistrationsViewMode[]).map(
+            (mode) => {
+              const active = viewMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  className={cn(
+                    "h-8 rounded-[5px] px-3 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() => handleViewModeChange(mode)}
+                >
+                  {mode === "individuals" ? "Individuals" : "Families"}
+                </button>
+              );
+            },
+          )}
         </div>
         {rooms.length > 0 && (
           <Select value={roomFilter} onValueChange={setRoomFilter}>
@@ -1144,7 +1622,9 @@ function ChildrenTabContent({
             <SelectContent>
               <SelectItem value="all">All rooms</SelectItem>
               {rooms.map((room) => (
-                <SelectItem key={room} value={room}>{room}</SelectItem>
+                <SelectItem key={room} value={room}>
+                  {room}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -1161,12 +1641,17 @@ function ChildrenTabContent({
           >
             <AlertTriangle className="w-3.5 h-3.5" />
             Alerts only
-            <span className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${alertsOnly ? "bg-red-100" : "bg-muted"}`}>
+            <span
+              className={`rounded-full px-1.5 py-0.5 text-xs font-bold ${alertsOnly ? "bg-red-100" : "bg-muted"}`}
+            >
               {alertCount}
             </span>
           </button>
         )}
-        <Select value={sort} onValueChange={(v) => setSort(v as RegistrationsSort)}>
+        <Select
+          value={sort}
+          onValueChange={(v) => setSort(v as RegistrationsSort)}
+        >
           <SelectTrigger className="h-9 text-sm w-auto min-w-[120px]">
             <SelectValue />
           </SelectTrigger>
@@ -1183,11 +1668,14 @@ function ChildrenTabContent({
             : filtered.length !== registrations.length
               ? `${filtered.length} of ${registrations.length} `
               : `${registrations.length} `}
-          {viewMode === "individuals" && (
-            registrations.length === 1
-              ? isChildCheckin ? "child" : "registrant"
-              : isChildCheckin ? "children" : "registrants"
-          )}
+          {viewMode === "individuals" &&
+            (registrations.length === 1
+              ? isChildCheckin
+                ? "child"
+                : "registrant"
+              : isChildCheckin
+                ? "children"
+                : "registrants")}
         </p>
       </div>
 
@@ -1199,19 +1687,24 @@ function ChildrenTabContent({
       ) : !registrations.length ? (
         <Card>
           <CardContent className="py-14 text-center text-muted-foreground">
-            {isChildCheckin
-              ? <Baby className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              : <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />}
+            {isChildCheckin ? (
+              <Baby className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            ) : (
+              <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            )}
             <p className="font-medium">No registrations yet</p>
             <p className="text-sm mt-1">
-              Use "{isChildCheckin ? "Add Child" : "Add Registrant"}" above to add the first one.
+              Use "{isChildCheckin ? "Add Child" : "Add Registrant"}" above to
+              add the first one.
             </p>
           </CardContent>
         </Card>
       ) : !filtered.length ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            <p className="text-sm">No registrations match the current filters.</p>
+            <p className="text-sm">
+              No registrations match the current filters.
+            </p>
           </CardContent>
         </Card>
       ) : viewMode === "families" ? (
@@ -1226,13 +1719,23 @@ function ChildrenTabContent({
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Users className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
-                      <span className="font-semibold text-base">{family.familyName}</span>
+                      <span className="font-semibold text-base">
+                        {family.familyName}
+                      </span>
                       <Badge variant="secondary" className="text-xs">
-                        {family.children.length} {family.children.length === 1 ? (isChildCheckin ? "child" : "registrant") : (isChildCheckin ? "children" : "registrants")}
+                        {family.children.length}{" "}
+                        {family.children.length === 1
+                          ? isChildCheckin
+                            ? "child"
+                            : "registrant"
+                          : isChildCheckin
+                            ? "children"
+                            : "registrants"}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {isChildCheckin ? "Guardian" : "Contact"}: {family.guardianName}
+                      {isChildCheckin ? "Guardian" : "Contact"}:{" "}
+                      {family.guardianName}
                       {family.guardianPhone && <> · {family.guardianPhone}</>}
                     </p>
                   </div>
@@ -1254,7 +1757,11 @@ function ChildrenTabContent({
 
               <div className="space-y-2 bg-muted/20 p-3">
                 {family.children.map((reg) => {
-                  const hasAlert = !!(reg.allergies || reg.specialNeeds || reg.medicalNotes);
+                  const hasAlert = !!(
+                    reg.allergies ||
+                    reg.specialNeeds ||
+                    reg.medicalNotes
+                  );
 
                   return (
                     <Card
@@ -1264,23 +1771,35 @@ function ChildrenTabContent({
                     >
                       <CardContent className="px-4 py-3.5 flex items-start gap-4">
                         <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5">
-                          {reg.childFirstName[0]}{reg.childLastName[0]}
+                          {reg.childFirstName[0]}
+                          {reg.childLastName[0]}
                         </div>
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="flex items-center flex-wrap gap-2">
-                            <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
+                            <span className="font-semibold text-base leading-tight">
+                              {reg.childFirstName} {reg.childLastName}
+                            </span>
                             {reg.room && (
-                              <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">{reg.room}</Badge>
+                              <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">
+                                {reg.room}
+                              </Badge>
                             )}
                             {reg.allergies && (
-                              <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">Allergy</Badge>
+                              <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
+                                Allergy
+                              </Badge>
                             )}
                             {reg.specialNeeds && (
-                              <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">Medical</Badge>
+                              <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">
+                                Medical
+                              </Badge>
                             )}
                           </div>
                           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <span>Registered {format(new Date(reg.createdAt), "MMM d")}</span>
+                            <span>
+                              Registered{" "}
+                              {format(new Date(reg.createdAt), "MMM d")}
+                            </span>
                             {hasAlert && (
                               <span className="inline-flex items-center gap-1 text-red-700">
                                 <AlertTriangle className="w-3.5 h-3.5" />
@@ -1304,59 +1823,68 @@ function ChildrenTabContent({
       ) : (
         <div className="space-y-2">
           {filtered.map((reg) => {
-            const registrantName = `${reg.childFirstName} ${reg.childLastName}`.trim();
+            const registrantName =
+              `${reg.childFirstName} ${reg.childLastName}`.trim();
             const contactParts = isChildCheckin
-              ? [
-                  reg.guardianName || "—",
-                  reg.guardianPhone,
-                ]
+              ? [reg.guardianName || "—", reg.guardianPhone]
               : [
-                  reg.guardianName && reg.guardianName !== registrantName ? reg.guardianName : null,
+                  reg.guardianName && reg.guardianName !== registrantName
+                    ? reg.guardianName
+                    : null,
                   reg.guardianPhone,
                   reg.guardianEmail,
                 ];
             const contactText = contactParts.filter(Boolean).join(" · ") || "—";
 
             return (
-            <Card
-              key={reg.id}
-              className="cursor-pointer transition-all hover:bg-muted/40 hover:shadow-sm group"
-              onClick={() => setSelectedReg(reg)}
-            >
-              <CardContent className="px-4 py-4 flex items-start gap-4">
-                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5">
-                  {reg.childFirstName[0]}{reg.childLastName[0]}
-                </div>
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center flex-wrap gap-2">
-                    <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
-                    {reg.room && (
-                      <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">{reg.room}</Badge>
-                    )}
-                    {reg.allergies && (
-                      <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">Allergy</Badge>
-                    )}
+              <Card
+                key={reg.id}
+                className="cursor-pointer transition-all hover:bg-muted/40 hover:shadow-sm group"
+                onClick={() => setSelectedReg(reg)}
+              >
+                <CardContent className="px-4 py-4 flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5">
+                    {reg.childFirstName[0]}
+                    {reg.childLastName[0]}
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-                    <span>
-                      <span className="font-medium text-foreground/80">
-                        {isChildCheckin ? "Parent/Guardian:" : "Contact:"}
-                      </span>{" "}
-                      {contactText}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <span className="font-semibold text-base leading-tight">
+                        {reg.childFirstName} {reg.childLastName}
+                      </span>
+                      {reg.room && (
+                        <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">
+                          {reg.room}
+                        </Badge>
+                      )}
+                      {reg.allergies && (
+                        <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
+                          Allergy
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+                      <span>
+                        <span className="font-medium text-foreground/80">
+                          {isChildCheckin ? "Parent/Guardian:" : "Contact:"}
+                        </span>{" "}
+                        {contactText}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(reg.createdAt), "MMM d")}
                     </span>
+                    <div className="flex items-center gap-1 text-muted-foreground group-hover:text-foreground transition-colors">
+                      <span className="text-xs hidden sm:block opacity-0 group-hover:opacity-60 transition-opacity">
+                        View
+                      </span>
+                      <ChevronRight className="w-4 h-4" />
+                    </div>
                   </div>
-                </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className="text-xs text-muted-foreground">
-                    {format(new Date(reg.createdAt), "MMM d")}
-                  </span>
-                  <div className="flex items-center gap-1 text-muted-foreground group-hover:text-foreground transition-colors">
-                    <span className="text-xs hidden sm:block opacity-0 group-hover:opacity-60 transition-opacity">View</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
             );
           })}
         </div>
@@ -1366,7 +1894,9 @@ function ChildrenTabContent({
         <RegistrationDetailSheet
           reg={selectedReg}
           open={!!selectedReg}
-          onOpenChange={(v) => { if (!v) setSelectedReg(null); }}
+          onOpenChange={(v) => {
+            if (!v) setSelectedReg(null);
+          }}
           isChildCheckin={isChildCheckin}
           formId={formId}
           eventId={eventId}
@@ -1376,7 +1906,9 @@ function ChildrenTabContent({
       <RegistrationFamilyDetailsDialog
         family={selectedFamily}
         open={!!selectedFamily}
-        onOpenChange={(v) => { if (!v) setSelectedFamily(null); }}
+        onOpenChange={(v) => {
+          if (!v) setSelectedFamily(null);
+        }}
         onEditChild={(reg) => {
           setSelectedFamily(null);
           setEditingReg(reg);
@@ -1386,8 +1918,13 @@ function ChildrenTabContent({
           setSelectedReg(reg);
         }}
         onSaved={() => {
-          if (formId) queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(formId) });
-          queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey() });
+          if (formId)
+            queryClient.invalidateQueries({
+              queryKey: getListRegistrationsQueryKey(formId),
+            });
+          queryClient.invalidateQueries({
+            queryKey: getListChildrenQueryKey(),
+          });
         }}
       />
 
@@ -1395,11 +1932,18 @@ function ChildrenTabContent({
         <RegistrationEditDialog
           reg={editingReg}
           open={!!editingReg}
-          onOpenChange={(v) => { if (!v) setEditingReg(null); }}
+          onOpenChange={(v) => {
+            if (!v) setEditingReg(null);
+          }}
           isChildCheckin={isChildCheckin}
           onSaved={() => {
-            if (formId) queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(formId) });
-            queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey() });
+            if (formId)
+              queryClient.invalidateQueries({
+                queryKey: getListRegistrationsQueryKey(formId),
+              });
+            queryClient.invalidateQueries({
+              queryKey: getListChildrenQueryKey(),
+            });
             setEditingReg(null);
           }}
         />
@@ -1428,7 +1972,10 @@ function FamiliesTabContent({ eventId }: { eventId: number }) {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: children, isLoading } = useListChildren({ eventId, search: debouncedSearch || undefined });
+  const { data: children, isLoading } = useListChildren({
+    eventId,
+    search: debouncedSearch || undefined,
+  });
 
   const families = useMemo(() => {
     if (!children) return [];
@@ -1438,7 +1985,10 @@ function FamiliesTabContent({ eventId }: { eventId: number }) {
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(child);
     }
-    return [...map.entries()].map(([guardian, members]) => ({ guardian, members }));
+    return [...map.entries()].map(([guardian, members]) => ({
+      guardian,
+      members,
+    }));
   }, [children]);
 
   return (
@@ -1446,7 +1996,12 @@ function FamiliesTabContent({ eventId }: { eventId: number }) {
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Search families…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input
+            className="pl-9"
+            placeholder="Search families…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
         <p className="text-sm text-muted-foreground shrink-0">
           {families.length} {families.length === 1 ? "family" : "families"}
@@ -1454,12 +2009,18 @@ function FamiliesTabContent({ eventId }: { eventId: number }) {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+        </div>
       ) : !families.length ? (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
             <Users className="w-8 h-8 mx-auto mb-3 opacity-30" />
-            <p>{search ? `No families matching "${search}"` : "No registrants yet."}</p>
+            <p>
+              {search
+                ? `No families matching "${search}"`
+                : "No registrants yet."}
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -1473,12 +2034,15 @@ function FamiliesTabContent({ eventId }: { eventId: number }) {
                   </div>
                   <p className="font-medium">{guardian}</p>
                   <Badge variant="secondary" className="text-xs ml-auto">
-                    {members.length} {members.length === 1 ? "member" : "members"}
+                    {members.length}{" "}
+                    {members.length === 1 ? "member" : "members"}
                   </Badge>
                 </div>
                 <div className="ml-12 space-y-0.5">
                   {members.map((m) => (
-                    <p key={m.id} className="text-sm text-muted-foreground">{m.firstName} {m.lastName}</p>
+                    <p key={m.id} className="text-sm text-muted-foreground">
+                      {m.firstName} {m.lastName}
+                    </p>
                   ))}
                 </div>
               </CardContent>
@@ -1506,7 +2070,12 @@ function CheckInConfirmDialog({
   isPending: boolean;
 }) {
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v && !isPending) onCancel(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && !isPending) onCancel();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -1517,24 +2086,35 @@ function CheckInConfirmDialog({
         <div className="space-y-3 py-1">
           {reg.allergies && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-              <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">Allergies</p>
+              <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">
+                Allergies
+              </p>
               <p className="text-sm text-red-800">{reg.allergies}</p>
             </div>
           )}
           {reg.specialNeeds && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
-              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Medical / Special Needs</p>
+              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">
+                Medical / Special Needs
+              </p>
               <p className="text-sm text-blue-800">{reg.specialNeeds}</p>
             </div>
           )}
           <p className="text-sm text-muted-foreground pt-1">
-            Please review the above notes with the supervising volunteer before checking in this child.
+            Please review the above notes with the supervising volunteer before
+            checking in this child.
           </p>
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+          <Button variant="outline" onClick={onCancel} disabled={isPending}>
+            Cancel
+          </Button>
           <Button onClick={onConfirm} disabled={isPending} className="gap-2">
-            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+            {isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <LogIn className="w-4 h-4" />
+            )}
             Check In Anyway
           </Button>
         </DialogFooter>
@@ -1568,12 +2148,18 @@ function CheckOutDialog({
     query: { enabled: open, queryKey: [`/api/registrations/${reg.id}`] },
   });
 
-  const authorizedPickup = regDetail?.customAnswers?.find(
-    (a) => a.fieldLabel.toLowerCase().includes("pickup")
-  )?.value ?? null;
+  const authorizedPickup =
+    regDetail?.customAnswers?.find((a) =>
+      a.fieldLabel.toLowerCase().includes("pickup"),
+    )?.value ?? null;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v && !isPending) onCancel(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && !isPending) onCancel();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -1613,7 +2199,9 @@ function CheckOutDialog({
             <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5">
               <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-xs font-semibold text-red-700">Allergy Alert</p>
+                <p className="text-xs font-semibold text-red-700">
+                  Allergy Alert
+                </p>
                 <p className="text-xs text-red-700">{reg.allergies}</p>
               </div>
             </div>
@@ -1622,7 +2210,9 @@ function CheckOutDialog({
           {/* Authorized pickup names */}
           {authorizedPickup && (
             <div className="rounded-lg border border-border px-3 py-2.5">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Authorized Pickup</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                Authorized Pickup
+              </p>
               <p className="text-sm">{authorizedPickup}</p>
             </div>
           )}
@@ -1630,7 +2220,10 @@ function CheckOutDialog({
           {/* Pickup person input */}
           <div className="space-y-1.5">
             <Label htmlFor="pickup-person" className="text-sm font-medium">
-              Who is picking up? <span className="text-muted-foreground font-normal">(optional)</span>
+              Who is picking up?{" "}
+              <span className="text-muted-foreground font-normal">
+                (optional)
+              </span>
             </Label>
             <Input
               id="pickup-person"
@@ -1645,7 +2238,10 @@ function CheckOutDialog({
           {/* Notes */}
           <div className="space-y-1.5">
             <Label htmlFor="checkout-notes" className="text-sm font-medium">
-              Notes <span className="text-muted-foreground font-normal">(optional)</span>
+              Notes{" "}
+              <span className="text-muted-foreground font-normal">
+                (optional)
+              </span>
             </Label>
             <Textarea
               id="checkout-notes"
@@ -1659,13 +2255,19 @@ function CheckOutDialog({
           </div>
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+          <Button variant="outline" onClick={onCancel} disabled={isPending}>
+            Cancel
+          </Button>
           <Button
             onClick={() => onConfirm(pickupPerson.trim(), notes.trim())}
             disabled={isPending}
             className="gap-2 border-amber-400 bg-amber-500 text-white hover:bg-amber-600"
           >
-            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+            {isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <LogOut className="w-4 h-4" />
+            )}
             Confirm Check-Out
           </Button>
         </DialogFooter>
@@ -1694,11 +2296,16 @@ function RegistrationEditDialog({
   const { id: _regEditEventIdStr } = useParams<{ id: string }>();
   const _regEditEventId = parseInt(_regEditEventIdStr || "0", 10);
   const { data: rooms } = useListRooms(_regEditEventId, {
-    query: { enabled: !!_regEditEventId, queryKey: getListRoomsQueryKey(_regEditEventId) },
+    query: {
+      enabled: !!_regEditEventId,
+      queryKey: getListRoomsQueryKey(_regEditEventId),
+    },
   });
 
   const [tab, setTab] = useState("child");
-  useEffect(() => { if (open) setTab("child"); }, [open]);
+  useEffect(() => {
+    if (open) setTab("child");
+  }, [open]);
 
   const guardianParts = (reg.guardianName ?? "").trim().split(/\s+/);
   const [form, setForm] = useState({
@@ -1723,13 +2330,18 @@ function RegistrationEditDialog({
     room: reg.room ?? "",
   });
 
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setForm((p) => ({ ...p, [field]: e.target.value }));
+  const set =
+    (field: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((p) => ({ ...p, [field]: e.target.value }));
 
   // Custom answers (for Additional Questions tab)
-  const { data: regDetail, isLoading: detailLoading } = useGetRegistration(reg.id, {
-    query: { enabled: open, queryKey: [`/api/registrations/${reg.id}`] },
-  });
+  const { data: regDetail, isLoading: detailLoading } = useGetRegistration(
+    reg.id,
+    {
+      query: { enabled: open, queryKey: [`/api/registrations/${reg.id}`] },
+    },
+  );
   const [customEdits, setCustomEdits] = useState<Record<number, string>>({});
   useEffect(() => {
     if (regDetail?.customAnswers) {
@@ -1741,27 +2353,45 @@ function RegistrationEditDialog({
 
   const isPickupRelated = (label: string) => {
     const l = label.toLowerCase();
-    return l.includes("authorized pickup") || l.includes("pickup name") ||
-      l.includes("unauthorized") || l.includes("not authorized") || l.includes("not allowed");
+    return (
+      l.includes("authorized pickup") ||
+      l.includes("pickup name") ||
+      l.includes("unauthorized") ||
+      l.includes("not authorized") ||
+      l.includes("not allowed")
+    );
   };
   const pickupAnswers = useMemo(
-    () => (regDetail?.customAnswers ?? []).filter((ca) => isPickupRelated(ca.fieldLabel)),
-    [regDetail]
+    () =>
+      (regDetail?.customAnswers ?? []).filter((ca) =>
+        isPickupRelated(ca.fieldLabel),
+      ),
+    [regDetail],
   );
   const additionalAnswers = useMemo(
-    () => (regDetail?.customAnswers ?? []).filter((ca) => !isPickupRelated(ca.fieldLabel)),
-    [regDetail]
+    () =>
+      (regDetail?.customAnswers ?? []).filter(
+        (ca) => !isPickupRelated(ca.fieldLabel),
+      ),
+    [regDetail],
   );
 
   const updateRegistration = useUpdateRegistration();
   const updateCustomAnswers = useUpdateRegistrationCustomAnswers();
-  const isPending = updateRegistration.isPending || updateCustomAnswers.isPending;
+  const isPending =
+    updateRegistration.isPending || updateCustomAnswers.isPending;
   const registrantInfoLabel = isChildCheckin ? "Child Info" : "Registrant Info";
   const contactLabel = isChildCheckin ? "Guardian" : "Contact";
-  const safetySectionLabel = isChildCheckin ? "Safety Information" : "Health / Accessibility";
-  const contactName = [form.guardianFirstName, form.guardianLastName].filter(Boolean).join(" ").trim();
+  const safetySectionLabel = isChildCheckin
+    ? "Safety Information"
+    : "Health / Accessibility";
+  const contactName = [form.guardianFirstName, form.guardianLastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   const registrantName = `${form.childFirstName} ${form.childLastName}`.trim();
-  const shouldShowContactNameInSummary = isChildCheckin || (contactName && contactName !== registrantName);
+  const shouldShowContactNameInSummary =
+    isChildCheckin || (contactName && contactName !== registrantName);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1780,28 +2410,39 @@ function RegistrationEditDialog({
           secondaryGuardianLastName: form.secondaryGuardianLastName.trim(),
           secondaryGuardianPhone: form.secondaryGuardianPhone.trim(),
           secondaryGuardianEmail: form.secondaryGuardianEmail.trim(),
-          secondaryGuardianRelationship: form.secondaryGuardianRelationship.trim(),
+          secondaryGuardianRelationship:
+            form.secondaryGuardianRelationship.trim(),
           allergies: form.allergies.trim(),
           medicalNotes: form.medicalNotes.trim(),
           specialNeeds: form.specialNeeds.trim(),
           emergencyContactName: form.emergencyContactName.trim(),
           emergencyContactPhone: form.emergencyContactPhone.trim(),
-          emergencyContactRelationship: form.emergencyContactRelationship.trim(),
+          emergencyContactRelationship:
+            form.emergencyContactRelationship.trim(),
           room: form.room || undefined,
         },
       });
       const changedAnswers = Object.entries(customEdits)
         .filter(([id, val]) => {
-          const orig = regDetail?.customAnswers.find((ca) => ca.id === Number(id));
+          const orig = regDetail?.customAnswers.find(
+            (ca) => ca.id === Number(id),
+          );
           return orig && orig.value !== val;
         })
         .map(([id, value]) => ({ id: Number(id), value }));
       if (changedAnswers.length > 0) {
-        await updateCustomAnswers.mutateAsync({ registrationId: reg.id, data: { answers: changedAnswers } });
+        await updateCustomAnswers.mutateAsync({
+          registrationId: reg.id,
+          data: { answers: changedAnswers },
+        });
       }
-      queryClient.invalidateQueries({ queryKey: getListRegistrationsQueryKey(reg.formId) });
+      queryClient.invalidateQueries({
+        queryKey: getListRegistrationsQueryKey(reg.formId),
+      });
       queryClient.invalidateQueries({ queryKey: getListChildrenQueryKey() });
-      queryClient.invalidateQueries({ queryKey: [`/api/registrations/${reg.id}`] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/registrations/${reg.id}`],
+      });
       toast({ title: "Changes saved" });
       onSaved();
       onOpenChange(false);
@@ -1810,18 +2451,27 @@ function RegistrationEditDialog({
     }
   };
 
-  const tabTriggerClass = "rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-3 sm:px-4 h-full text-xs sm:text-sm font-medium";
+  const tabTriggerClass =
+    "rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-3 sm:px-4 h-full text-xs sm:text-sm font-medium";
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!isPending) onOpenChange(v); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!isPending) onOpenChange(v);
+      }}
+    >
       <DialogContent className="sm:max-w-2xl flex flex-col p-0 gap-0 max-h-[90vh] overflow-hidden">
-
         {/* ── Header: title + summary ── */}
         <div className="px-6 pt-5 pb-3 shrink-0 border-b">
-          <DialogTitle className="text-xl font-serif mb-3">Edit Registrant</DialogTitle>
+          <DialogTitle className="text-xl font-serif mb-3">
+            Edit Registrant
+          </DialogTitle>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-semibold leading-tight">{reg.childFirstName} {reg.childLastName}</p>
+              <p className="font-semibold leading-tight">
+                {reg.childFirstName} {reg.childLastName}
+              </p>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {[
                   form.room && `Room: ${form.room}`,
@@ -1830,64 +2480,130 @@ function RegistrationEditDialog({
                     : !isChildCheckin && form.guardianPhone
                       ? `Contact: ${form.guardianPhone}`
                       : null,
-                ].filter(Boolean).join(" · ")}
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </p>
             </div>
             {(form.allergies || form.medicalNotes || form.specialNeeds) && (
               <div className="flex gap-1.5 flex-wrap justify-end shrink-0">
-                {form.allergies && <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5">Allergy</Badge>}
-                {form.medicalNotes && <Badge className="bg-amber-500 hover:bg-amber-500 text-white text-[10px] px-1.5 py-0.5">Medical</Badge>}
-                {form.specialNeeds && <Badge className="bg-blue-500 hover:bg-blue-500 text-white text-[10px] px-1.5 py-0.5">Special Needs</Badge>}
+                {form.allergies && (
+                  <Badge
+                    variant="destructive"
+                    className="text-[10px] px-1.5 py-0.5"
+                  >
+                    Allergy
+                  </Badge>
+                )}
+                {form.medicalNotes && (
+                  <Badge className="bg-amber-500 hover:bg-amber-500 text-white text-[10px] px-1.5 py-0.5">
+                    Medical
+                  </Badge>
+                )}
+                {form.specialNeeds && (
+                  <Badge className="bg-blue-500 hover:bg-blue-500 text-white text-[10px] px-1.5 py-0.5">
+                    Special Needs
+                  </Badge>
+                )}
               </div>
             )}
           </div>
         </div>
 
         {/* ── Tabs + form ── */}
-        <Tabs value={tab} onValueChange={setTab} className="flex flex-col flex-1 min-h-0">
-
+        <Tabs
+          value={tab}
+          onValueChange={setTab}
+          className="flex flex-col flex-1 min-h-0"
+        >
           {/* Tab bar */}
           <div className="px-6 border-b shrink-0">
             <TabsList className="rounded-none bg-transparent p-0 h-10 w-full justify-start gap-0">
-              <TabsTrigger value="child" className={tabTriggerClass}>{registrantInfoLabel}</TabsTrigger>
-              <TabsTrigger value="guardian" className={tabTriggerClass}>{contactLabel}</TabsTrigger>
-              <TabsTrigger value="emergency" className={tabTriggerClass}>Emergency</TabsTrigger>
+              <TabsTrigger value="child" className={tabTriggerClass}>
+                {registrantInfoLabel}
+              </TabsTrigger>
+              <TabsTrigger value="guardian" className={tabTriggerClass}>
+                {contactLabel}
+              </TabsTrigger>
+              <TabsTrigger value="emergency" className={tabTriggerClass}>
+                Emergency
+              </TabsTrigger>
               <TabsTrigger value="additional" className={tabTriggerClass}>
                 Additional
                 {additionalAnswers.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-muted text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 leading-none">{additionalAnswers.length}</span>
+                  <span className="ml-1.5 rounded-full bg-muted text-muted-foreground text-[10px] font-bold px-1.5 py-0.5 leading-none">
+                    {additionalAnswers.length}
+                  </span>
                 )}
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col flex-1 min-h-0"
+          >
             {/* Scrollable tab content */}
             <div className="flex-1 overflow-y-auto px-6 py-5">
-
               {/* ── Registrant Info ── */}
               <TabsContent value="child" className="mt-0 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5"><Label>First Name</Label><Input value={form.childFirstName} onChange={set("childFirstName")} /></div>
-                  <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.childLastName} onChange={set("childLastName")} /></div>
+                  <div className="space-y-1.5">
+                    <Label>First Name</Label>
+                    <Input
+                      value={form.childFirstName}
+                      onChange={set("childFirstName")}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Last Name</Label>
+                    <Input
+                      value={form.childLastName}
+                      onChange={set("childLastName")}
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label>{isChildCheckin ? "Date of Birth" : "Birthdate"}</Label>
-                    <Input type="date" value={form.childDateOfBirth} onChange={set("childDateOfBirth")} />
+                    <Label>
+                      {isChildCheckin ? "Date of Birth" : "Birthdate"}
+                    </Label>
+                    <Input
+                      type="date"
+                      value={form.childDateOfBirth}
+                      onChange={set("childDateOfBirth")}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Room / Group</Label>
                     {rooms && rooms.length > 0 ? (
-                      <Select value={form.room || "__none__"} onValueChange={(v) => setForm((p) => ({ ...p, room: v === "__none__" ? "" : v }))}>
-                        <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                      <Select
+                        value={form.room || "__none__"}
+                        onValueChange={(v) =>
+                          setForm((p) => ({
+                            ...p,
+                            room: v === "__none__" ? "" : v,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unassigned" />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">Unassigned</SelectItem>
-                          {rooms.map((r) => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
+                          {rooms.map((r) => (
+                            <SelectItem key={r.id} value={r.name}>
+                              {r.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     ) : (
-                      <Input value={form.room} onChange={set("room")} placeholder="Room name" />
+                      <Input
+                        value={form.room}
+                        onChange={set("room")}
+                        placeholder="Room name"
+                      />
                     )}
                   </div>
                 </div>
@@ -1896,19 +2612,36 @@ function RegistrationEditDialog({
                 <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-3">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <p className="text-sm font-semibold text-amber-800">{safetySectionLabel}</p>
+                    <p className="text-sm font-semibold text-amber-800">
+                      {safetySectionLabel}
+                    </p>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Allergies</Label>
-                    <Textarea value={form.allergies} onChange={set("allergies")} placeholder="e.g. peanuts, latex" rows={2} />
+                    <Textarea
+                      value={form.allergies}
+                      onChange={set("allergies")}
+                      placeholder="e.g. peanuts, latex"
+                      rows={2}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Medical Notes</Label>
-                    <Textarea value={form.medicalNotes} onChange={set("medicalNotes")} placeholder="Any diagnoses, medications, or medical considerations…" rows={2} />
+                    <Textarea
+                      value={form.medicalNotes}
+                      onChange={set("medicalNotes")}
+                      placeholder="Any diagnoses, medications, or medical considerations…"
+                      rows={2}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Special Needs / Accommodations</Label>
-                    <Textarea value={form.specialNeeds} onChange={set("specialNeeds")} placeholder="Describe any special needs or accommodations required…" rows={2} />
+                    <Textarea
+                      value={form.specialNeeds}
+                      onChange={set("specialNeeds")}
+                      placeholder="Describe any special needs or accommodations required…"
+                      rows={2}
+                    />
                   </div>
                 </div>
               </TabsContent>
@@ -1921,19 +2654,41 @@ function RegistrationEditDialog({
                     : "Contact details for this registrant."}
                 </p>
                 <div className="space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Primary Guardian</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5"><Label>First Name</Label><Input value={form.guardianFirstName} onChange={set("guardianFirstName")} /></div>
-                  <div className="space-y-1.5"><Label>Last Name</Label><Input value={form.guardianLastName} onChange={set("guardianLastName")} /></div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Phone</Label>
-                  <Input type="tel" value={form.guardianPhone} onChange={set("guardianPhone")} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Email</Label>
-                  <Input type="email" value={form.guardianEmail} onChange={set("guardianEmail")} />
-                </div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Primary Guardian
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>First Name</Label>
+                      <Input
+                        value={form.guardianFirstName}
+                        onChange={set("guardianFirstName")}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Last Name</Label>
+                      <Input
+                        value={form.guardianLastName}
+                        onChange={set("guardianLastName")}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Phone</Label>
+                    <Input
+                      type="tel"
+                      value={form.guardianPhone}
+                      onChange={set("guardianPhone")}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={form.guardianEmail}
+                      onChange={set("guardianEmail")}
+                    />
+                  </div>
                 </div>
                 {isChildCheckin && (
                   <div className="space-y-3 border-t border-border pt-4">
@@ -1948,36 +2703,61 @@ function RegistrationEditDialog({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <Label>First Name</Label>
-                        <Input value={form.secondaryGuardianFirstName} onChange={set("secondaryGuardianFirstName")} />
+                        <Input
+                          value={form.secondaryGuardianFirstName}
+                          onChange={set("secondaryGuardianFirstName")}
+                        />
                       </div>
                       <div className="space-y-1.5">
                         <Label>Last Name</Label>
-                        <Input value={form.secondaryGuardianLastName} onChange={set("secondaryGuardianLastName")} />
+                        <Input
+                          value={form.secondaryGuardianLastName}
+                          onChange={set("secondaryGuardianLastName")}
+                        />
                       </div>
                     </div>
                     <div className="space-y-1.5">
                       <Label>Phone</Label>
-                      <Input type="tel" value={form.secondaryGuardianPhone} onChange={set("secondaryGuardianPhone")} />
+                      <Input
+                        type="tel"
+                        value={form.secondaryGuardianPhone}
+                        onChange={set("secondaryGuardianPhone")}
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <Label>Email</Label>
-                      <Input type="email" value={form.secondaryGuardianEmail} onChange={set("secondaryGuardianEmail")} />
+                      <Input
+                        type="email"
+                        value={form.secondaryGuardianEmail}
+                        onChange={set("secondaryGuardianEmail")}
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <Label>Relationship</Label>
-                      <Input value={form.secondaryGuardianRelationship} onChange={set("secondaryGuardianRelationship")} placeholder="e.g. Parent, Step-parent" />
+                      <Input
+                        value={form.secondaryGuardianRelationship}
+                        onChange={set("secondaryGuardianRelationship")}
+                        placeholder="e.g. Parent, Step-parent"
+                      />
                     </div>
                   </div>
                 )}
                 {pickupAnswers.length > 0 && (
                   <div className="pt-3 border-t border-border space-y-3">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pickup Authorization</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Pickup Authorization
+                    </p>
                     {pickupAnswers.map((ca) => (
                       <div key={ca.id} className="space-y-1.5">
                         <Label>{ca.fieldLabel}</Label>
                         <Textarea
                           value={customEdits[ca.id] ?? ca.value}
-                          onChange={(e) => setCustomEdits((p) => ({ ...p, [ca.id]: e.target.value }))}
+                          onChange={(e) =>
+                            setCustomEdits((p) => ({
+                              ...p,
+                              [ca.id]: e.target.value,
+                            }))
+                          }
                           rows={2}
                         />
                       </div>
@@ -1989,12 +2769,31 @@ function RegistrationEditDialog({
               {/* ── Emergency Contact ── */}
               <TabsContent value="emergency" className="mt-0 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5"><Label>Name</Label><Input value={form.emergencyContactName} onChange={set("emergencyContactName")} placeholder="Full name" /></div>
-                  <div className="space-y-1.5"><Label>Relationship</Label><Input value={form.emergencyContactRelationship} onChange={set("emergencyContactRelationship")} placeholder="e.g. Aunt, Neighbor" /></div>
+                  <div className="space-y-1.5">
+                    <Label>Name</Label>
+                    <Input
+                      value={form.emergencyContactName}
+                      onChange={set("emergencyContactName")}
+                      placeholder="Full name"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Relationship</Label>
+                    <Input
+                      value={form.emergencyContactRelationship}
+                      onChange={set("emergencyContactRelationship")}
+                      placeholder="e.g. Aunt, Neighbor"
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Phone</Label>
-                  <Input type="tel" value={form.emergencyContactPhone} onChange={set("emergencyContactPhone")} placeholder="(555) 000-0000" />
+                  <Input
+                    type="tel"
+                    value={form.emergencyContactPhone}
+                    onChange={set("emergencyContactPhone")}
+                    placeholder="(555) 000-0000"
+                  />
                 </div>
               </TabsContent>
 
@@ -2006,7 +2805,9 @@ function RegistrationEditDialog({
                   </div>
                 ) : additionalAnswers.length === 0 ? (
                   <div className="py-12 text-center text-muted-foreground">
-                    <p className="text-sm">No additional questions for this registration.</p>
+                    <p className="text-sm">
+                      No additional questions for this registration.
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -2015,7 +2816,12 @@ function RegistrationEditDialog({
                         <Label>{ca.fieldLabel}</Label>
                         <Textarea
                           value={customEdits[ca.id] ?? ca.value}
-                          onChange={(e) => setCustomEdits((p) => ({ ...p, [ca.id]: e.target.value }))}
+                          onChange={(e) =>
+                            setCustomEdits((p) => ({
+                              ...p,
+                              [ca.id]: e.target.value,
+                            }))
+                          }
                           rows={2}
                         />
                       </div>
@@ -2023,12 +2829,18 @@ function RegistrationEditDialog({
                   </div>
                 )}
               </TabsContent>
-
             </div>
 
             {/* ── Sticky footer ── */}
             <div className="border-t px-6 py-4 shrink-0 flex items-center justify-end gap-3 bg-background">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>Cancel</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isPending}
+              >
+                Cancel
+              </Button>
               <Button type="submit" disabled={isPending} className="gap-2">
                 {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 Save Changes
@@ -2036,7 +2848,6 @@ function RegistrationEditDialog({
             </div>
           </form>
         </Tabs>
-
       </DialogContent>
     </Dialog>
   );
@@ -2081,12 +2892,15 @@ function ChildDetailSheet({
   const updateCheckin = useUpdateCheckin({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
+        queryClient.invalidateQueries({
+          queryKey: getListEventCheckinsQueryKey(eventId),
+        });
         toast({ title: "Note saved" });
         setShowNoteForm(false);
         setNoteText("");
       },
-      onError: () => toast({ title: "Failed to save note", variant: "destructive" }),
+      onError: () =>
+        toast({ title: "Failed to save note", variant: "destructive" }),
     },
   });
 
@@ -2101,8 +2915,8 @@ function ChildDetailSheet({
   const status: Exclude<DeskFilter, "all"> = !checkin
     ? "not_checked_in"
     : !checkin.checkoutAt
-    ? "checked_in"
-    : "checked_out";
+      ? "checked_in"
+      : "checked_out";
 
   const age = reg.childDateOfBirth
     ? (() => {
@@ -2113,7 +2927,8 @@ function ChildDetailSheet({
         if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) years--;
         if (years === 0) {
           const months =
-            (today.getFullYear() - birth.getFullYear()) * 12 + (today.getMonth() - birth.getMonth());
+            (today.getFullYear() - birth.getFullYear()) * 12 +
+            (today.getMonth() - birth.getMonth());
           return `${months < 0 ? 0 : months} mo`;
         }
         return `${years} yr`;
@@ -2122,12 +2937,24 @@ function ChildDetailSheet({
 
   const customAnswers = regDetail?.customAnswers ?? [];
   const findAnswer = (...keywords: string[]) =>
-    customAnswers.find((a) => keywords.some((kw) => a.fieldLabel.toLowerCase().includes(kw)))?.value ?? null;
+    customAnswers.find((a) =>
+      keywords.some((kw) => a.fieldLabel.toLowerCase().includes(kw)),
+    )?.value ?? null;
 
-  const emergencyContactName = findAnswer("emergency contact", "emergency name");
-  const emergencyContactPhone = findAnswer("emergency phone", "emergency contact phone");
+  const emergencyContactName = findAnswer(
+    "emergency contact",
+    "emergency name",
+  );
+  const emergencyContactPhone = findAnswer(
+    "emergency phone",
+    "emergency contact phone",
+  );
   const authorizedPickup = findAnswer("authorized pickup", "pickup name");
-  const unauthorizedPickup = findAnswer("unauthorized", "not authorized", "not allowed");
+  const unauthorizedPickup = findAnswer(
+    "unauthorized",
+    "not authorized",
+    "not allowed",
+  );
   const secondaryGuardian = findAnswer("secondary guardian", "second guardian");
   const grade = findAnswer("grade");
 
@@ -2158,25 +2985,40 @@ function ChildDetailSheet({
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
-          <SheetTitle className="sr-only">{reg.childFirstName} {reg.childLastName} — Details</SheetTitle>
+          <SheetTitle className="sr-only">
+            {reg.childFirstName} {reg.childLastName} — Details
+          </SheetTitle>
 
           {/* Header (leave pr-12 for the built-in close button at right-4 top-4) */}
           <div className="flex items-center gap-3 px-5 pt-5 pb-4 pr-14 border-b shrink-0">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold font-serif flex-shrink-0 ${statusColor}`}>
-              {reg.childFirstName[0]}{reg.childLastName[0]}
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center text-base font-bold font-serif flex-shrink-0 ${statusColor}`}
+            >
+              {reg.childFirstName[0]}
+              {reg.childLastName[0]}
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-xl font-bold font-serif leading-tight truncate">
                 {reg.childFirstName} {reg.childLastName}
               </h2>
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                <Badge className={`text-xs ${statusColor}`}>{statusLabel}</Badge>
-                {reg.room && <Badge variant="outline" className="text-xs">{reg.room}</Badge>}
+                <Badge className={`text-xs ${statusColor}`}>
+                  {statusLabel}
+                </Badge>
+                {reg.room && (
+                  <Badge variant="outline" className="text-xs">
+                    {reg.room}
+                  </Badge>
+                )}
                 {reg.allergies && (
-                  <Badge className="text-xs bg-red-100 text-red-800 border-red-200 hover:bg-red-100">Allergy</Badge>
+                  <Badge className="text-xs bg-red-100 text-red-800 border-red-200 hover:bg-red-100">
+                    Allergy
+                  </Badge>
                 )}
                 {reg.specialNeeds && (
-                  <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">Medical</Badge>
+                  <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">
+                    Medical
+                  </Badge>
                 )}
               </div>
             </div>
@@ -2185,16 +3027,26 @@ function ChildDetailSheet({
           {/* Scrollable body */}
           <div className="flex-1 overflow-y-auto">
             <div className="px-5 py-5 space-y-6">
-
               {/* Child Info */}
               <section className="space-y-2">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Child Info</p>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  Child Info
+                </p>
                 <div className="space-y-1.5 text-sm">
                   {reg.childDateOfBirth && (
                     <div className="flex items-center gap-2">
                       <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span>{format(new Date(reg.childDateOfBirth + "T00:00:00"), "MMMM d, yyyy")}</span>
-                      {age && <span className="text-muted-foreground">({age} old)</span>}
+                      <span>
+                        {format(
+                          new Date(reg.childDateOfBirth + "T00:00:00"),
+                          "MMMM d, yyyy",
+                        )}
+                      </span>
+                      {age && (
+                        <span className="text-muted-foreground">
+                          ({age} old)
+                        </span>
+                      )}
                     </div>
                   )}
                   {grade && (
@@ -2206,20 +3058,30 @@ function ChildDetailSheet({
                   {reg.room && (
                     <div className="flex items-center gap-2">
                       <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span>Room: <span className="font-medium">{reg.room}</span></span>
+                      <span>
+                        Room: <span className="font-medium">{reg.room}</span>
+                      </span>
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Calendar className="w-3.5 h-3.5 shrink-0" />
-                    <span>Registered {format(new Date(reg.createdAt), "MMM d, yyyy")}</span>
+                    <span>
+                      Registered{" "}
+                      {format(new Date(reg.createdAt), "MMM d, yyyy")}
+                    </span>
                   </div>
                 </div>
               </section>
 
               {/* Guardian Info */}
-              {(reg.guardianName || reg.guardianPhone || reg.guardianEmail || secondaryGuardian) && (
+              {(reg.guardianName ||
+                reg.guardianPhone ||
+                reg.guardianEmail ||
+                secondaryGuardian) && (
                 <section className="space-y-2">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Guardian</p>
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    Guardian
+                  </p>
                   <div className="space-y-1.5 text-sm">
                     {reg.guardianName && (
                       <div className="flex items-center gap-2">
@@ -2230,7 +3092,10 @@ function ChildDetailSheet({
                     {reg.guardianPhone && (
                       <div className="flex items-center gap-2">
                         <Phone className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                        <a href={`tel:${reg.guardianPhone}`} className="text-primary hover:underline">
+                        <a
+                          href={`tel:${reg.guardianPhone}`}
+                          className="text-primary hover:underline"
+                        >
                           {reg.guardianPhone}
                         </a>
                       </div>
@@ -2238,14 +3103,18 @@ function ChildDetailSheet({
                     {reg.guardianEmail && (
                       <div className="flex items-center gap-2">
                         <Mail className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                        <span className="text-muted-foreground truncate">{reg.guardianEmail}</span>
+                        <span className="text-muted-foreground truncate">
+                          {reg.guardianEmail}
+                        </span>
                       </div>
                     )}
                     {secondaryGuardian && (
                       <div className="flex items-start gap-2 pt-1 border-t border-border">
                         <Users className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-xs text-muted-foreground">Secondary Guardian</p>
+                          <p className="text-xs text-muted-foreground">
+                            Secondary Guardian
+                          </p>
                           <p>{secondaryGuardian}</p>
                         </div>
                       </div>
@@ -2255,9 +3124,16 @@ function ChildDetailSheet({
               )}
 
               {/* Safety Info */}
-              {(reg.allergies || reg.specialNeeds || emergencyContactName || emergencyContactPhone || authorizedPickup || unauthorizedPickup) && (
+              {(reg.allergies ||
+                reg.specialNeeds ||
+                emergencyContactName ||
+                emergencyContactPhone ||
+                authorizedPickup ||
+                unauthorizedPickup) && (
                 <section className="space-y-2">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Safety</p>
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    Safety
+                  </p>
                   <div className="space-y-2">
                     {reg.allergies && (
                       <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
@@ -2270,9 +3146,12 @@ function ChildDetailSheet({
                     {reg.specialNeeds && (
                       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
                         <p className="text-xs font-bold text-blue-700 uppercase tracking-wide flex items-center gap-1.5 mb-1">
-                          <ShieldCheck className="w-3.5 h-3.5" /> Medical / Special Needs
+                          <ShieldCheck className="w-3.5 h-3.5" /> Medical /
+                          Special Needs
                         </p>
-                        <p className="text-sm text-blue-800">{reg.specialNeeds}</p>
+                        <p className="text-sm text-blue-800">
+                          {reg.specialNeeds}
+                        </p>
                       </div>
                     )}
                     {(emergencyContactName || emergencyContactPhone) && (
@@ -2280,9 +3159,16 @@ function ChildDetailSheet({
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">
                           Emergency Contact
                         </p>
-                        {emergencyContactName && <p className="text-sm font-medium">{emergencyContactName}</p>}
+                        {emergencyContactName && (
+                          <p className="text-sm font-medium">
+                            {emergencyContactName}
+                          </p>
+                        )}
                         {emergencyContactPhone && (
-                          <a href={`tel:${emergencyContactPhone}`} className="text-sm text-primary hover:underline">
+                          <a
+                            href={`tel:${emergencyContactPhone}`}
+                            className="text-sm text-primary hover:underline"
+                          >
                             {emergencyContactPhone}
                           </a>
                         )}
@@ -2293,7 +3179,9 @@ function ChildDetailSheet({
                         <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">
                           Authorized Pickup
                         </p>
-                        <p className="text-sm text-green-800">{authorizedPickup}</p>
+                        <p className="text-sm text-green-800">
+                          {authorizedPickup}
+                        </p>
                       </div>
                     )}
                     {unauthorizedPickup && (
@@ -2301,7 +3189,9 @@ function ChildDetailSheet({
                         <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">
                           Not Authorized for Pickup
                         </p>
-                        <p className="text-sm text-red-800">{unauthorizedPickup}</p>
+                        <p className="text-sm text-red-800">
+                          {unauthorizedPickup}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -2310,47 +3200,79 @@ function ChildDetailSheet({
 
               {/* Attendance */}
               <section className="space-y-2">
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Attendance</p>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                  Attendance
+                </p>
                 <div className="rounded-lg border border-border divide-y divide-border text-sm">
                   <div className="flex justify-between items-center px-4 py-2.5">
                     <span className="text-muted-foreground">Status</span>
-                    <Badge className={`text-xs ${statusColor}`}>{statusLabel}</Badge>
+                    <Badge className={`text-xs ${statusColor}`}>
+                      {statusLabel}
+                    </Badge>
                   </div>
                   {checkin && (
                     <>
                       <div className="flex justify-between px-4 py-2.5">
-                        <span className="text-muted-foreground">Checked In</span>
-                        <span className="font-medium">{format(new Date(checkin.checkinAt), "h:mm a, MMM d")}</span>
+                        <span className="text-muted-foreground">
+                          Checked In
+                        </span>
+                        <span className="font-medium">
+                          {format(new Date(checkin.checkinAt), "h:mm a, MMM d")}
+                        </span>
                       </div>
                       {checkin.checkoutAt && (
                         <div className="flex justify-between px-4 py-2.5">
-                          <span className="text-muted-foreground">Checked Out</span>
-                          <span className="font-medium">{format(new Date(checkin.checkoutAt), "h:mm a, MMM d")}</span>
-                        </div>
-                      )}
-                      {checkin.checkoutAt && checkin.checkoutMethod === "bulk_admin" && (
-                        <div className="flex justify-between px-4 py-2.5">
-                          <span className="text-muted-foreground">Checkout method</span>
-                          <span className="font-medium text-amber-700">Bulk checkout by admin</span>
-                        </div>
-                      )}
-                      {checkin.checkoutMethod === "bulk_admin" && checkin.checkoutReason && (
-                        <div className="flex justify-between px-4 py-2.5">
-                          <span className="text-muted-foreground">Reason</span>
+                          <span className="text-muted-foreground">
+                            Checked Out
+                          </span>
                           <span className="font-medium">
-                            {BULK_CHECKOUT_REASON_LABELS[checkin.checkoutReason] ?? checkin.checkoutReason}
+                            {format(
+                              new Date(checkin.checkoutAt),
+                              "h:mm a, MMM d",
+                            )}
                           </span>
                         </div>
                       )}
-                      {checkin.pickupPersonName && checkin.checkoutMethod !== "bulk_admin" && (
-                        <div className="flex justify-between px-4 py-2.5">
-                          <span className="text-muted-foreground">Picked Up By</span>
-                          <span className="font-medium">{checkin.pickupPersonName}</span>
-                        </div>
-                      )}
+                      {checkin.checkoutAt &&
+                        checkin.checkoutMethod === "bulk_admin" && (
+                          <div className="flex justify-between px-4 py-2.5">
+                            <span className="text-muted-foreground">
+                              Checkout method
+                            </span>
+                            <span className="font-medium text-amber-700">
+                              Bulk checkout by admin
+                            </span>
+                          </div>
+                        )}
+                      {checkin.checkoutMethod === "bulk_admin" &&
+                        checkin.checkoutReason && (
+                          <div className="flex justify-between px-4 py-2.5">
+                            <span className="text-muted-foreground">
+                              Reason
+                            </span>
+                            <span className="font-medium">
+                              {BULK_CHECKOUT_REASON_LABELS[
+                                checkin.checkoutReason
+                              ] ?? checkin.checkoutReason}
+                            </span>
+                          </div>
+                        )}
+                      {checkin.pickupPersonName &&
+                        checkin.checkoutMethod !== "bulk_admin" && (
+                          <div className="flex justify-between px-4 py-2.5">
+                            <span className="text-muted-foreground">
+                              Picked Up By
+                            </span>
+                            <span className="font-medium">
+                              {checkin.pickupPersonName}
+                            </span>
+                          </div>
+                        )}
                       {checkin.labelCode && (
                         <div className="flex justify-between items-center px-4 py-2.5">
-                          <span className="text-muted-foreground">Pickup Code</span>
+                          <span className="text-muted-foreground">
+                            Pickup Code
+                          </span>
                           <span className="font-mono font-bold tracking-widest text-green-700 bg-green-100 px-2 py-0.5 rounded">
                             {checkin.labelCode}
                           </span>
@@ -2358,7 +3280,9 @@ function ChildDetailSheet({
                       )}
                       {checkin.notes && (
                         <div className="px-4 py-2.5">
-                          <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                          <p className="text-xs text-muted-foreground mb-1">
+                            Notes
+                          </p>
                           <p>{checkin.notes}</p>
                         </div>
                       )}
@@ -2367,11 +3291,22 @@ function ChildDetailSheet({
                 </div>
                 {allCheckins.length > 1 && (
                   <div className="space-y-1 mt-1">
-                    <p className="text-xs text-muted-foreground">Previous Sessions</p>
+                    <p className="text-xs text-muted-foreground">
+                      Previous Sessions
+                    </p>
                     {allCheckins.slice(1).map((c) => (
-                      <div key={c.id} className="flex justify-between text-xs text-muted-foreground rounded border border-border px-3 py-1.5">
-                        <span>{format(new Date(c.checkinAt), "MMM d, h:mm a")}</span>
-                        {c.checkoutAt && <span className="text-amber-700">Out {format(new Date(c.checkoutAt), "h:mm a")}</span>}
+                      <div
+                        key={c.id}
+                        className="flex justify-between text-xs text-muted-foreground rounded border border-border px-3 py-1.5"
+                      >
+                        <span>
+                          {format(new Date(c.checkinAt), "MMM d, h:mm a")}
+                        </span>
+                        {c.checkoutAt && (
+                          <span className="text-amber-700">
+                            Out {format(new Date(c.checkoutAt), "h:mm a")}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -2392,7 +3327,9 @@ function ChildDetailSheet({
                     </button>
                   ) : (
                     <div className="space-y-2">
-                      <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Note</Label>
+                      <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">
+                        Note
+                      </Label>
                       <Textarea
                         placeholder="Add a note about this check-in…"
                         rows={3}
@@ -2406,18 +3343,30 @@ function ChildDetailSheet({
                           size="sm"
                           className="gap-1.5"
                           disabled={updateCheckin.isPending}
-                          onClick={() => updateCheckin.mutate({ checkinId: checkin.id, data: { notes: noteText } })}
+                          onClick={() =>
+                            updateCheckin.mutate({
+                              checkinId: checkin.id,
+                              data: { notes: noteText },
+                            })
+                          }
                         >
-                          {updateCheckin.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          {updateCheckin.isPending && (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          )}
                           Save Note
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setShowNoteForm(false)}>Cancel</Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setShowNoteForm(false)}
+                        >
+                          Cancel
+                        </Button>
                       </div>
                     </div>
                   )}
                 </section>
               )}
-
             </div>
           </div>
 
@@ -2425,25 +3374,44 @@ function ChildDetailSheet({
           <div className="border-t border-border px-5 py-4 bg-background shrink-0 space-y-2">
             <div className="flex gap-2">
               {status === "not_checked_in" && (
-                <Button className="flex-1 gap-2" onClick={() => { onOpenChange(false); onCheckin(); }}>
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={() => {
+                    onOpenChange(false);
+                    onCheckin();
+                  }}
+                >
                   <LogIn className="w-4 h-4" /> Check In
                 </Button>
               )}
               {status === "checked_in" && requireCheckout && (
                 <Button
-                  onClick={() => { onOpenChange(false); onCheckout(); }}
+                  onClick={() => {
+                    onOpenChange(false);
+                    onCheckout();
+                  }}
                   className="flex-1 gap-2 bg-amber-500 text-white hover:bg-amber-600 border-amber-400"
                 >
                   <LogOut className="w-4 h-4" /> Check Out
                 </Button>
               )}
               {status === "checked_out" && (
-                <Button className="flex-1 gap-2" onClick={() => { onOpenChange(false); onCheckin(); }}>
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={() => {
+                    onOpenChange(false);
+                    onCheckin();
+                  }}
+                >
                   <LogIn className="w-4 h-4" /> Check In Again
                 </Button>
               )}
               {checkin && labelData && (
-                <Button variant="outline" className="flex-1 gap-2" onClick={() => setPrintOpen(true)}>
+                <Button
+                  variant="outline"
+                  className="flex-1 gap-2"
+                  onClick={() => setPrintOpen(true)}
+                >
                   <Printer className="w-4 h-4" /> Print Label
                 </Button>
               )}
@@ -2460,7 +3428,11 @@ function ChildDetailSheet({
       </Sheet>
 
       {labelData && (
-        <LabelPrintDialog open={printOpen} onOpenChange={setPrintOpen} labels={[labelData]} />
+        <LabelPrintDialog
+          open={printOpen}
+          onOpenChange={setPrintOpen}
+          labels={[labelData]}
+        />
       )}
 
       <RegistrationEditDialog
@@ -2502,7 +3474,11 @@ function EndSessionDialog({
 
   const bulkCheckout = useBulkCheckout();
 
-  const reset = () => { setReason(""); setNote(""); setConfirm(""); };
+  const reset = () => {
+    setReason("");
+    setNote("");
+    setConfirm("");
+  };
   const canSubmit = !!reason && confirm === "CHECK OUT" && !submitting;
 
   const handleSubmit = async () => {
@@ -2510,20 +3486,36 @@ function EndSessionDialog({
     setSubmitting(true);
     try {
       const result = await bulkCheckout.mutateAsync({
-        data: { eventId, sessionId: sessionId ?? undefined, reason, note: note || undefined },
+        data: {
+          eventId,
+          sessionId: sessionId ?? undefined,
+          reason,
+          note: note || undefined,
+        },
       });
       onSuccess(result.count);
       onOpenChange(false);
       reset();
     } catch {
-      toast({ title: "Bulk checkout failed — please try again.", variant: "destructive" });
+      toast({
+        title: "Bulk checkout failed — please try again.",
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!submitting) { onOpenChange(v); if (!v) reset(); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!submitting) {
+          onOpenChange(v);
+          if (!v) reset();
+        }
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-serif flex items-center gap-2">
@@ -2539,13 +3531,18 @@ function EndSessionDialog({
               <span className="font-medium">{eventName}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Currently checked in</span>
+              <span className="text-muted-foreground">
+                Currently checked in
+              </span>
               <span className="font-bold">{checkedInCount}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Checkout time</span>
               <span className="font-medium">
-                {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                {new Date().toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
               </span>
             </div>
           </div>
@@ -2553,8 +3550,9 @@ function EndSessionDialog({
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex gap-2 text-sm text-amber-800">
             <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <p>
-              This will check out all children who are currently checked in. Use this only at
-              the end of the event or when individual checkout was not recorded.
+              This will check out all children who are currently checked in. Use
+              this only at the end of the event or when individual checkout was
+              not recorded.
             </p>
           </div>
 
@@ -2563,10 +3561,14 @@ function EndSessionDialog({
               Reason <span className="text-destructive">*</span>
             </Label>
             <Select value={reason} onValueChange={setReason}>
-              <SelectTrigger><SelectValue placeholder="Select a reason…" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a reason…" />
+              </SelectTrigger>
               <SelectContent>
                 {BULK_CHECKOUT_REASONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -2574,7 +3576,10 @@ function EndSessionDialog({
 
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
-              Additional note <span className="text-muted-foreground font-normal">(optional)</span>
+              Additional note{" "}
+              <span className="text-muted-foreground font-normal">
+                (optional)
+              </span>
             </Label>
             <Textarea
               value={note}
@@ -2586,7 +3591,8 @@ function EndSessionDialog({
 
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">
-              Type <span className="font-mono font-bold">CHECK OUT</span> to confirm
+              Type <span className="font-mono font-bold">CHECK OUT</span> to
+              confirm
             </Label>
             <Input
               value={confirm}
@@ -2598,7 +3604,13 @@ function EndSessionDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => { onOpenChange(false); reset(); }}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              onOpenChange(false);
+              reset();
+            }}
+          >
             Cancel
           </Button>
           <Button
@@ -2607,10 +3619,11 @@ function EndSessionDialog({
             onClick={handleSubmit}
             className="gap-2"
           >
-            {submitting
-              ? <Loader2 className="w-4 h-4 animate-spin" />
-              : <PowerOff className="w-4 h-4" />
-            }
+            {submitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <PowerOff className="w-4 h-4" />
+            )}
             Check Out All Remaining
           </Button>
         </DialogFooter>
@@ -2651,7 +3664,11 @@ function CheckinDeskSettingsDialog({
   onFamilyCodeEnabledChange: (v: boolean) => void;
   showFamilyCodeSetting: boolean;
 }) {
-  const options: { value: DeskDisplayMode; label: string; description: string }[] = [
+  const options: {
+    value: DeskDisplayMode;
+    label: string;
+    description: string;
+  }[] = [
     {
       value: "standard",
       label: "Standard List",
@@ -2678,7 +3695,9 @@ function CheckinDeskSettingsDialog({
         <div className="space-y-6 py-2">
           {/* Display mode */}
           <div className="space-y-3">
-            <p className="text-sm font-semibold text-foreground">Check-In List Display Mode</p>
+            <p className="text-sm font-semibold text-foreground">
+              Check-In List Display Mode
+            </p>
             <div className="space-y-3">
               {options.map((opt) => {
                 const active = displayMode === opt.value;
@@ -2687,21 +3706,29 @@ function CheckinDeskSettingsDialog({
                     key={opt.value}
                     type="button"
                     className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                      active ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                      active
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/40"
                     }`}
                     onClick={() => onDisplayModeChange(opt.value)}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                          active ? "border-primary bg-primary" : "border-muted-foreground"
+                          active
+                            ? "border-primary bg-primary"
+                            : "border-muted-foreground"
                         }`}
                       >
-                        {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        {active && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                        )}
                       </div>
                       <div>
                         <p className="font-medium text-sm">{opt.label}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{opt.description}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {opt.description}
+                        </p>
                       </div>
                     </div>
                   </button>
@@ -2715,17 +3742,25 @@ function CheckinDeskSettingsDialog({
             <>
               <div className="border-t border-border" />
               <div className="space-y-3">
-                <p className="text-sm font-semibold text-foreground">Security Pickup Codes</p>
+                <p className="text-sm font-semibold text-foreground">
+                  Security Pickup Codes
+                </p>
                 <div className="flex items-start justify-between gap-4 p-4 rounded-lg border border-border">
                   <div className="space-y-1 flex-1 min-w-0">
-                    <Label htmlFor="family-code-toggle" className="text-sm font-medium cursor-pointer">
+                    <Label
+                      htmlFor="family-code-toggle"
+                      className="text-sm font-medium cursor-pointer"
+                    >
                       Keep family pickup code the same
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Use one pickup/security code for the entire family during this event, even if siblings are checked in at different times.
+                      Use one pickup/security code for the entire family during
+                      this event, even if siblings are checked in at different
+                      times.
                     </p>
                     <p className="text-xs text-muted-foreground/70 italic">
-                      Recommended when parents may drop off siblings at different times.
+                      Recommended when parents may drop off siblings at
+                      different times.
                     </p>
                   </div>
                   <Switch
@@ -2764,7 +3799,9 @@ interface FamilyGroupDeskCardProps {
   onIndividualCheckin: (reg: Registration) => void;
   onOpenDetail: (regId: number) => void;
   onCheckout: (reg: Registration, checkin: EventCheckin) => void;
-  onCheckoutSelected: (items: Array<{ reg: Registration; checkin: EventCheckin }>) => void;
+  onCheckoutSelected: (
+    items: Array<{ reg: Registration; checkin: EventCheckin }>,
+  ) => void;
   isGroupCheckoutLoading?: boolean;
   onUndoCheckin: (checkinId: number, regId: number) => void;
   onUndoCheckout: (checkinId: number, regId: number) => void;
@@ -2793,10 +3830,12 @@ function FamilyGroupDeskCard({
   const checkedIn = items.filter((p) => p.status === "checked_in");
 
   const [selected, setSelected] = useState<Set<number>>(
-    new Set(notCheckedIn.map((p) => p.reg.id))
+    new Set(notCheckedIn.map((p) => p.reg.id)),
   );
   // Track explicit deselections so newly-checked-in children are selected by default
-  const [deselectedForCheckout, setDeselectedForCheckout] = useState<Set<number>>(new Set());
+  const [deselectedForCheckout, setDeselectedForCheckout] = useState<
+    Set<number>
+  >(new Set());
 
   const toggleChild = (id: number) =>
     setSelected((prev) => {
@@ -2812,7 +3851,9 @@ function FamilyGroupDeskCard({
       return next;
     });
 
-  const selectedRegs = notCheckedIn.filter((p) => selected.has(p.reg.id)).map((p) => p.reg);
+  const selectedRegs = notCheckedIn
+    .filter((p) => selected.has(p.reg.id))
+    .map((p) => p.reg);
   const selectedForCheckoutItems = checkedIn
     .filter((p) => !deselectedForCheckout.has(p.reg.id) && p.checkin)
     .map((p) => ({ reg: p.reg, checkin: p.checkin! }));
@@ -2829,7 +3870,9 @@ function FamilyGroupDeskCard({
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
             <Users className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
-            <span className="font-semibold text-sm">{familyLastName} Family</span>
+            <span className="font-semibold text-sm">
+              {familyLastName} Family
+            </span>
             <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
               {childCount} {childCount === 1 ? "child" : "children"}
             </Badge>
@@ -2845,9 +3888,11 @@ function FamilyGroupDeskCard({
                   onCheckinSelected(selectedRegs);
                 }}
               >
-                {isGroupCheckinLoading
-                  ? <Loader2 className="w-3 h-3 animate-spin" />
-                  : <LogIn className="w-3 h-3" />}
+                {isGroupCheckinLoading ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <LogIn className="w-3 h-3" />
+                )}
                 {selectedRegs.length === 0
                   ? "No children selected"
                   : selectedRegs.length === 1
@@ -2860,15 +3905,20 @@ function FamilyGroupDeskCard({
                 size="sm"
                 variant="outline"
                 className="gap-1.5 h-7 px-3 text-xs font-semibold shrink-0 border-amber-300 text-amber-800 hover:bg-amber-50 hover:border-amber-400"
-                disabled={selectedForCheckoutItems.length === 0 || isGroupCheckoutLoading}
+                disabled={
+                  selectedForCheckoutItems.length === 0 ||
+                  isGroupCheckoutLoading
+                }
                 onClick={(e) => {
                   e.stopPropagation();
                   onCheckoutSelected(selectedForCheckoutItems);
                 }}
               >
-                {isGroupCheckoutLoading
-                  ? <Loader2 className="w-3 h-3 animate-spin" />
-                  : <LogOut className="w-3 h-3" />}
+                {isGroupCheckoutLoading ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <LogOut className="w-3 h-3" />
+                )}
                 {selectedForCheckoutItems.length === 0
                   ? "No Children Selected"
                   : selectedForCheckoutItems.length === 1
@@ -2876,12 +3926,15 @@ function FamilyGroupDeskCard({
                     : `Check Out ${selectedForCheckoutItems.length} Children`}
               </Button>
             ) : !showBatchCheckout && allCheckedIn ? (
-              <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px] shrink-0">All Checked In</Badge>
+              <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px] shrink-0">
+                All Checked In
+              </Badge>
             ) : null}
           </div>
         </div>
         <div className="text-xs text-muted-foreground mt-1">
-          Guardian: {guardian}{guardianPhone && <> · {guardianPhone}</>}
+          Guardian: {guardian}
+          {guardianPhone && <> · {guardianPhone}</>}
         </div>
       </div>
 
@@ -2891,47 +3944,71 @@ function FamilyGroupDeskCard({
           const acting = loadingId === reg.id;
           const isNotIn = status === "not_checked_in";
           const isSelected = isNotIn && selected.has(reg.id);
-          const isSelectedForCheckout = status === "checked_in" && showBatchCheckout && !deselectedForCheckout.has(reg.id);
-          const isClickable = isNotIn || (status === "checked_in" && showBatchCheckout);
+          const isSelectedForCheckout =
+            status === "checked_in" &&
+            showBatchCheckout &&
+            !deselectedForCheckout.has(reg.id);
+          const isClickable =
+            isNotIn || (status === "checked_in" && showBatchCheckout);
           const childName = `${reg.childFirstName} ${reg.childLastName}`;
           const avatarCls =
-            status === "checked_in" ? "bg-green-100 text-green-800" :
-            status === "checked_out" ? "bg-amber-100 text-amber-800" :
-            "bg-primary/10 text-primary";
+            status === "checked_in"
+              ? "bg-green-100 text-green-800"
+              : status === "checked_out"
+                ? "bg-amber-100 text-amber-800"
+                : "bg-primary/10 text-primary";
           const cardCls =
             status === "checked_in"
               ? isSelectedForCheckout
                 ? "border-green-400 bg-green-50/60 dark:border-green-600 dark:bg-green-950/30"
                 : "border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-950/20"
-              : status === "checked_out" ? "border-amber-200 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/20" :
-            isSelected ? "border-amber-300/80 bg-amber-50/50" :
-            "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50";
+              : status === "checked_out"
+                ? "border-amber-200 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/20"
+                : isSelected
+                  ? "border-amber-300/80 bg-amber-50/50"
+                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50";
 
           return (
             <Card
               key={reg.id}
-              className={cn("transition-all", isClickable ? "cursor-pointer" : "", cardCls)}
+              className={cn(
+                "transition-all",
+                isClickable ? "cursor-pointer" : "",
+                cardCls,
+              )}
               onClick={() => {
                 if (isNotIn) toggleChild(reg.id);
-                if (status === "checked_in" && showBatchCheckout) toggleCheckoutChild(reg.id);
+                if (status === "checked_in" && showBatchCheckout)
+                  toggleCheckoutChild(reg.id);
               }}
             >
               <CardContent className="px-3 py-2.5 flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 ${avatarCls}`}>
-                  {reg.childFirstName[0]}{reg.childLastName[0]}
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 ${avatarCls}`}
+                >
+                  {reg.childFirstName[0]}
+                  {reg.childLastName[0]}
                 </div>
 
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <div className="flex items-center flex-wrap gap-2">
-                    <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
+                    <span className="font-semibold text-base leading-tight">
+                      {reg.childFirstName} {reg.childLastName}
+                    </span>
                     {reg.room && (
-                      <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">{reg.room}</Badge>
+                      <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">
+                        {reg.room}
+                      </Badge>
                     )}
                     {reg.allergies && (
-                      <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">Allergy</Badge>
+                      <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
+                        Allergy
+                      </Badge>
                     )}
                     {reg.specialNeeds && (
-                      <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">Medical</Badge>
+                      <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">
+                        Medical
+                      </Badge>
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -2944,24 +4021,33 @@ function FamilyGroupDeskCard({
                       <div className="space-y-1.5">
                         <span className="text-green-700 font-medium flex items-center gap-1.5">
                           <LogIn className="w-3 h-3" />
-                          Checked in {format(new Date(checkin.checkinAt), "h:mm a")}
+                          Checked in{" "}
+                          {format(new Date(checkin.checkinAt), "h:mm a")}
                         </span>
-                        {labelType === "child_security" && checkin.labelCode && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground font-medium">Pickup Code</span>
-                            <span className="font-mono font-bold tracking-widest text-sm bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-1 rounded-md">
-                              {checkin.labelCode}
-                            </span>
-                          </div>
-                        )}
+                        {labelType === "child_security" &&
+                          checkin.labelCode && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground font-medium">
+                                Pickup Code
+                              </span>
+                              <span className="font-mono font-bold tracking-widest text-sm bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-1 rounded-md">
+                                {checkin.labelCode}
+                              </span>
+                            </div>
+                          )}
                       </div>
                     )}
                     {status === "checked_out" && checkin && (
                       <span className="text-amber-700 font-medium flex items-center gap-1.5">
                         <LogOut className="w-3 h-3" />
-                        Out {checkin.checkoutAt ? format(new Date(checkin.checkoutAt), "h:mm a") : ""}
+                        Out{" "}
+                        {checkin.checkoutAt
+                          ? format(new Date(checkin.checkoutAt), "h:mm a")
+                          : ""}
                         {checkin.labelCode && (
-                          <span className="font-mono text-muted-foreground ml-1">{checkin.labelCode}</span>
+                          <span className="font-mono text-muted-foreground ml-1">
+                            {checkin.labelCode}
+                          </span>
                         )}
                       </span>
                     )}
@@ -2969,7 +4055,10 @@ function FamilyGroupDeskCard({
                 </div>
 
                 {/* Actions — checkbox on right for eligible children; secondary actions for checked-in/out */}
-                <div className="flex flex-col items-end gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="flex flex-col items-end gap-1.5 flex-shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <div className="flex items-center gap-2">
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -2987,62 +4076,67 @@ function FamilyGroupDeskCard({
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Edit {reg.childFirstName} {reg.childLastName}</TooltipContent>
+                      <TooltipContent>
+                        Edit {reg.childFirstName} {reg.childLastName}
+                      </TooltipContent>
                     </Tooltip>
-                    {isNotIn && (
-                      acting
-                        ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                        : (
-                          <button
-                            type="button"
-                            className={cn(
-                              "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                              isSelected
-                                ? "border-primary-border bg-primary text-primary-foreground shadow-sm hover:bg-[hsl(38_90%_44%)] hover:shadow-md hover:-translate-y-px active:translate-y-0 active:shadow-sm"
-                                : "border-muted-foreground/30 bg-background text-transparent hover:border-primary/60"
-                            )}
-                            aria-pressed={isSelected}
-                            aria-label={
-                              isSelected
-                                ? `Exclude ${childName} from family check-in`
-                                : `Include ${childName} in family check-in`
-                            }
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleChild(reg.id);
-                            }}
-                          >
-                            {isSelected && <Check className="w-3.5 h-3.5 stroke-[2.75]" />}
-                          </button>
-                        )
-                    )}
-                    {status === "checked_in" && showBatchCheckout && (
-                      acting
-                        ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                        : (
-                          <button
-                            type="button"
-                            className={cn(
-                              "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                              isSelectedForCheckout
-                                ? "border-green-600 bg-green-600 text-white shadow-sm hover:bg-green-700 hover:shadow-md hover:-translate-y-px active:translate-y-0 active:shadow-sm"
-                                : "border-muted-foreground/30 bg-background text-transparent hover:border-green-600/60"
-                            )}
-                            aria-pressed={isSelectedForCheckout}
-                            aria-label={
-                              isSelectedForCheckout
-                                ? `Exclude ${childName} from family check-out`
-                                : `Include ${childName} in family check-out`
-                            }
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleCheckoutChild(reg.id);
-                            }}
-                          >
-                            {isSelectedForCheckout && <Check className="w-3.5 h-3.5 stroke-[2.75]" />}
-                          </button>
-                        )
-                    )}
+                    {isNotIn &&
+                      (acting ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <button
+                          type="button"
+                          className={cn(
+                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                            isSelected
+                              ? "border-primary-border bg-primary text-primary-foreground shadow-sm hover:bg-[hsl(38_90%_44%)] hover:shadow-md hover:-translate-y-px active:translate-y-0 active:shadow-sm"
+                              : "border-muted-foreground/30 bg-background text-transparent hover:border-primary/60",
+                          )}
+                          aria-pressed={isSelected}
+                          aria-label={
+                            isSelected
+                              ? `Exclude ${childName} from family check-in`
+                              : `Include ${childName} in family check-in`
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleChild(reg.id);
+                          }}
+                        >
+                          {isSelected && (
+                            <Check className="w-3.5 h-3.5 stroke-[2.75]" />
+                          )}
+                        </button>
+                      ))}
+                    {status === "checked_in" &&
+                      showBatchCheckout &&
+                      (acting ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <button
+                          type="button"
+                          className={cn(
+                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                            isSelectedForCheckout
+                              ? "border-green-600 bg-green-600 text-white shadow-sm hover:bg-green-700 hover:shadow-md hover:-translate-y-px active:translate-y-0 active:shadow-sm"
+                              : "border-muted-foreground/30 bg-background text-transparent hover:border-green-600/60",
+                          )}
+                          aria-pressed={isSelectedForCheckout}
+                          aria-label={
+                            isSelectedForCheckout
+                              ? `Exclude ${childName} from family check-out`
+                              : `Include ${childName} in family check-out`
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleCheckoutChild(reg.id);
+                          }}
+                        >
+                          {isSelectedForCheckout && (
+                            <Check className="w-3.5 h-3.5 stroke-[2.75]" />
+                          )}
+                        </button>
+                      ))}
                   </div>
                   {status === "checked_in" && checkin && (
                     <>
@@ -3056,11 +4150,17 @@ function FamilyGroupDeskCard({
                             onCheckout(reg, checkin);
                           }}
                         >
-                          {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+                          {acting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <LogOut className="w-4 h-4" />
+                          )}
                           Check Out
                         </Button>
                       ) : (
-                        <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
+                        <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
+                          Checked In
+                        </Badge>
                       )}
                       <div className="flex items-center gap-3">
                         <button
@@ -3089,7 +4189,9 @@ function FamilyGroupDeskCard({
                   )}
                   {status === "checked_out" && checkin && (
                     <>
-                      <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Checked Out</Badge>
+                      <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">
+                        Checked Out
+                      </Badge>
                       <Button
                         size="sm"
                         variant="outline"
@@ -3100,7 +4202,11 @@ function FamilyGroupDeskCard({
                           onIndividualCheckin(reg);
                         }}
                       >
-                        {acting ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogIn className="w-3 h-3" />}
+                        {acting ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <LogIn className="w-3 h-3" />
+                        )}
                         Check In Again
                       </Button>
                       <button
@@ -3220,24 +4326,35 @@ function CheckInDeskContent({
   const [addRegOpen, setAddRegOpen] = useState(false);
   const [printLabels, setPrintLabels] = useState(initialPrintLabels ?? true);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
-  const [pendingPrintLabel, setPendingPrintLabel] = useState<LabelData | null>(null);
+  const [pendingPrintLabel, setPendingPrintLabel] = useState<LabelData | null>(
+    null,
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [displayMode, setDisplayMode] = useState<DeskDisplayMode>("standard");
   const [familyCodeEnabled, setFamilyCodeEnabled] = useState(false);
-  const [batchLoadingGroupId, setBatchLoadingGroupId] = useState<string | null>(null);
-  const [batchCheckoutGroupId, setBatchCheckoutGroupId] = useState<string | null>(null);
+  const [batchLoadingGroupId, setBatchLoadingGroupId] = useState<string | null>(
+    null,
+  );
+  const [batchCheckoutGroupId, setBatchCheckoutGroupId] = useState<
+    string | null
+  >(null);
 
   // Family code setting is only relevant when printing child-security labels
   const showFamilyCodeSetting = isChildEvent && labelType === "child_security";
 
   // Dialog state
-  const [pendingCheckinReg, setPendingCheckinReg] = useState<Registration | null>(null);
-  const [pendingCheckout, setPendingCheckout] = useState<{ reg: Registration; checkin: EventCheckin } | null>(null);
+  const [pendingCheckinReg, setPendingCheckinReg] =
+    useState<Registration | null>(null);
+  const [pendingCheckout, setPendingCheckout] = useState<{
+    reg: Registration;
+    checkin: EventCheckin;
+  } | null>(null);
   const [endSessionOpen, setEndSessionOpen] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(`checkin:displayMode:${eventId}`);
-    if (saved === "standard" || saved === "family_grouping") setDisplayMode(saved);
+    if (saved === "standard" || saved === "family_grouping")
+      setDisplayMode(saved);
     else setDisplayMode(isChildEvent ? "family_grouping" : "standard");
   }, [eventId, isChildEvent]);
 
@@ -3261,10 +4378,15 @@ function CheckInDeskContent({
     localStorage.setItem(`checkin:familyCode:${eventId}`, v ? "on" : "off");
   };
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: getListEventCheckinsQueryKey(eventId) });
+  const invalidate = () =>
+    queryClient.invalidateQueries({
+      queryKey: getListEventCheckinsQueryKey(eventId),
+    });
 
   const handleEndSession = (count: number) => {
-    toast({ title: `${count} ${count === 1 ? "child" : "children"} checked out.` });
+    toast({
+      title: `${count} ${count === 1 ? "child" : "children"} checked out.`,
+    });
     invalidate();
   };
 
@@ -3276,11 +4398,19 @@ function CheckInDeskContent({
         setLoadingId(null);
         setPendingCheckinReg(null);
         if (data.labelData) {
-          const labelToPrint = labelType === "child_security"
-            ? data.labelData
-            : labelType === "simple_name_tag"
-            ? { ...data.labelData, labelCode: "", room: null, allergies: null, specialNeeds: null, guardianName: undefined }
-            : { ...data.labelData, labelCode: "" };
+          const labelToPrint =
+            labelType === "child_security"
+              ? data.labelData
+              : labelType === "simple_name_tag"
+                ? {
+                    ...data.labelData,
+                    labelCode: "",
+                    room: null,
+                    allergies: null,
+                    specialNeeds: null,
+                    guardianName: undefined,
+                  }
+                : { ...data.labelData, labelCode: "" };
           setPendingPrintLabel(labelToPrint);
           if (printLabels) {
             printLabelDirectly([labelToPrint], labelType);
@@ -3292,7 +4422,11 @@ function CheckInDeskContent({
         setPendingCheckinReg(null);
         const status = (err as { status?: number })?.status;
         if (status === 409) {
-          toast({ title: "Already checked in", description: "This child already has an active check-in.", variant: "destructive" });
+          toast({
+            title: "Already checked in",
+            description: "This child already has an active check-in.",
+            variant: "destructive",
+          });
           invalidate(); // refresh to show current state
         } else {
           toast({ title: "Check-in failed", variant: "destructive" });
@@ -3312,19 +4446,37 @@ function CheckInDeskContent({
         setLoadingId(null);
         setPendingCheckout(null);
       },
-      onError: () => { toast({ title: "Check-out failed", variant: "destructive" }); setLoadingId(null); setPendingCheckout(null); },
+      onError: () => {
+        toast({ title: "Check-out failed", variant: "destructive" });
+        setLoadingId(null);
+        setPendingCheckout(null);
+      },
     },
   });
   const deleteCheckinMutation = useDeleteCheckin({
     mutation: {
-      onSuccess: () => { invalidate(); toast({ title: "Check-in removed" }); setLoadingId(null); },
-      onError: () => { toast({ title: "Could not undo check-in", variant: "destructive" }); setLoadingId(null); },
+      onSuccess: () => {
+        invalidate();
+        toast({ title: "Check-in removed" });
+        setLoadingId(null);
+      },
+      onError: () => {
+        toast({ title: "Could not undo check-in", variant: "destructive" });
+        setLoadingId(null);
+      },
     },
   });
   const undoCheckoutMutation = useUndoCheckout({
     mutation: {
-      onSuccess: () => { invalidate(); toast({ title: "Check-out reversed" }); setLoadingId(null); },
-      onError: () => { toast({ title: "Could not undo check-out", variant: "destructive" }); setLoadingId(null); },
+      onSuccess: () => {
+        invalidate();
+        toast({ title: "Check-out reversed" });
+        setLoadingId(null);
+      },
+      onError: () => {
+        toast({ title: "Could not undo check-out", variant: "destructive" });
+        setLoadingId(null);
+      },
     },
   });
 
@@ -3349,7 +4501,10 @@ function CheckInDeskContent({
     try {
       const result = await batchCheckin.mutateAsync({
         data: {
-          items: regs.map((r) => ({ registrationId: r.id, room: r.room ?? undefined })),
+          items: regs.map((r) => ({
+            registrationId: r.id,
+            room: r.room ?? undefined,
+          })),
           sessionId: selectedSessionId ?? undefined,
           reuseFamilyCode: familyCodeEnabled || undefined,
         },
@@ -3362,36 +4517,50 @@ function CheckInDeskContent({
             labelCode: labelType !== "child_security" ? "" : l.labelCode,
             room: labelType === "simple_name_tag" ? null : l.room,
           })),
-          labelType
+          labelType,
         );
       }
       toast({
-        title: regs.length > 1
-          ? `${regs.length} children checked in!`
-          : `${regs[0]!.childFirstName} checked in!`,
+        title:
+          regs.length > 1
+            ? `${regs.length} children checked in!`
+            : `${regs[0]!.childFirstName} checked in!`,
       });
     } catch {
-      toast({ title: "Check-in failed — please try again.", variant: "destructive" });
+      toast({
+        title: "Check-in failed — please try again.",
+        variant: "destructive",
+      });
     } finally {
       setBatchLoadingGroupId(null);
     }
   };
 
-  const handleGroupCheckout = async (groupKey: string, items: Array<{ reg: Registration; checkin: EventCheckin }>) => {
+  const handleGroupCheckout = async (
+    groupKey: string,
+    items: Array<{ reg: Registration; checkin: EventCheckin }>,
+  ) => {
     if (items.length === 0) return;
     setBatchCheckoutGroupId(groupKey);
     try {
       for (const { checkin } of items) {
-        await groupCheckoutMutation.mutateAsync({ checkinId: checkin.id, data: {} });
+        await groupCheckoutMutation.mutateAsync({
+          checkinId: checkin.id,
+          data: {},
+        });
       }
       invalidate();
       toast({
-        title: items.length > 1
-          ? `${items.length} children checked out!`
-          : `${items[0]!.reg.childFirstName} checked out!`,
+        title:
+          items.length > 1
+            ? `${items.length} children checked out!`
+            : `${items[0]!.reg.childFirstName} checked out!`,
       });
     } catch {
-      toast({ title: "Check-out failed — please try again.", variant: "destructive" });
+      toast({
+        title: "Check-out failed — please try again.",
+        variant: "destructive",
+      });
       invalidate();
     } finally {
       setBatchCheckoutGroupId(null);
@@ -3401,16 +4570,22 @@ function CheckInDeskContent({
   const handleStartTodaySession = async () => {
     try {
       const session = await createTodaySession.mutateAsync({ eventId });
-      await queryClient.invalidateQueries({ queryKey: getListEventSessionsQueryKey(eventId) });
+      await queryClient.invalidateQueries({
+        queryKey: getListEventSessionsQueryKey(eventId),
+      });
       onSessionChange?.(session.id);
       const today = getLocalDateKey();
       toast({
-        title: session.sessionDate === today
-          ? "Today's session is ready"
-          : `Selected ${format(new Date(session.sessionDate + "T00:00:00"), "MMMM d, yyyy")}`,
+        title:
+          session.sessionDate === today
+            ? "Today's session is ready"
+            : `Selected ${format(new Date(session.sessionDate + "T00:00:00"), "MMMM d, yyyy")}`,
       });
     } catch {
-      toast({ title: "Could not start today's session", variant: "destructive" });
+      toast({
+        title: "Could not start today's session",
+        variant: "destructive",
+      });
     }
   };
 
@@ -3418,9 +4593,10 @@ function CheckInDeskContent({
   const latestCheckinByRegId = useMemo(() => {
     const map = new Map<number, EventCheckin>();
     if (!checkins) return map;
-    const pool = selectedSessionId != null
-      ? checkins.filter((c) => c.sessionId === selectedSessionId)
-      : [];
+    const pool =
+      selectedSessionId != null
+        ? checkins.filter((c) => c.sessionId === selectedSessionId)
+        : [];
     for (const c of pool) {
       if (!map.has(c.registrationId)) map.set(c.registrationId, c);
     }
@@ -3428,36 +4604,57 @@ function CheckInDeskContent({
   }, [checkins, selectedSessionId]);
 
   const participants = useMemo(() => {
-    if (!registrations) return [] as Array<{ reg: Registration; checkin: EventCheckin | undefined; status: Exclude<DeskFilter, "all"> }>;
+    if (!registrations)
+      return [] as Array<{
+        reg: Registration;
+        checkin: EventCheckin | undefined;
+        status: Exclude<DeskFilter, "all">;
+      }>;
     return registrations.map((reg) => {
       const checkin = latestCheckinByRegId.get(reg.id);
-      const status: Exclude<DeskFilter, "all"> = !checkin ? "not_checked_in" : !checkin.checkoutAt ? "checked_in" : "checked_out";
+      const status: Exclude<DeskFilter, "all"> = !checkin
+        ? "not_checked_in"
+        : !checkin.checkoutAt
+          ? "checked_in"
+          : "checked_out";
       return { reg, checkin, status };
     });
   }, [registrations, latestCheckinByRegId]);
 
   // Derived — always stays fresh after edits because it reads from the `participants` memo
-  const selectedParticipant = selectedRegId !== null
-    ? (participants.find((p) => p.reg.id === selectedRegId) ?? null)
-    : null;
+  const selectedParticipant =
+    selectedRegId !== null
+      ? (participants.find((p) => p.reg.id === selectedRegId) ?? null)
+      : null;
 
-  const counts = useMemo(() => ({
-    all: participants.length,
-    not_checked_in: participants.filter((p) => p.status === "not_checked_in").length,
-    checked_in: participants.filter((p) => p.status === "checked_in").length,
-    checked_out: participants.filter((p) => p.status === "checked_out").length,
-  }), [participants]);
+  const counts = useMemo(
+    () => ({
+      all: participants.length,
+      not_checked_in: participants.filter((p) => p.status === "not_checked_in")
+        .length,
+      checked_in: participants.filter((p) => p.status === "checked_in").length,
+      checked_out: participants.filter((p) => p.status === "checked_out")
+        .length,
+    }),
+    [participants],
+  );
 
   const filtered = useMemo(() => {
-    let result = filter === "all" ? participants : participants.filter((p) => p.status === filter);
+    let result =
+      filter === "all"
+        ? participants
+        : participants.filter((p) => p.status === filter);
     if (!search.trim()) return result;
     const q = search.toLowerCase();
-    return result.filter(({ reg, checkin }) =>
-      `${reg.childFirstName} ${reg.childLastName}`.toLowerCase().includes(q) ||
-      (reg.guardianName ?? "").toLowerCase().includes(q) ||
-      (reg.guardianPhone ?? "").toLowerCase().includes(q) ||
-      (reg.room ?? "").toLowerCase().includes(q) ||
-      (checkin?.labelCode ?? "").toLowerCase().includes(q)
+    return result.filter(
+      ({ reg, checkin }) =>
+        `${reg.childFirstName} ${reg.childLastName}`
+          .toLowerCase()
+          .includes(q) ||
+        (reg.guardianName ?? "").toLowerCase().includes(q) ||
+        (reg.guardianPhone ?? "").toLowerCase().includes(q) ||
+        (reg.room ?? "").toLowerCase().includes(q) ||
+        (checkin?.labelCode ?? "").toLowerCase().includes(q),
     );
   }, [participants, filter, search]);
 
@@ -3467,15 +4664,20 @@ function CheckInDeskContent({
     if (!search.trim() || !isChildEvent) return filtered;
     const matchingGroupIds = new Set<number>();
     for (const p of filtered) {
-      if (p.reg.registrationGroupId != null) matchingGroupIds.add(p.reg.registrationGroupId);
+      if (p.reg.registrationGroupId != null)
+        matchingGroupIds.add(p.reg.registrationGroupId);
     }
     if (matchingGroupIds.size === 0) return filtered;
-    const statusPool = filter === "all" ? participants : participants.filter((p) => p.status === filter);
+    const statusPool =
+      filter === "all"
+        ? participants
+        : participants.filter((p) => p.status === filter);
     const directMatchIds = new Set(filtered.map((p) => p.reg.id));
     const expanded = statusPool.filter(
       (p) =>
         directMatchIds.has(p.reg.id) ||
-        (p.reg.registrationGroupId != null && matchingGroupIds.has(p.reg.registrationGroupId))
+        (p.reg.registrationGroupId != null &&
+          matchingGroupIds.has(p.reg.registrationGroupId)),
     );
     return expanded;
   }, [filtered, search, isChildEvent, filter, participants]);
@@ -3483,7 +4685,9 @@ function CheckInDeskContent({
   const isLoading = regsLoading || checkinsLoading;
 
   const today = getLocalDateKey();
-  const selectedSession = sessions?.find((session) => session.id === selectedSessionId);
+  const selectedSession = sessions?.find(
+    (session) => session.id === selectedSessionId,
+  );
   const selectedSessionDate = selectedSession?.sessionDate;
   const selectedSessionShortLabel = selectedSessionDate
     ? selectedSessionDate === today
@@ -3534,7 +4738,11 @@ function CheckInDeskContent({
             )}
             <div
               className={`flex items-center gap-1.5 text-sm font-medium cursor-pointer select-none transition-colors px-2 py-1.5 rounded-md hover:bg-muted/60 ${printLabels ? "text-primary" : "text-muted-foreground"}`}
-              title={printLabels ? "Label printing on — click to disable" : "Label printing off — click to enable"}
+              title={
+                printLabels
+                  ? "Label printing on — click to disable"
+                  : "Label printing off — click to enable"
+              }
               onClick={() => setPrintLabels((v) => !v)}
             >
               <Printer className="w-4 h-4" />
@@ -3562,32 +4770,40 @@ function CheckInDeskContent({
               disabled={isExporting}
               className="text-muted-foreground hover:text-foreground gap-1.5"
             >
-              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {isExporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
               <span className="hidden sm:inline">Export CSV</span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-muted-foreground px-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground px-2"
+                >
                   <MoreHorizontal className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {isChildEvent && (
                   <>
-                  <DropdownMenuItem
-                    className="gap-2 cursor-pointer"
-                    onClick={handleStartTodaySession}
-                  >
-                    <Calendar className="w-4 h-4" />
-                    Start new session / Reset for today
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive gap-2 cursor-pointer"
-                    onClick={() => setEndSessionOpen(true)}
-                  >
-                    <PowerOff className="w-4 h-4" />
-                    End Session / Check Out Remaining
-                  </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="gap-2 cursor-pointer"
+                      onClick={handleStartTodaySession}
+                    >
+                      <Calendar className="w-4 h-4" />
+                      Start new session / Reset for today
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive gap-2 cursor-pointer"
+                      onClick={() => setEndSessionOpen(true)}
+                    >
+                      <PowerOff className="w-4 h-4" />
+                      End Session / Check Out Remaining
+                    </DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
@@ -3614,11 +4830,15 @@ function CheckInDeskContent({
               </SelectTrigger>
               <SelectContent align="end">
                 {sessions.map((s) => {
-                  const label = format(new Date(s.sessionDate + "T00:00:00"), "EEEE, MMMM d, yyyy");
+                  const label = format(
+                    new Date(s.sessionDate + "T00:00:00"),
+                    "EEEE, MMMM d, yyyy",
+                  );
                   const isToday = s.sessionDate === today;
                   return (
                     <SelectItem key={s.id} value={String(s.id)}>
-                      {label}{isToday ? " — Today" : ""}
+                      {label}
+                      {isToday ? " — Today" : ""}
                     </SelectItem>
                   );
                 })}
@@ -3628,11 +4848,13 @@ function CheckInDeskContent({
         )}
       </div>
       {selectedSessionDate && selectedSessionDate !== today && (
-        <div className={`flex items-start gap-2.5 px-4 py-3 rounded-lg border text-sm ${
-          selectedSessionDate < today
-            ? "border-amber-300 bg-amber-50 text-amber-900"
-            : "border-blue-300 bg-blue-50 text-blue-900"
-        }`}>
+        <div
+          className={`flex items-start gap-2.5 px-4 py-3 rounded-lg border text-sm ${
+            selectedSessionDate < today
+              ? "border-amber-300 bg-amber-50 text-amber-900"
+              : "border-blue-300 bg-blue-50 text-blue-900"
+          }`}
+        >
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span>
             {selectedSessionDate < today
@@ -3644,7 +4866,9 @@ function CheckInDeskContent({
 
       {/* Filter pills */}
       <div className="flex flex-wrap gap-2">
-        {(["all", "not_checked_in", "checked_in", "checked_out"] as DeskFilter[]).map((f) => {
+        {(
+          ["all", "not_checked_in", "checked_in", "checked_out"] as DeskFilter[]
+        ).map((f) => {
           const active = filter === f;
           return (
             <button
@@ -3658,9 +4882,11 @@ function CheckInDeskContent({
               }`}
             >
               {DESK_FILTER_LABELS[f]}
-              <span className={`text-xs rounded-full px-1.5 py-0.5 font-bold min-w-[1.4rem] text-center ${
-                active ? "bg-white/20 text-white" : "bg-muted"
-              }`}>
+              <span
+                className={`text-xs rounded-full px-1.5 py-0.5 font-bold min-w-[1.4rem] text-center ${
+                  active ? "bg-white/20 text-white" : "bg-muted"
+                }`}
+              >
                 {counts[f]}
               </span>
             </button>
@@ -3673,7 +4899,8 @@ function CheckInDeskContent({
         <div>
           <h2 className="text-base font-semibold">Registrants</h2>
           <p className="text-sm text-muted-foreground">
-            {counts.all} registered{displayMode === "family_grouping" ? " · Family grouping on" : ""}
+            {counts.all} registered
+            {displayMode === "family_grouping" ? " · Family grouping on" : ""}
           </p>
         </div>
 
@@ -3693,14 +4920,20 @@ function CheckInDeskContent({
             />
           </div>
           {isChildEvent && (
-            <Button className="shrink-0 gap-2 h-12 px-5 text-base font-semibold" onClick={() => setAddRegOpen(true)}>
+            <Button
+              className="shrink-0 gap-2 h-12 px-5 text-base font-semibold"
+              onClick={() => setAddRegOpen(true)}
+            >
               <Plus className="w-5 h-5" /> Add Registrant
             </Button>
           )}
         </div>
 
         {displayMode === "family_grouping" && isChildEvent && (
-          <p className="text-xs text-muted-foreground">Click a child card to include/exclude from family check-in. Use the pencil icon to edit details.</p>
+          <p className="text-xs text-muted-foreground">
+            Click a child card to include/exclude from family check-in. Use the
+            pencil icon to edit details.
+          </p>
         )}
       </div>
 
@@ -3717,62 +4950,83 @@ function CheckInDeskContent({
               {search
                 ? `No results for "${search}"`
                 : filter === "all"
-                ? `No ${isChildEvent ? "children" : "participants"} registered yet.`
-                : `No ${isChildEvent ? "children" : "participants"} — ${DESK_FILTER_LABELS[filter].toLowerCase()}.`}
+                  ? `No ${isChildEvent ? "children" : "participants"} registered yet.`
+                  : `No ${isChildEvent ? "children" : "participants"} — ${DESK_FILTER_LABELS[filter].toLowerCase()}.`}
             </p>
           </CardContent>
         </Card>
       ) : displayMode === "family_grouping" && isChildEvent ? (
         <div className="space-y-4">
-          {groupForDesk(filteredForGrouping as DeskParticipant[]).map((group) => {
-            const groupKey = group.groupId != null ? String(group.groupId) : `ungrouped-${group.items[0]!.reg.id}`;
+          {groupForDesk(filteredForGrouping as DeskParticipant[]).map(
+            (group) => {
+              const groupKey =
+                group.groupId != null
+                  ? String(group.groupId)
+                  : `ungrouped-${group.items[0]!.reg.id}`;
 
-            return (
-              <FamilyGroupDeskCard
-                key={groupKey}
-                guardian={group.guardian}
-                guardianPhone={group.guardianPhone}
-                items={group.items as DeskParticipant[]}
-                isGroupCheckinLoading={batchLoadingGroupId === groupKey}
-                loadingId={loadingId}
-                labelType={labelType}
-                requireCheckout={requireCheckout}
-                onCheckinSelected={(regs) => handleGroupCheckin(groupKey, regs)}
-                onIndividualCheckin={handleCheckinClick}
-                onOpenDetail={setSelectedRegId}
-                onCheckout={(reg, checkin) => setPendingCheckout({ reg, checkin })}
-                onCheckoutSelected={(items) => handleGroupCheckout(groupKey, items)}
-                isGroupCheckoutLoading={batchCheckoutGroupId === groupKey}
-                onUndoCheckin={(checkinId, regId) => { setLoadingId(regId); deleteCheckinMutation.mutate({ checkinId }); }}
-                onUndoCheckout={(checkinId, regId) => { setLoadingId(regId); undoCheckoutMutation.mutate({ checkinId }); }}
-                onReprint={(reg, checkin) => {
-                  const reprintData: LabelData = {
-                    childName: `${reg.childFirstName} ${reg.childLastName}`,
-                    guardianName: reg.guardianName ?? "",
-                    labelCode: checkin.labelCode,
-                    checkinDate: checkin.checkinAt,
-                    room: reg.room ?? null,
-                    allergies: reg.allergies ?? null,
-                    specialNeeds: reg.specialNeeds ?? null,
-                  };
-                  printLabelDirectly([reprintData], labelType);
-                }}
-              />
-            );
-          })}
+              return (
+                <FamilyGroupDeskCard
+                  key={groupKey}
+                  guardian={group.guardian}
+                  guardianPhone={group.guardianPhone}
+                  items={group.items as DeskParticipant[]}
+                  isGroupCheckinLoading={batchLoadingGroupId === groupKey}
+                  loadingId={loadingId}
+                  labelType={labelType}
+                  requireCheckout={requireCheckout}
+                  onCheckinSelected={(regs) =>
+                    handleGroupCheckin(groupKey, regs)
+                  }
+                  onIndividualCheckin={handleCheckinClick}
+                  onOpenDetail={setSelectedRegId}
+                  onCheckout={(reg, checkin) =>
+                    setPendingCheckout({ reg, checkin })
+                  }
+                  onCheckoutSelected={(items) =>
+                    handleGroupCheckout(groupKey, items)
+                  }
+                  isGroupCheckoutLoading={batchCheckoutGroupId === groupKey}
+                  onUndoCheckin={(checkinId, regId) => {
+                    setLoadingId(regId);
+                    deleteCheckinMutation.mutate({ checkinId });
+                  }}
+                  onUndoCheckout={(checkinId, regId) => {
+                    setLoadingId(regId);
+                    undoCheckoutMutation.mutate({ checkinId });
+                  }}
+                  onReprint={(reg, checkin) => {
+                    const reprintData: LabelData = {
+                      childName: `${reg.childFirstName} ${reg.childLastName}`,
+                      guardianName: reg.guardianName ?? "",
+                      labelCode: checkin.labelCode,
+                      checkinDate: checkin.checkinAt,
+                      room: reg.room ?? null,
+                      allergies: reg.allergies ?? null,
+                      specialNeeds: reg.specialNeeds ?? null,
+                    };
+                    printLabelDirectly([reprintData], labelType);
+                  }}
+                />
+              );
+            },
+          )}
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map(({ reg, checkin, status }) => {
             const acting = loadingId === reg.id;
             const avatarCls =
-              status === "checked_in" ? "bg-green-100 text-green-800" :
-              status === "checked_out" ? "bg-amber-100 text-amber-800" :
-              "bg-primary/10 text-primary";
+              status === "checked_in"
+                ? "bg-green-100 text-green-800"
+                : status === "checked_out"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-primary/10 text-primary";
             const cardCls =
-              status === "checked_in" ? "border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-950/20" :
-              status === "checked_out" ? "border-amber-200 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/20" :
-              "";
+              status === "checked_in"
+                ? "border-green-200 bg-green-50/30 dark:border-green-800 dark:bg-green-950/20"
+                : status === "checked_out"
+                  ? "border-amber-200 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/20"
+                  : "";
 
             return (
               <Card
@@ -3782,22 +5036,33 @@ function CheckInDeskContent({
               >
                 <CardContent className="px-4 py-4 flex items-start gap-4">
                   {/* Avatar */}
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5 ${avatarCls}`}>
-                    {reg.childFirstName[0]}{reg.childLastName[0]}
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5 ${avatarCls}`}
+                  >
+                    {reg.childFirstName[0]}
+                    {reg.childLastName[0]}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center flex-wrap gap-2">
-                      <span className="font-semibold text-base leading-tight">{reg.childFirstName} {reg.childLastName}</span>
+                      <span className="font-semibold text-base leading-tight">
+                        {reg.childFirstName} {reg.childLastName}
+                      </span>
                       {reg.room && (
-                        <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">{reg.room}</Badge>
+                        <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">
+                          {reg.room}
+                        </Badge>
                       )}
                       {reg.allergies && (
-                        <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">Allergy</Badge>
+                        <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
+                          Allergy
+                        </Badge>
                       )}
                       {reg.specialNeeds && (
-                        <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">Medical</Badge>
+                        <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">
+                          Medical
+                        </Badge>
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
@@ -3805,13 +5070,26 @@ function CheckInDeskContent({
                         <span className="font-medium text-foreground/80">
                           {isChildEvent ? "Parent/Guardian:" : "Contact:"}
                         </span>{" "}
-                        {isChildEvent
-                          ? <>{reg.guardianName || "—"}{reg.guardianPhone && <> · {reg.guardianPhone}</>}</>
-                          : <>{[
-                              reg.guardianName && reg.guardianName !== `${reg.childFirstName} ${reg.childLastName}` ? reg.guardianName : null,
+                        {isChildEvent ? (
+                          <>
+                            {reg.guardianName || "—"}
+                            {reg.guardianPhone && <> · {reg.guardianPhone}</>}
+                          </>
+                        ) : (
+                          <>
+                            {[
+                              reg.guardianName &&
+                              reg.guardianName !==
+                                `${reg.childFirstName} ${reg.childLastName}`
+                                ? reg.guardianName
+                                : null,
                               reg.guardianPhone,
                               reg.guardianEmail,
-                            ].filter(Boolean).join(" · ") || "—"}</>}
+                            ]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
+                          </>
+                        )}
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -3824,24 +5102,33 @@ function CheckInDeskContent({
                         <div className="space-y-1.5">
                           <span className="text-green-700 font-medium flex items-center gap-1.5">
                             <LogIn className="w-3 h-3" />
-                            Checked in {format(new Date(checkin.checkinAt), "h:mm a")}
+                            Checked in{" "}
+                            {format(new Date(checkin.checkinAt), "h:mm a")}
                           </span>
-                          {labelType === "child_security" && checkin.labelCode && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground font-medium">Pickup Code</span>
-                              <span className="font-mono font-bold tracking-widest text-sm bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-1 rounded-md">
-                                {checkin.labelCode}
-                              </span>
-                            </div>
-                          )}
+                          {labelType === "child_security" &&
+                            checkin.labelCode && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground font-medium">
+                                  Pickup Code
+                                </span>
+                                <span className="font-mono font-bold tracking-widest text-sm bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-1 rounded-md">
+                                  {checkin.labelCode}
+                                </span>
+                              </div>
+                            )}
                         </div>
                       )}
                       {status === "checked_out" && checkin && (
                         <span className="text-amber-700 font-medium flex items-center gap-1.5">
                           <LogOut className="w-3 h-3" />
-                          Out {checkin.checkoutAt ? format(new Date(checkin.checkoutAt), "h:mm a") : ""}
+                          Out{" "}
+                          {checkin.checkoutAt
+                            ? format(new Date(checkin.checkoutAt), "h:mm a")
+                            : ""}
                           {checkin.labelCode && (
-                            <span className="font-mono text-muted-foreground ml-1">{checkin.labelCode}</span>
+                            <span className="font-mono text-muted-foreground ml-1">
+                              {checkin.labelCode}
+                            </span>
                           )}
                         </span>
                       )}
@@ -3849,7 +5136,10 @@ function CheckInDeskContent({
                   </div>
 
                   {/* Action column — stop propagation so clicks here don't open the detail drawer */}
-                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="flex flex-col items-end gap-1.5 flex-shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     {status === "not_checked_in" && (
                       <Button
                         className="gap-2 h-11 px-5 font-semibold min-w-[108px]"
@@ -3859,7 +5149,11 @@ function CheckInDeskContent({
                           handleCheckinClick(reg);
                         }}
                       >
-                        {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+                        {acting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <LogIn className="w-4 h-4" />
+                        )}
                         Check In
                       </Button>
                     )}
@@ -3876,11 +5170,17 @@ function CheckInDeskContent({
                               setPendingCheckout({ reg, checkin });
                             }}
                           >
-                            {acting ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+                            {acting ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <LogOut className="w-4 h-4" />
+                            )}
                             Check Out
                           </Button>
                         ) : (
-                          <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">Checked In</Badge>
+                          <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">
+                            Checked In
+                          </Badge>
                         )}
                         <div className="flex items-center gap-3">
                           <button
@@ -3890,7 +5190,9 @@ function CheckInDeskContent({
                             onClick={(e) => {
                               e.stopPropagation();
                               setLoadingId(reg.id);
-                              deleteCheckinMutation.mutate({ checkinId: checkin.id });
+                              deleteCheckinMutation.mutate({
+                                checkinId: checkin.id,
+                              });
                             }}
                           >
                             <Undo2 className="w-3 h-3" /> Undo
@@ -3920,9 +5222,13 @@ function CheckInDeskContent({
 
                     {status === "checked_out" && checkin && (
                       <>
-                        <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">Checked Out</Badge>
+                        <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-xs">
+                          Checked Out
+                        </Badge>
                         {checkin.checkoutMethod === "bulk_admin" ? (
-                          <p className="text-[11px] text-amber-700 text-right">Bulk checkout by admin</p>
+                          <p className="text-[11px] text-amber-700 text-right">
+                            Bulk checkout by admin
+                          </p>
                         ) : checkin.pickupPersonName ? (
                           <p className="text-[11px] text-muted-foreground text-right max-w-[120px] truncate">
                             Picked up by {checkin.pickupPersonName}
@@ -3938,7 +5244,11 @@ function CheckInDeskContent({
                             handleCheckinClick(reg);
                           }}
                         >
-                          {acting ? <Loader2 className="w-3 h-3 animate-spin" /> : <LogIn className="w-3 h-3" />}
+                          {acting ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <LogIn className="w-3 h-3" />
+                          )}
                           Check In Again
                         </Button>
                         <button
@@ -3948,7 +5258,9 @@ function CheckInDeskContent({
                           onClick={(e) => {
                             e.stopPropagation();
                             setLoadingId(reg.id);
-                            undoCheckoutMutation.mutate({ checkinId: checkin.id });
+                            undoCheckoutMutation.mutate({
+                              checkinId: checkin.id,
+                            });
                           }}
                         >
                           <Undo2 className="w-3 h-3" /> Undo Checkout
@@ -3967,19 +5279,28 @@ function CheckInDeskContent({
       {selectedParticipant && (
         <ChildDetailSheet
           open={!!selectedParticipant}
-          onOpenChange={(v) => { if (!v) setSelectedRegId(null); }}
+          onOpenChange={(v) => {
+            if (!v) setSelectedRegId(null);
+          }}
           reg={selectedParticipant.reg}
           checkin={selectedParticipant.checkin}
           allCheckins={(checkins ?? [])
             .filter((c) => c.registrationId === selectedParticipant.reg.id)
-            .sort((a, b) => new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime())}
+            .sort(
+              (a, b) =>
+                new Date(b.checkinAt).getTime() -
+                new Date(a.checkinAt).getTime(),
+            )}
           eventId={eventId}
           labelType={labelType}
           requireCheckout={requireCheckout}
           onCheckin={() => handleCheckinClick(selectedParticipant.reg)}
           onCheckout={() => {
             if (selectedParticipant.checkin) {
-              setPendingCheckout({ reg: selectedParticipant.reg, checkin: selectedParticipant.checkin });
+              setPendingCheckout({
+                reg: selectedParticipant.reg,
+                checkin: selectedParticipant.checkin,
+              });
             }
           }}
         />
@@ -4004,7 +5325,13 @@ function CheckInDeskContent({
           open={!!pendingCheckout}
           onConfirm={(pickupPersonName, notes) => {
             setLoadingId(pendingCheckout.reg.id);
-            checkoutMutation.mutate({ checkinId: pendingCheckout.checkin.id, data: { pickupPersonName: pickupPersonName || undefined, notes: notes || undefined } });
+            checkoutMutation.mutate({
+              checkinId: pendingCheckout.checkin.id,
+              data: {
+                pickupPersonName: pickupPersonName || undefined,
+                notes: notes || undefined,
+              },
+            });
           }}
           onCancel={() => setPendingCheckout(null)}
           isPending={loadingId === pendingCheckout.reg.id}
@@ -4021,7 +5348,10 @@ function CheckInDeskContent({
           >
             <BarChart2 className="w-4 h-4" />
             {showAttendance ? "Hide" : "View"} Attendance History
-            <Badge variant="secondary" className="text-xs">{attendanceSessions.length} session{attendanceSessions.length !== 1 ? "s" : ""}</Badge>
+            <Badge variant="secondary" className="text-xs">
+              {attendanceSessions.length} session
+              {attendanceSessions.length !== 1 ? "s" : ""}
+            </Badge>
           </button>
           {showAttendance && (
             <div className="space-y-3 mt-3">
@@ -4030,28 +5360,57 @@ function CheckInDeskContent({
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">
-                        {format(new Date(date + "T00:00:00"), "EEEE, MMMM d, yyyy")}
+                        {format(
+                          new Date(date + "T00:00:00"),
+                          "EEEE, MMMM d, yyyy",
+                        )}
                       </CardTitle>
                       <div className="flex flex-wrap justify-end gap-2 text-xs text-muted-foreground">
                         <span>Total check-ins: {items.length}</span>
-                        <span>Currently in: {items.filter((item) => !item.checkoutAt).length}</span>
-                        <span>Checked out: {items.filter((item) => !!item.checkoutAt).length}</span>
+                        <span>
+                          Currently in:{" "}
+                          {items.filter((item) => !item.checkoutAt).length}
+                        </span>
+                        <span>
+                          Checked out:{" "}
+                          {items.filter((item) => !!item.checkoutAt).length}
+                        </span>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="divide-y divide-border">
                       {[...items]
-                        .sort((a, b) => new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime())
+                        .sort(
+                          (a, b) =>
+                            new Date(a.checkinAt).getTime() -
+                            new Date(b.checkinAt).getTime(),
+                        )
                         .map((c) => (
-                          <div key={c.id} className="px-5 py-2.5 flex items-center justify-between gap-4">
+                          <div
+                            key={c.id}
+                            className="px-5 py-2.5 flex items-center justify-between gap-4"
+                          >
                             <div>
-                              <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
-                              {c.room && <p className="text-xs text-muted-foreground">{c.room}</p>}
+                              <p className="font-medium text-sm">
+                                {c.childFirstName} {c.childLastName}
+                              </p>
+                              {c.room && (
+                                <p className="text-xs text-muted-foreground">
+                                  {c.room}
+                                </p>
+                              )}
                             </div>
                             <div className="text-right text-xs text-muted-foreground flex-shrink-0">
-                              <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
-                              {c.checkoutAt && <p className="text-amber-700">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>}
+                              <p>
+                                In: {format(new Date(c.checkinAt), "h:mm a")}
+                              </p>
+                              {c.checkoutAt && (
+                                <p className="text-amber-700">
+                                  Out:{" "}
+                                  {format(new Date(c.checkoutAt), "h:mm a")}
+                                </p>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -4075,7 +5434,10 @@ function CheckInDeskContent({
 
       <LabelPrintDialog
         open={printDialogOpen}
-        onOpenChange={(v) => { setPrintDialogOpen(v); if (!v) setPendingPrintLabel(null); }}
+        onOpenChange={(v) => {
+          setPrintDialogOpen(v);
+          if (!v) setPendingPrintLabel(null);
+        }}
         labels={pendingPrintLabel ? [pendingPrintLabel] : []}
       />
       <EndSessionDialog
@@ -4103,11 +5465,21 @@ function CheckInDeskContent({
 // ─── Event Date Card ──────────────────────────────────────────────────────────
 
 function EventDateCard({ event }: { event: EventWithForm }) {
-  const { scheduleType, startDate, endDate, repeatDayOfWeek, nextSessionDate } = event;
-  const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const { scheduleType, startDate, endDate, repeatDayOfWeek, nextSessionDate } =
+    event;
+  const DAY_NAMES = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
 
   if (scheduleType === "repeating") {
-    const dayLabel = repeatDayOfWeek != null ? DAY_NAMES[repeatDayOfWeek] : null;
+    const dayLabel =
+      repeatDayOfWeek != null ? DAY_NAMES[repeatDayOfWeek] : null;
     if (nextSessionDate) {
       return (
         <Card>
@@ -4116,35 +5488,55 @@ function EventDateCard({ event }: { event: EventWithForm }) {
             <p className="text-xl font-bold font-serif mt-1">
               {format(new Date(nextSessionDate + "T00:00:00"), "MMM d")}
             </p>
-            {dayLabel && <p className="text-xs text-muted-foreground mt-0.5">Every {dayLabel}</p>}
+            {dayLabel && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Every {dayLabel}
+              </p>
+            )}
           </CardContent>
         </Card>
       );
     }
-    const startLabel = startDate ? format(new Date(startDate + "T00:00:00"), "MMM d") : null;
-    const endLabel = endDate ? format(new Date(endDate + "T00:00:00"), "MMM d, yyyy") : null;
+    const startLabel = startDate
+      ? format(new Date(startDate + "T00:00:00"), "MMM d")
+      : null;
+    const endLabel = endDate
+      ? format(new Date(endDate + "T00:00:00"), "MMM d, yyyy")
+      : null;
     return (
       <Card>
         <CardContent className="p-5">
           <p className="text-sm text-muted-foreground">Event Date</p>
           <p className="text-base font-bold font-serif mt-1 leading-tight">
-            {startLabel && endLabel ? `${startLabel} – ${endLabel}` : startLabel ?? "—"}
+            {startLabel && endLabel
+              ? `${startLabel} – ${endLabel}`
+              : (startLabel ?? "—")}
           </p>
-          {dayLabel && <p className="text-xs text-muted-foreground mt-0.5">Every {dayLabel}</p>}
+          {dayLabel && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Every {dayLabel}
+            </p>
+          )}
         </CardContent>
       </Card>
     );
   }
 
   if (scheduleType === "multi_day") {
-    const startLabel = startDate ? format(new Date(startDate + "T00:00:00"), "MMM d") : null;
-    const endLabel = endDate ? format(new Date(endDate + "T00:00:00"), "MMM d, yyyy") : null;
+    const startLabel = startDate
+      ? format(new Date(startDate + "T00:00:00"), "MMM d")
+      : null;
+    const endLabel = endDate
+      ? format(new Date(endDate + "T00:00:00"), "MMM d, yyyy")
+      : null;
     return (
       <Card>
         <CardContent className="p-5">
           <p className="text-sm text-muted-foreground">Event Dates</p>
           <p className="text-base font-bold font-serif mt-1 leading-tight">
-            {startLabel && endLabel ? `${startLabel} – ${endLabel}` : startLabel ?? "—"}
+            {startLabel && endLabel
+              ? `${startLabel} – ${endLabel}`
+              : (startLabel ?? "—")}
           </p>
         </CardContent>
       </Card>
@@ -4156,7 +5548,9 @@ function EventDateCard({ event }: { event: EventWithForm }) {
       <CardContent className="p-5">
         <p className="text-sm text-muted-foreground">Event Date</p>
         <p className="text-xl font-bold font-serif mt-1">
-          {startDate ? format(new Date(startDate + "T00:00:00"), "MMM d, yyyy") : "—"}
+          {startDate
+            ? format(new Date(startDate + "T00:00:00"), "MMM d, yyyy")
+            : "—"}
         </p>
       </CardContent>
     </Card>
@@ -4203,11 +5597,17 @@ function EventDashboardSection({
   };
 
   const recentRegistrations = [...(registrations ?? [])]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
     .slice(0, 5);
 
   const recentCheckins = [...(checkedIn ?? [])]
-    .sort((a, b) => new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime())
+    .sort(
+      (a, b) =>
+        new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime(),
+    )
     .slice(0, 5);
 
   // ── Dynamic stat cards ──────────────────────────────────────────────────────
@@ -4217,9 +5617,12 @@ function EventDashboardSection({
   const totalRegs = registrations?.length ?? 0;
 
   const groupCount = isFamilyGroup
-    ? new Set((registrations ?? []).map((r) => r.guardianName ?? "").filter(Boolean)).size
+    ? new Set(
+        (registrations ?? []).map((r) => r.guardianName ?? "").filter(Boolean),
+      ).size
     : 0;
-  const attendanceRate = totalRegs > 0 ? Math.round((checkedIn.length / totalRegs) * 100) : 0;
+  const attendanceRate =
+    totalRegs > 0 ? Math.round((checkedIn.length / totalRegs) * 100) : 0;
 
   let card2: React.ReactNode = null;
   let card3: React.ReactNode = null;
@@ -4229,7 +5632,9 @@ function EventDashboardSection({
       <Card>
         <CardContent className="p-5">
           <p className="text-sm text-muted-foreground">Checked In</p>
-          <p className="text-3xl font-bold font-serif mt-1 text-green-800">{checkedIn.length}</p>
+          <p className="text-3xl font-bold font-serif mt-1 text-green-800">
+            {checkedIn.length}
+          </p>
         </CardContent>
       </Card>
     );
@@ -4237,7 +5642,9 @@ function EventDashboardSection({
       <Card>
         <CardContent className="p-5">
           <p className="text-sm text-muted-foreground">Checked Out</p>
-          <p className="text-3xl font-bold font-serif mt-1 text-amber-800">{checkedOut.length}</p>
+          <p className="text-3xl font-bold font-serif mt-1 text-amber-800">
+            {checkedOut.length}
+          </p>
         </CardContent>
       </Card>
     );
@@ -4255,7 +5662,9 @@ function EventDashboardSection({
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Checked In</p>
-            <p className="text-3xl font-bold font-serif mt-1 text-green-800">{checkedIn.length}</p>
+            <p className="text-3xl font-bold font-serif mt-1 text-green-800">
+              {checkedIn.length}
+            </p>
           </CardContent>
         </Card>
       );
@@ -4264,7 +5673,9 @@ function EventDashboardSection({
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Public Form</p>
-            <p className="text-sm font-medium mt-1">{event.formEmbedSlug ? "Active" : "Not configured"}</p>
+            <p className="text-sm font-medium mt-1">
+              {event.formEmbedSlug ? "Active" : "Not configured"}
+            </p>
             {event.formEmbedSlug && (
               <a
                 href={`${window.location.origin}/register/${event.formEmbedSlug}`}
@@ -4285,7 +5696,9 @@ function EventDashboardSection({
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Checked In</p>
-            <p className="text-3xl font-bold font-serif mt-1 text-green-800">{checkedIn.length}</p>
+            <p className="text-3xl font-bold font-serif mt-1 text-green-800">
+              {checkedIn.length}
+            </p>
           </CardContent>
         </Card>
       );
@@ -4293,8 +5706,12 @@ function EventDashboardSection({
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Attendance Rate</p>
-            <p className="text-3xl font-bold font-serif mt-1">{attendanceRate}%</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{checkedIn.length} of {totalRegs}</p>
+            <p className="text-3xl font-bold font-serif mt-1">
+              {attendanceRate}%
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {checkedIn.length} of {totalRegs}
+            </p>
           </CardContent>
         </Card>
       );
@@ -4303,7 +5720,9 @@ function EventDashboardSection({
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Form Status</p>
-            <p className="text-xl font-bold font-serif mt-1">{event.formEmbedSlug ? "Active" : "Not Set"}</p>
+            <p className="text-xl font-bold font-serif mt-1">
+              {event.formEmbedSlug ? "Active" : "Not Set"}
+            </p>
           </CardContent>
         </Card>
       );
@@ -4321,7 +5740,9 @@ function EventDashboardSection({
                 <ExternalLink className="w-3.5 h-3.5" /> Open Form
               </a>
             ) : (
-              <p className="text-sm text-muted-foreground mt-1">Not configured</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Not configured
+              </p>
             )}
           </CardContent>
         </Card>
@@ -4338,26 +5759,37 @@ function EventDashboardSection({
     </Card>
   );
 
-  const statsSection = !card2 && !card3 ? (
-    <div className="grid grid-cols-2 gap-4">
-      {totalRegisteredCard}
-      <EventDateCard event={event} />
-    </div>
-  ) : (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {totalRegisteredCard}
-      {card2}
-      {card3}
-      <EventDateCard event={event} />
-    </div>
-  );
+  const statsSection =
+    !card2 && !card3 ? (
+      <div className="grid grid-cols-2 gap-4">
+        {totalRegisteredCard}
+        <EventDateCard event={event} />
+      </div>
+    ) : (
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {totalRegisteredCard}
+        {card2}
+        {card3}
+        <EventDateCard event={event} />
+      </div>
+    );
 
   // ── Event header date/schedule summary ──────────────────────────────────────
-  const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const { scheduleType, startDate, endDate, repeatDayOfWeek, nextSessionDate } = event;
+  const DAY_NAMES_FULL = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const { scheduleType, startDate, endDate, repeatDayOfWeek, nextSessionDate } =
+    event;
   let scheduleSummary: React.ReactNode = null;
   if (scheduleType === "repeating") {
-    const dayLabel = repeatDayOfWeek != null ? DAY_NAMES_FULL[repeatDayOfWeek] : null;
+    const dayLabel =
+      repeatDayOfWeek != null ? DAY_NAMES_FULL[repeatDayOfWeek] : null;
     scheduleSummary = (
       <div className="flex flex-col gap-0.5">
         <span className="text-sm text-muted-foreground">
@@ -4365,17 +5797,20 @@ function EventDashboardSection({
         </span>
         {nextSessionDate && (
           <span className="text-xs text-muted-foreground">
-            Next session: {format(new Date(nextSessionDate + "T00:00:00"), "MMM d")}
+            Next session:{" "}
+            {format(new Date(nextSessionDate + "T00:00:00"), "MMM d")}
           </span>
         )}
       </div>
     );
   } else if (scheduleType === "multi_day") {
-    const s = startDate ? format(new Date(startDate + "T00:00:00"), "MMM d") : null;
+    const s = startDate
+      ? format(new Date(startDate + "T00:00:00"), "MMM d")
+      : null;
     const e = endDate ? format(new Date(endDate + "T00:00:00"), "MMM d") : null;
     scheduleSummary = (
       <span className="text-sm text-muted-foreground">
-        {s && e ? `${s} – ${e}` : s ?? ""}
+        {s && e ? `${s} – ${e}` : (s ?? "")}
       </span>
     );
   } else if (startDate) {
@@ -4399,7 +5834,15 @@ function EventDashboardSection({
   let heroButtonLabel: string;
   let heroHref: string;
   let heroIcon: React.ReactNode;
-  let heroColors: { border: string; bg: string; titleColor: string; descColor: string; btnClass: string; iconBg: string; iconColor: string };
+  let heroColors: {
+    border: string;
+    bg: string;
+    titleColor: string;
+    descColor: string;
+    btnClass: string;
+    iconBg: string;
+    iconColor: string;
+  };
 
   if (trackAttendance) {
     if (isChildCheckin) {
@@ -4424,7 +5867,8 @@ function EventDashboardSection({
     };
   } else {
     heroTitle = "Share Registration Form";
-    heroDescription = "Open or share your public form to start collecting registrations.";
+    heroDescription =
+      "Open or share your public form to start collecting registrations.";
     heroButtonLabel = "Open Public Form";
     heroHref = registrationUrl ?? "#";
     heroIcon = <ExternalLink className="w-7 h-7 text-primary" />;
@@ -4433,7 +5877,8 @@ function EventDashboardSection({
       bg: "bg-primary/5",
       titleColor: "text-foreground",
       descColor: "text-muted-foreground",
-      btnClass: "bg-primary hover:bg-primary/90 text-primary-foreground border-0 shadow-sm",
+      btnClass:
+        "bg-primary hover:bg-primary/90 text-primary-foreground border-0 shadow-sm",
       iconBg: "bg-primary/10 border border-primary/20",
       iconColor: "text-primary",
     };
@@ -4441,15 +5886,20 @@ function EventDashboardSection({
 
   return (
     <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-6">
-
       {/* 1 — Page Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-serif font-bold">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Manage this event's registration, check-in, and activity.</p>
+          <p className="text-muted-foreground mt-1">
+            Manage this event's registration, check-in, and activity.
+          </p>
         </div>
         <Link href={`/events/${eventId}/settings`} className="shrink-0">
-          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground"
+          >
             <Settings className="w-4 h-4" />
             <span className="hidden sm:inline">Settings</span>
           </Button>
@@ -4459,7 +5909,9 @@ function EventDashboardSection({
       {/* Event meta row */}
       <div className="flex items-center gap-2.5 flex-wrap -mt-2 pb-4 border-b border-border/60">
         <h2 className="text-base font-semibold">{event.name}</h2>
-        <Badge variant="secondary" className="text-xs">{regTypeLabel}</Badge>
+        <Badge variant="secondary" className="text-xs">
+          {regTypeLabel}
+        </Badge>
         {statusBadge(event.status)}
         {scheduleSummary}
       </div>
@@ -4468,24 +5920,40 @@ function EventDashboardSection({
       {statsSection}
 
       {/* 3 — Primary Hero Action */}
-      <div className={`relative overflow-hidden rounded-2xl border ${heroColors.border} ${heroColors.bg} p-5`}>
+      <div
+        className={`relative overflow-hidden rounded-2xl border ${heroColors.border} ${heroColors.bg} p-5`}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex items-center gap-4 flex-1 min-w-0">
-            <div className={`w-12 h-12 rounded-xl ${heroColors.iconBg} flex items-center justify-center shrink-0`}>
+            <div
+              className={`w-12 h-12 rounded-xl ${heroColors.iconBg} flex items-center justify-center shrink-0`}
+            >
               {heroIcon}
             </div>
             <div className="min-w-0">
-              <h2 className={`text-lg font-serif font-bold ${heroColors.titleColor}`}>{heroTitle}</h2>
-              <p className={`text-sm ${heroColors.descColor} mt-0.5`}>{heroDescription}</p>
+              <h2
+                className={`text-lg font-serif font-bold ${heroColors.titleColor}`}
+              >
+                {heroTitle}
+              </h2>
+              <p className={`text-sm ${heroColors.descColor} mt-0.5`}>
+                {heroDescription}
+              </p>
               {trackAttendance && (
                 <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${heroColors.border} ${heroColors.iconBg} ${heroColors.descColor}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${heroColors.border} ${heroColors.iconBg} ${heroColors.descColor}`}
+                  >
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
                     Check-in open
                   </span>
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${heroColors.border} ${heroColors.iconBg} ${heroColors.descColor}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${heroColors.border} ${heroColors.iconBg} ${heroColors.descColor}`}
+                  >
                     <Printer className="w-3 h-3" />
-                    {(event.printLabels ?? isChildCheckin) ? "Labels on" : "Labels off"}
+                    {(event.printLabels ?? isChildCheckin)
+                      ? "Labels on"
+                      : "Labels off"}
                   </span>
                 </div>
               )}
@@ -4500,7 +5968,11 @@ function EventDashboardSection({
                 </Button>
               </Link>
             ) : registrationUrl ? (
-              <a href={registrationUrl} target="_blank" rel="noopener noreferrer">
+              <a
+                href={registrationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <Button className={`gap-2 ${heroColors.btnClass}`}>
                   <ExternalLink className="w-4 h-4" />
                   {heroButtonLabel}
@@ -4524,25 +5996,46 @@ function EventDashboardSection({
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-semibold">Recent Registrations</h2>
-            <Link href={`/events/${eventId}/registrations`} className="text-sm text-primary hover:underline">View all</Link>
+            <Link
+              href={`/events/${eventId}/registrations`}
+              className="text-sm text-primary hover:underline"
+            >
+              View all
+            </Link>
           </div>
           <Card className="overflow-hidden">
             {recentRegistrations.length > 0 ? (
               <CardContent className="p-0 divide-y divide-border">
                 {recentRegistrations.map((reg) => (
-                  <div key={reg.id} className="px-4 py-3.5 flex items-center gap-3">
+                  <div
+                    key={reg.id}
+                    className="px-4 py-3.5 flex items-center gap-3"
+                  >
                     <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-sm shrink-0">
-                      {reg.childFirstName[0]}{reg.childLastName[0]}
+                      {reg.childFirstName[0]}
+                      {reg.childLastName[0]}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{reg.childFirstName} {reg.childLastName}</p>
+                      <p className="font-medium text-sm">
+                        {reg.childFirstName} {reg.childLastName}
+                      </p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {reg.guardianName}{reg.guardianPhone ? ` · ${reg.guardianPhone}` : ""}
+                        {reg.guardianName}
+                        {reg.guardianPhone ? ` · ${reg.guardianPhone}` : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {reg.room && <Badge variant="outline" className="text-[10px] hidden sm:flex">{reg.room}</Badge>}
-                      <p className="text-xs text-muted-foreground">{format(new Date(reg.createdAt), "MMM d")}</p>
+                      {reg.room && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] hidden sm:flex"
+                        >
+                          {reg.room}
+                        </Badge>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(reg.createdAt), "MMM d")}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -4550,11 +6043,23 @@ function EventDashboardSection({
             ) : (
               <CardContent className="py-8 text-center space-y-2">
                 <Users className="w-7 h-7 mx-auto text-muted-foreground/40" />
-                <p className="text-sm font-medium text-muted-foreground">No registrations yet.</p>
-                <p className="text-xs text-muted-foreground">Share the public form to start collecting registrations.</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  No registrations yet.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Share the public form to start collecting registrations.
+                </p>
                 {registrationUrl && (
-                  <a href={registrationUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="sm" className="mt-2 gap-1.5">
+                  <a
+                    href={registrationUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 gap-1.5"
+                    >
                       <ExternalLink className="w-3.5 h-3.5" /> Open Public Form
                     </Button>
                   </a>
@@ -4569,25 +6074,46 @@ function EventDashboardSection({
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold">Recently Checked In</h2>
-              <Link href={`/events/${eventId}/checkin`} className="text-sm text-primary hover:underline">View all</Link>
+              <Link
+                href={`/events/${eventId}/checkin`}
+                className="text-sm text-primary hover:underline"
+              >
+                View all
+              </Link>
             </div>
             <Card className="overflow-hidden">
               {recentCheckins.length > 0 ? (
                 <CardContent className="p-0 divide-y divide-border">
                   {recentCheckins.map((c) => (
-                    <div key={c.id} className="px-4 py-3.5 flex items-center gap-3">
+                    <div
+                      key={c.id}
+                      className="px-4 py-3.5 flex items-center gap-3"
+                    >
                       <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center font-serif font-bold text-green-800 text-sm shrink-0">
-                        {c.childFirstName[0]}{c.childLastName[0]}
+                        {c.childFirstName[0]}
+                        {c.childLastName[0]}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
+                        <p className="font-medium text-sm">
+                          {c.childFirstName} {c.childLastName}
+                        </p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {c.guardianName}{c.room ? ` · ${c.room}` : ""}
+                          {c.guardianName}
+                          {c.room ? ` · ${c.room}` : ""}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {c.room && <Badge variant="outline" className="text-[10px] hidden sm:flex">{c.room}</Badge>}
-                        <p className="text-xs text-green-700 font-medium">{format(new Date(c.checkinAt), "h:mm a")}</p>
+                        {c.room && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] hidden sm:flex"
+                          >
+                            {c.room}
+                          </Badge>
+                        )}
+                        <p className="text-xs text-green-700 font-medium">
+                          {format(new Date(c.checkinAt), "h:mm a")}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -4595,8 +6121,12 @@ function EventDashboardSection({
               ) : (
                 <CardContent className="py-8 text-center space-y-2">
                   <LogIn className="w-7 h-7 mx-auto text-muted-foreground/40" />
-                  <p className="text-sm font-medium text-muted-foreground">No check-ins yet.</p>
-                  <p className="text-xs text-muted-foreground">Check-ins will appear here once people are checked in.</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    No check-ins yet.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Check-ins will appear here once people are checked in.
+                  </p>
                 </CardContent>
               )}
             </Card>
@@ -4641,7 +6171,11 @@ function EventDashboardSection({
             disabled={isExporting}
             className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center disabled:opacity-50"
           >
-            {isExporting ? <Loader2 className="w-5 h-5 animate-spin text-primary" /> : <Download className="w-5 h-5 text-primary" />}
+            {isExporting ? (
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+            ) : (
+              <Download className="w-5 h-5 text-primary" />
+            )}
             Export CSV
           </button>
           <Link href={`/events/${eventId}/settings`}>
@@ -4652,7 +6186,6 @@ function EventDashboardSection({
           </Link>
         </div>
       </div>
-
     </div>
   );
 }
@@ -4690,31 +6223,51 @@ function NonChildCheckinSection({
     <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-6">
       <div>
         <h1 className="text-2xl font-serif font-bold">Check-In Desk</h1>
-        <p className="text-muted-foreground mt-1">Search and check participants in or out for this event.</p>
+        <p className="text-muted-foreground mt-1">
+          Search and check participants in or out for this event.
+        </p>
       </div>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="registrations" className="gap-1.5 text-xs sm:text-sm flex-1">
+          <TabsTrigger
+            value="registrations"
+            className="gap-1.5 text-xs sm:text-sm flex-1"
+          >
             <ClipboardList className="w-4 h-4 shrink-0" />
             Registrations
-            <Badge variant="secondary" className="text-xs ml-1">{registrations?.length ?? 0}</Badge>
+            <Badge variant="secondary" className="text-xs ml-1">
+              {registrations?.length ?? 0}
+            </Badge>
           </TabsTrigger>
           {trackAttendance && (
-            <TabsTrigger value="checked-in" className="gap-1.5 text-xs sm:text-sm flex-1">
+            <TabsTrigger
+              value="checked-in"
+              className="gap-1.5 text-xs sm:text-sm flex-1"
+            >
               <LogIn className="w-4 h-4 shrink-0" />
               Checked In
-              <Badge variant="secondary" className="text-xs ml-1">{checkedIn.length}</Badge>
+              <Badge variant="secondary" className="text-xs ml-1">
+                {checkedIn.length}
+              </Badge>
             </TabsTrigger>
           )}
           {requireCheckout && (
-            <TabsTrigger value="checked-out" className="gap-1.5 text-xs sm:text-sm flex-1">
+            <TabsTrigger
+              value="checked-out"
+              className="gap-1.5 text-xs sm:text-sm flex-1"
+            >
               <LogOut className="w-4 h-4 shrink-0" />
               Checked Out
-              <Badge variant="secondary" className="text-xs ml-1">{checkedOut.length}</Badge>
+              <Badge variant="secondary" className="text-xs ml-1">
+                {checkedOut.length}
+              </Badge>
             </TabsTrigger>
           )}
           {trackAttendance && (
-            <TabsTrigger value="attendance" className="gap-1.5 text-xs sm:text-sm flex-1">
+            <TabsTrigger
+              value="attendance"
+              className="gap-1.5 text-xs sm:text-sm flex-1"
+            >
               <BarChart2 className="w-4 h-4 shrink-0" />
               Attendance
             </TabsTrigger>
@@ -4724,17 +6277,29 @@ function NonChildCheckinSection({
         <TabsContent value="registrations">
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-muted-foreground">
-              {registrations?.length ?? 0} registration{registrations?.length === 1 ? "" : "s"}
+              {registrations?.length ?? 0} registration
+              {registrations?.length === 1 ? "" : "s"}
             </p>
-            <Button variant="outline" size="sm" onClick={onExportCsv} disabled={isExporting}>
-              {isExporting ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-1.5" />}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onExportCsv}
+              disabled={isExporting}
+            >
+              {isExporting ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+              )}
               Export CSV
             </Button>
           </div>
           <Card>
             <CardContent className="p-0">
               {regsLoading ? (
-                <div className="p-8 text-center text-muted-foreground">Loading...</div>
+                <div className="p-8 text-center text-muted-foreground">
+                  Loading...
+                </div>
               ) : !registrations?.length ? (
                 <div className="p-10 text-center text-muted-foreground">
                   <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -4743,12 +6308,21 @@ function NonChildCheckinSection({
               ) : (
                 <div className="divide-y divide-border">
                   {registrations.map((reg) => (
-                    <div key={reg.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                    <div
+                      key={reg.id}
+                      className="px-5 py-3 flex items-center justify-between gap-4"
+                    >
                       <div>
-                        <p className="font-medium">{reg.childFirstName} {reg.childLastName}</p>
-                        <p className="text-sm text-muted-foreground">{reg.guardianName} · {reg.guardianPhone}</p>
+                        <p className="font-medium">
+                          {reg.childFirstName} {reg.childLastName}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {reg.guardianName} · {reg.guardianPhone}
+                        </p>
                       </div>
-                      <p className="text-sm text-muted-foreground shrink-0">{format(new Date(reg.createdAt), "MMM d")}</p>
+                      <p className="text-sm text-muted-foreground shrink-0">
+                        {format(new Date(reg.createdAt), "MMM d")}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -4761,7 +6335,9 @@ function NonChildCheckinSection({
           <Card>
             <CardContent className="p-0">
               {checkinsLoading ? (
-                <div className="p-8 text-center text-muted-foreground">Loading...</div>
+                <div className="p-8 text-center text-muted-foreground">
+                  Loading...
+                </div>
               ) : !checkedIn.length ? (
                 <div className="p-10 text-center text-muted-foreground">
                   <LogIn className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -4770,12 +6346,22 @@ function NonChildCheckinSection({
               ) : (
                 <div className="divide-y divide-border">
                   {checkedIn.map((c) => (
-                    <div key={c.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                    <div
+                      key={c.id}
+                      className="px-5 py-3 flex items-center justify-between gap-4"
+                    >
                       <div>
-                        <p className="font-medium">{c.childFirstName} {c.childLastName}</p>
-                        <p className="text-sm text-muted-foreground">{c.guardianName}{c.room ? ` · ${c.room}` : ""}</p>
+                        <p className="font-medium">
+                          {c.childFirstName} {c.childLastName}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {c.guardianName}
+                          {c.room ? ` · ${c.room}` : ""}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">{format(new Date(c.checkinAt), "h:mm a")}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(c.checkinAt), "h:mm a")}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -4788,7 +6374,9 @@ function NonChildCheckinSection({
           <Card>
             <CardContent className="p-0">
               {checkinsLoading ? (
-                <div className="p-8 text-center text-muted-foreground">Loading...</div>
+                <div className="p-8 text-center text-muted-foreground">
+                  Loading...
+                </div>
               ) : !checkedOut.length ? (
                 <div className="p-10 text-center text-muted-foreground">
                   <LogOut className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -4797,14 +6385,26 @@ function NonChildCheckinSection({
               ) : (
                 <div className="divide-y divide-border">
                   {checkedOut.map((c) => (
-                    <div key={c.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                    <div
+                      key={c.id}
+                      className="px-5 py-3 flex items-center justify-between gap-4"
+                    >
                       <div>
-                        <p className="font-medium">{c.childFirstName} {c.childLastName}</p>
-                        <p className="text-sm text-muted-foreground">{c.guardianName}{c.room ? ` · ${c.room}` : ""}</p>
+                        <p className="font-medium">
+                          {c.childFirstName} {c.childLastName}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {c.guardianName}
+                          {c.room ? ` · ${c.room}` : ""}
+                        </p>
                       </div>
                       <div className="text-xs text-muted-foreground text-right">
                         <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
-                        {c.checkoutAt && <p className="text-amber-700">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>}
+                        {c.checkoutAt && (
+                          <p className="text-amber-700">
+                            Out: {format(new Date(c.checkoutAt), "h:mm a")}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -4823,26 +6423,43 @@ function NonChildCheckinSection({
           ) : (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                {attendanceSessions.length} session{attendanceSessions.length !== 1 ? "s" : ""}
+                {attendanceSessions.length} session
+                {attendanceSessions.length !== 1 ? "s" : ""}
               </p>
               {attendanceSessions.map(({ date, items }) => (
                 <Card key={date}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">
-                        {format(new Date(date + "T00:00:00"), "EEEE, MMMM d, yyyy")}
+                        {format(
+                          new Date(date + "T00:00:00"),
+                          "EEEE, MMMM d, yyyy",
+                        )}
                       </CardTitle>
-                      <span className="text-sm text-muted-foreground">{items.length} attendees</span>
+                      <span className="text-sm text-muted-foreground">
+                        {items.length} attendees
+                      </span>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="divide-y divide-border">
                       {items
-                        .sort((a, b) => new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime())
+                        .sort(
+                          (a, b) =>
+                            new Date(a.checkinAt).getTime() -
+                            new Date(b.checkinAt).getTime(),
+                        )
                         .map((c) => (
-                          <div key={c.id} className="px-5 py-2.5 flex items-center justify-between gap-4">
-                            <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
-                            <p className="text-xs text-muted-foreground">In: {format(new Date(c.checkinAt), "h:mm a")}</p>
+                          <div
+                            key={c.id}
+                            className="px-5 py-2.5 flex items-center justify-between gap-4"
+                          >
+                            <p className="font-medium text-sm">
+                              {c.childFirstName} {c.childLastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              In: {format(new Date(c.checkinAt), "h:mm a")}
+                            </p>
                           </div>
                         ))}
                     </div>
@@ -4859,10 +6476,17 @@ function NonChildCheckinSection({
 
 // ─── Section: Public Form ──────────────────────────────────────────────────────
 
-function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eventId: number }) {
+function RegistrationFormSection({
+  event,
+  eventId,
+}: {
+  event: EventWithForm;
+  eventId: number;
+}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
+  const isChildCheckin =
+    !event.registrationType || event.registrationType === "child_checkin";
 
   const registrationUrl = event.formEmbedSlug
     ? `${window.location.origin}/register/${event.formEmbedSlug}`
@@ -4896,15 +6520,22 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
       hideOrgName: event.form?.hideOrgName ?? false,
       confirmationEmailEnabled: event.form?.confirmationEmailEnabled ?? true,
       confirmationEmailSubject:
-        event.form?.confirmationEmailSubject ?? DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
+        event.form?.confirmationEmailSubject ??
+        DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
       confirmationEmailMessage:
-        event.form?.confirmationEmailMessage ?? DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
+        event.form?.confirmationEmailMessage ??
+        DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
+      registrationCompleteMessage:
+        event.form?.registrationCompleteMessage ??
+        DEFAULT_REGISTRATION_COMPLETE_MESSAGE,
     }),
     [event.form, event.formTitle],
   );
 
   const [formSettings, setFormSettings] = useState(initialFormSettings);
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const lastSavedSettingsRef = useRef(JSON.stringify(initialFormSettings));
   const previousFormIdRef = useRef(event.formId);
 
@@ -4923,8 +6554,12 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
         lastSavedSettingsRef.current = JSON.stringify(variables.data);
         setSaveStatus("saved");
         if (event.formId) {
-          queryClient.invalidateQueries({ queryKey: getGetFormQueryKey(event.formId) });
-          queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+          queryClient.invalidateQueries({
+            queryKey: getGetFormQueryKey(event.formId),
+          });
+          queryClient.invalidateQueries({
+            queryKey: getGetEventQueryKey(eventId),
+          });
         }
       },
       onError: () => {
@@ -4933,6 +6568,7 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
       },
     },
   });
+  const saveFormSettings = updateForm.mutate;
 
   useEffect(() => {
     if (!event.formId) return;
@@ -4941,46 +6577,19 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
 
     setSaveStatus("saving");
     const saveTimer = window.setTimeout(() => {
-      updateForm.mutate({ formId: event.formId!, data: formSettings });
+      saveFormSettings({ formId: event.formId!, data: formSettings });
     }, 650);
 
     return () => window.clearTimeout(saveTimer);
-  }, [event.formId, formSettings, updateForm]);
-
-  /*
-  const [formSettings, setFormSettings] = useState({
-    title: event.form?.title ?? event.formTitle ?? "",
-    description: event.form?.description ?? "",
-    isActive: event.form?.isActive ?? true,
-    isPublic: event.form?.isPublic ?? false,
-    showSectionsOneAtATime: event.form?.showSectionsOneAtATime ?? false,
-    requireStartButton: event.form?.requireStartButton ?? false,
-    hideOrgLogo: event.form?.hideOrgLogo ?? false,
-    hideOrgName: event.form?.hideOrgName ?? false,
-    confirmationEmailEnabled: event.form?.confirmationEmailEnabled ?? true,
-    confirmationEmailSubject: event.form?.confirmationEmailSubject ?? DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
-    confirmationEmailMessage: event.form?.confirmationEmailMessage ?? DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
-  });
-
-  const updateForm = useUpdateForm({
-    mutation: {
-      onSuccess: () => {
-        if (event.formId) {
-          queryClient.invalidateQueries({ queryKey: getGetFormQueryKey(event.formId) });
-          queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
-        }
-        toast({ title: "Form settings saved" });
-      },
-      onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
-    },
-  });
-  */
+  }, [event.formId, formSettings, saveFormSettings]);
 
   return (
     <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
       <div>
         <h1 className="text-2xl font-serif font-bold">Registration Form</h1>
-        <p className="text-muted-foreground mt-1">Build your form, share it, and configure settings.</p>
+        <p className="text-muted-foreground mt-1">
+          Build your form, share it, and configure settings.
+        </p>
       </div>
 
       <Tabs defaultValue="build">
@@ -4992,7 +6601,12 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
 
         <TabsContent value="build" className="mt-5">
           {event.formId ? (
-            <FormBuilderPanel formId={event.formId} eventId={eventId} hideAdditionalPeople={isChildCheckin} hideSettings />
+            <FormBuilderPanel
+              formId={event.formId}
+              eventId={eventId}
+              hideAdditionalPeople={isChildCheckin}
+              hideSettings
+            />
           ) : (
             <Card>
               <CardContent className="p-10 text-center text-muted-foreground">
@@ -5021,12 +6635,21 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
                     {registrationUrl}
                   </div>
                   <div className="flex gap-2">
-                    <a href={registrationUrl} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={registrationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       <Button variant="outline" size="sm" className="gap-2">
                         <ExternalLink className="w-3.5 h-3.5" /> Open Form
                       </Button>
                     </a>
-                    <Button variant="outline" size="sm" className="gap-2" onClick={copyUrl}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={copyUrl}
+                    >
                       <Copy className="w-3.5 h-3.5" /> Copy URL
                     </Button>
                   </div>
@@ -5039,12 +6662,18 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    Paste this into your website to embed the registration form directly.
+                    Paste this into your website to embed the registration form
+                    directly.
                   </p>
                   <div className="p-3 bg-muted rounded-lg font-mono text-xs break-all">
                     {embedCode}
                   </div>
-                  <Button variant="outline" size="sm" className="gap-2" onClick={copyEmbed}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={copyEmbed}
+                  >
                     <Copy className="w-3.5 h-3.5" /> Copy Embed Code
                   </Button>
                 </CardContent>
@@ -5054,28 +6683,35 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
         </TabsContent>
 
         <TabsContent value="settings" className="mt-5">
-          <div className="space-y-5 max-w-2xl">
-            <Card>
+          <div className="space-y-5 max-w-3xl">
+            <div className="flex items-center justify-end min-h-5">
+              <span className="text-xs text-muted-foreground" aria-live="polite">
+                {saveStatus === "saving"
+                  ? "Saving..."
+                  : saveStatus === "saved"
+                    ? "Saved"
+                    : saveStatus === "error"
+                      ? "Save failed"
+                      : ""}
+              </span>
+            </div>
+
+            <Card className="border-card-border bg-white">
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-base">Form Settings</CardTitle>
-                  <span className="text-xs text-muted-foreground" aria-live="polite">
-                    {saveStatus === "saving"
-                      ? "Saving..."
-                      : saveStatus === "saved"
-                        ? "Saved"
-                        : saveStatus === "error"
-                          ? "Save failed"
-                          : ""}
-                  </span>
-                </div>
+                <CardTitle className="text-base">Basic Form Details</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Customize the title and messages shown on the public
+                  registration form.
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-1.5">
                   <Label>Form Title</Label>
                   <Input
                     value={formSettings.title}
-                    onChange={(e) => setFormSettings((p) => ({ ...p, title: e.target.value }))}
+                    onChange={(e) =>
+                      setFormSettings((p) => ({ ...p, title: e.target.value }))
+                    }
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -5084,83 +6720,172 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
                     rows={2}
                     placeholder="Optional intro shown at the top of the form"
                     value={formSettings.description}
-                    onChange={(e) => setFormSettings((p) => ({ ...p, description: e.target.value }))}
+                    onChange={(e) =>
+                      setFormSettings((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
+                    }
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Registration Complete Message</Label>
+                  <Textarea
+                    rows={2}
+                    value={formSettings.registrationCompleteMessage}
+                    onChange={(e) =>
+                      setFormSettings((p) => ({
+                        ...p,
+                        registrationCompleteMessage: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-card-border bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Availability</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="flex items-center justify-between py-0.5">
                   <div>
-                    <Label className="text-sm font-medium">Form is active</Label>
-                    <p className="text-xs text-muted-foreground">Accepting new registrations</p>
+                    <Label className="text-sm font-medium">
+                      Accepting registrations
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      People can submit new registrations.
+                    </p>
                   </div>
                   <Switch
                     checked={formSettings.isActive}
-                    onCheckedChange={(v) => setFormSettings((p) => ({ ...p, isActive: v }))}
+                    onCheckedChange={(v) =>
+                      setFormSettings((p) => ({ ...p, isActive: v }))
+                    }
                   />
                 </div>
                 <div className="flex items-center justify-between py-0.5">
                   <div>
-                    <Label className="text-sm font-medium">Form is public</Label>
-                    <p className="text-xs text-muted-foreground">Visible via the public registration link</p>
+                    <Label className="text-sm font-medium">
+                      Public registration link
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      People with the link can view and submit this form.
+                    </p>
                   </div>
                   <Switch
                     checked={formSettings.isPublic}
-                    onCheckedChange={(v) => setFormSettings((p) => ({ ...p, isPublic: v }))}
+                    onCheckedChange={(v) =>
+                      setFormSettings((p) => ({ ...p, isPublic: v }))
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-card-border bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Public Form Display</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between py-0.5">
+                  <div>
+                    <Label className="text-sm font-medium">
+                      Show organization logo
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Display the logo at the top of the public form.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={!formSettings.hideOrgLogo}
+                    onCheckedChange={(v) =>
+                      setFormSettings((p) => ({ ...p, hideOrgLogo: !v }))
+                    }
                   />
                 </div>
                 <div className="flex items-center justify-between py-0.5">
                   <div>
-                    <Label className="text-sm font-medium">Hide organization logo</Label>
-                    <p className="text-xs text-muted-foreground">Do not show the logo at the top of the public form</p>
+                    <Label className="text-sm font-medium">
+                      Show organization name
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Display the organization name at the top of the public
+                      form.
+                    </p>
                   </div>
                   <Switch
-                    checked={formSettings.hideOrgLogo}
-                    onCheckedChange={(v) => setFormSettings((p) => ({ ...p, hideOrgLogo: v }))}
+                    checked={!formSettings.hideOrgName}
+                    onCheckedChange={(v) =>
+                      setFormSettings((p) => ({ ...p, hideOrgName: !v }))
+                    }
                   />
                 </div>
                 <div className="flex items-center justify-between py-0.5">
                   <div>
-                    <Label className="text-sm font-medium">Hide organization name</Label>
-                    <p className="text-xs text-muted-foreground">Do not show the organization name at the top of the public form</p>
+                    <Label className="text-sm font-medium">
+                      Show start screen
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Display a welcome screen before the registration form.
+                    </p>
                   </div>
                   <Switch
-                    checked={formSettings.hideOrgName}
-                    onCheckedChange={(v) => setFormSettings((p) => ({ ...p, hideOrgName: v }))}
+                    checked={formSettings.requireStartButton}
+                    onCheckedChange={(v) =>
+                      setFormSettings((p) => ({ ...p, requireStartButton: v }))
+                    }
                   />
                 </div>
                 {isChildCheckin && (
                   <div className="flex items-center justify-between py-0.5">
                     <div>
-                      <Label className="text-sm font-medium">One section at a time</Label>
-                      <p className="text-xs text-muted-foreground">Show Next and Back steps on the public form</p>
+                      <Label className="text-sm font-medium">
+                        Step-by-step form
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Show one section at a time with Next and Back buttons.
+                      </p>
                     </div>
                     <Switch
                       checked={formSettings.showSectionsOneAtATime}
-                      onCheckedChange={(v) => setFormSettings((p) => ({ ...p, showSectionsOneAtATime: v }))}
+                      onCheckedChange={(v) =>
+                        setFormSettings((p) => ({
+                          ...p,
+                          showSectionsOneAtATime: v,
+                        }))
+                      }
                     />
                   </div>
                 )}
-                <div className="flex items-center justify-between py-0.5">
-                  <div>
-                    <Label className="text-sm font-medium">Start registration button</Label>
-                    <p className="text-xs text-muted-foreground">Show a start screen before the public form</p>
-                  </div>
-                  <Switch
-                    checked={formSettings.requireStartButton}
-                    onCheckedChange={(v) => setFormSettings((p) => ({ ...p, requireStartButton: v }))}
-                  />
-                </div>
-                <div className="space-y-3 border-t border-border pt-4">
+              </CardContent>
+            </Card>
+
+            <Card className="border-card-border bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Confirmation Email</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <Label className="text-sm font-medium flex items-center gap-1.5">
                         <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                        Confirmation Email
+                        Send confirmation email
                       </Label>
-                      <p className="text-xs text-muted-foreground">Send after successful registration</p>
+                      <p className="text-xs text-muted-foreground">
+                        Send after successful registration.
+                      </p>
                     </div>
                     <Switch
                       checked={formSettings.confirmationEmailEnabled}
-                      onCheckedChange={(v) => setFormSettings((p) => ({ ...p, confirmationEmailEnabled: v }))}
+                      onCheckedChange={(v) =>
+                        setFormSettings((p) => ({
+                          ...p,
+                          confirmationEmailEnabled: v,
+                        }))
+                      }
                     />
                   </div>
                   {formSettings.confirmationEmailEnabled && (
@@ -5169,15 +6894,27 @@ function RegistrationFormSection({ event, eventId }: { event: EventWithForm; eve
                         <Label>Subject</Label>
                         <Input
                           value={formSettings.confirmationEmailSubject}
-                          onChange={(e) => setFormSettings((p) => ({ ...p, confirmationEmailSubject: e.target.value }))}
+                          onChange={(e) =>
+                            setFormSettings((p) => ({
+                              ...p,
+                              confirmationEmailSubject: e.target.value,
+                            }))
+                          }
                         />
                       </div>
                       <ConfirmationEmailMessageEditor
                         value={formSettings.confirmationEmailMessage}
-                        onChange={(value) => setFormSettings((p) => ({ ...p, confirmationEmailMessage: value }))}
+                        onChange={(value) =>
+                          setFormSettings((p) => ({
+                            ...p,
+                            confirmationEmailMessage: value,
+                          }))
+                        }
                       />
                       <p className="text-xs text-muted-foreground">
-                        Available: {"{{eventName}}"}, {"{{organizationName}}"}, {"{{eventDate}}"}, {"{{primaryContactName}}"}, {"{{participantNames}}"}
+                        Available: {"{{eventName}}"}, {"{{organizationName}}"},{" "}
+                        {"{{eventDate}}"}, {"{{primaryContactName}}"},{" "}
+                        {"{{participantNames}}"}
                       </p>
                     </div>
                   )}
@@ -5212,7 +6949,9 @@ function ReportsSection({
     <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-6">
       <div>
         <h1 className="text-2xl font-serif font-bold">Reports</h1>
-        <p className="text-muted-foreground mt-1">View attendance history and check-in summaries.</p>
+        <p className="text-muted-foreground mt-1">
+          View attendance history and check-in summaries.
+        </p>
       </div>
 
       {/* Summary stats */}
@@ -5220,14 +6959,18 @@ function ReportsSection({
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Total Check-ins</p>
-            <p className="text-3xl font-bold font-serif mt-1">{checkins?.length ?? 0}</p>
+            <p className="text-3xl font-bold font-serif mt-1">
+              {checkins?.length ?? 0}
+            </p>
           </CardContent>
         </Card>
         {trackAttendance && (
           <Card>
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">Currently In</p>
-              <p className="text-3xl font-bold font-serif mt-1 text-green-700">{checkedIn.length}</p>
+              <p className="text-3xl font-bold font-serif mt-1 text-green-700">
+                {checkedIn.length}
+              </p>
             </CardContent>
           </Card>
         )}
@@ -5235,7 +6978,9 @@ function ReportsSection({
           <Card>
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">Checked Out</p>
-              <p className="text-3xl font-bold font-serif mt-1 text-amber-700">{checkedOut.length}</p>
+              <p className="text-3xl font-bold font-serif mt-1 text-amber-700">
+                {checkedOut.length}
+              </p>
             </CardContent>
           </Card>
         )}
@@ -5248,19 +6993,34 @@ function ReportsSection({
             <CardContent className="py-12 text-center text-muted-foreground">
               <BarChart2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="font-medium">No attendance recorded yet.</p>
-              <p className="text-sm mt-1">Once check-ins begin, attendance summaries will appear here.</p>
+              <p className="text-sm mt-1">
+                Once check-ins begin, attendance summaries will appear here.
+              </p>
             </CardContent>
           </Card>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {([
-              { title: "Attendance by Date", desc: "Available after check-ins begin." },
-              { title: "Room Attendance", desc: "Available after check-ins begin." },
-              { title: "Registrant Attendance", desc: "Available after check-ins begin." },
-            ] as const).map(({ title, desc }) => (
+            {(
+              [
+                {
+                  title: "Attendance by Date",
+                  desc: "Available after check-ins begin.",
+                },
+                {
+                  title: "Room Attendance",
+                  desc: "Available after check-ins begin.",
+                },
+                {
+                  title: "Registrant Attendance",
+                  desc: "Available after check-ins begin.",
+                },
+              ] as const
+            ).map(({ title, desc }) => (
               <Card key={title} className="border-border/60">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <p className="text-sm font-medium text-foreground">{title}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {title}
+                    </p>
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wide shrink-0">
                       No data yet
                     </span>
@@ -5274,7 +7034,9 @@ function ReportsSection({
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            {attendanceSessions.length} session{attendanceSessions.length !== 1 ? "s" : ""} · {checkins?.length ?? 0} total check-ins
+            {attendanceSessions.length} session
+            {attendanceSessions.length !== 1 ? "s" : ""} ·{" "}
+            {checkins?.length ?? 0} total check-ins
           </p>
           {attendanceSessions.map(({ date, items }) => (
             <Card key={date}>
@@ -5285,25 +7047,46 @@ function ReportsSection({
                   </CardTitle>
                   <div className="flex flex-wrap justify-end gap-2 text-xs text-muted-foreground">
                     <span>Total check-ins: {items.length}</span>
-                    <span>Currently in: {items.filter((item) => !item.checkoutAt).length}</span>
-                    <span>Checked out: {items.filter((item) => !!item.checkoutAt).length}</span>
+                    <span>
+                      Currently in:{" "}
+                      {items.filter((item) => !item.checkoutAt).length}
+                    </span>
+                    <span>
+                      Checked out:{" "}
+                      {items.filter((item) => !!item.checkoutAt).length}
+                    </span>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y divide-border">
                   {[...items]
-                    .sort((a, b) => new Date(a.checkinAt).getTime() - new Date(b.checkinAt).getTime())
+                    .sort(
+                      (a, b) =>
+                        new Date(a.checkinAt).getTime() -
+                        new Date(b.checkinAt).getTime(),
+                    )
                     .map((c) => (
-                      <div key={c.id} className="px-5 py-2.5 flex items-center justify-between gap-4">
+                      <div
+                        key={c.id}
+                        className="px-5 py-2.5 flex items-center justify-between gap-4"
+                      >
                         <div>
-                          <p className="font-medium text-sm">{c.childFirstName} {c.childLastName}</p>
-                          {c.room && <p className="text-xs text-muted-foreground">{c.room}</p>}
+                          <p className="font-medium text-sm">
+                            {c.childFirstName} {c.childLastName}
+                          </p>
+                          {c.room && (
+                            <p className="text-xs text-muted-foreground">
+                              {c.room}
+                            </p>
+                          )}
                         </div>
                         <div className="text-right text-xs text-muted-foreground flex-shrink-0">
                           <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
                           {c.checkoutAt && (
-                            <p className="text-amber-700">Out: {format(new Date(c.checkoutAt), "h:mm a")}</p>
+                            <p className="text-amber-700">
+                              Out: {format(new Date(c.checkoutAt), "h:mm a")}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -5340,21 +7123,30 @@ function EventSettingsSection({
   const createCategory = useCreateEventCategory({
     mutation: {
       onSuccess: (cat) => {
-        queryClient.invalidateQueries({ queryKey: getListEventCategoriesQueryKey() });
+        queryClient.invalidateQueries({
+          queryKey: getListEventCategoriesQueryKey(),
+        });
         set("eventType")(cat.slug);
         setCreateCatOpen(false);
         setNewCatName("");
         toast({ title: `Category "${cat.name}" created` });
       },
-      onError: () => toast({ title: "Failed to create category", variant: "destructive" }),
+      onError: () =>
+        toast({ title: "Failed to create category", variant: "destructive" }),
     },
   });
 
-  const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
+  const isChildCheckin =
+    !event.registrationType || event.registrationType === "child_checkin";
   const scheduleType =
-    (event.scheduleType === "repeating" || event.repeatDayOfWeek != null) ? "repeating"
-    : (event.scheduleType === "multi_day" || (event.endDate && event.startDate && event.endDate !== event.startDate)) ? "multi_day"
-    : "one_time";
+    event.scheduleType === "repeating" || event.repeatDayOfWeek != null
+      ? "repeating"
+      : event.scheduleType === "multi_day" ||
+          (event.endDate &&
+            event.startDate &&
+            event.endDate !== event.startDate)
+        ? "multi_day"
+        : "one_time";
 
   const [form, setForm] = useState({
     name: event.name,
@@ -5367,44 +7159,62 @@ function EventSettingsSection({
 
   const [labelSettings, setLabelSettings] = useState({
     printLabels: event.printLabels ?? isChildCheckin,
-    labelType: event.labelType ?? (isChildCheckin ? "child_security" : "simple_name_tag"),
+    labelType:
+      event.labelType ??
+      (isChildCheckin ? "child_security" : "simple_name_tag"),
     requireCheckout: event.requireCheckout ?? isChildCheckin,
   });
 
-  const [roomMode, setRoomMode] = useState(event.roomAssignmentMode ?? "manual");
+  const [roomMode, setRoomMode] = useState(
+    event.roomAssignmentMode ?? "manual",
+  );
 
   const updateRoomMode = useUpdateEvent({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+        queryClient.invalidateQueries({
+          queryKey: getGetEventQueryKey(eventId),
+        });
         toast({ title: "Room settings saved" });
       },
-      onError: () => toast({ title: "Failed to save room settings", variant: "destructive" }),
+      onError: () =>
+        toast({
+          title: "Failed to save room settings",
+          variant: "destructive",
+        }),
     },
   });
 
   const updateEvent = useUpdateEvent({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+        queryClient.invalidateQueries({
+          queryKey: getGetEventQueryKey(eventId),
+        });
         toast({ title: "Settings saved" });
       },
-      onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
+      onError: () =>
+        toast({ title: "Failed to save settings", variant: "destructive" }),
     },
   });
 
   const updateLabels = useUpdateEvent({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetEventQueryKey(eventId) });
+        queryClient.invalidateQueries({
+          queryKey: getGetEventQueryKey(eventId),
+        });
         toast({ title: "Label settings saved" });
       },
-      onError: () => toast({ title: "Failed to save settings", variant: "destructive" }),
+      onError: () =>
+        toast({ title: "Failed to save settings", variant: "destructive" }),
     },
   });
 
-  const set = <K extends keyof typeof form>(key: K) => (value: (typeof form)[K]) =>
-    setForm((p) => ({ ...p, [key]: value }));
+  const set =
+    <K extends keyof typeof form>(key: K) =>
+    (value: (typeof form)[K]) =>
+      setForm((p) => ({ ...p, [key]: value }));
 
   const deleteEvent = useDeleteEvent({
     mutation: {
@@ -5413,7 +7223,8 @@ function EventSettingsSection({
         toast({ title: "Event deleted" });
         navigate("/events");
       },
-      onError: () => toast({ title: "Failed to delete event", variant: "destructive" }),
+      onError: () =>
+        toast({ title: "Failed to delete event", variant: "destructive" }),
     },
   });
 
@@ -5421,7 +7232,9 @@ function EventSettingsSection({
     <div className="p-6 md:p-8 max-w-[800px] mx-auto w-full space-y-6">
       <div>
         <h1 className="text-2xl font-serif font-bold">Event Settings</h1>
-        <p className="text-muted-foreground mt-1">Edit event details and check-in configuration.</p>
+        <p className="text-muted-foreground mt-1">
+          Edit event details and check-in configuration.
+        </p>
       </div>
 
       {/* Basic info */}
@@ -5432,21 +7245,31 @@ function EventSettingsSection({
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <Label>Event Name</Label>
-            <Input value={form.name} onChange={(e) => set("name")(e.target.value)} />
+            <Input
+              value={form.name}
+              onChange={(e) => set("name")(e.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Event Category</Label>
             <Select value={form.eventType} onValueChange={set("eventType")}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
-                  <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
+                  <SelectItem key={cat.slug} value={cat.slug}>
+                    {cat.name}
+                  </SelectItem>
                 ))}
                 <div className="border-t border-border mt-1 pt-1">
                   <button
                     type="button"
                     className="w-full flex items-center gap-1.5 text-sm px-2 py-1.5 text-primary hover:bg-accent rounded-sm"
-                    onMouseDown={(e) => { e.preventDefault(); setCreateCatOpen(true); }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setCreateCatOpen(true);
+                    }}
                   >
                     <Plus className="w-3.5 h-3.5" /> Create new category
                   </button>
@@ -5460,7 +7283,8 @@ function EventSettingsSection({
               <DialogHeader>
                 <DialogTitle>New Event Category</DialogTitle>
                 <DialogDescription>
-                  Give your category a name. It will be available for all events.
+                  Give your category a name. It will be available for all
+                  events.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-1.5 py-2">
@@ -5472,15 +7296,24 @@ function EventSettingsSection({
                   onChange={(e) => setNewCatName(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && newCatName.trim()) {
-                      createCategory.mutate({ data: { name: newCatName.trim() } });
+                      createCategory.mutate({
+                        data: { name: newCatName.trim() },
+                      });
                     }
                   }}
                 />
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setCreateCatOpen(false)}>Cancel</Button>
                 <Button
-                  onClick={() => createCategory.mutate({ data: { name: newCatName.trim() } })}
+                  variant="outline"
+                  onClick={() => setCreateCatOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() =>
+                    createCategory.mutate({ data: { name: newCatName.trim() } })
+                  }
                   disabled={!newCatName.trim() || createCategory.isPending}
                 >
                   {createCategory.isPending ? "Creating…" : "Create"}
@@ -5490,7 +7323,11 @@ function EventSettingsSection({
           </Dialog>
           <div className="space-y-1.5">
             <Label>Description</Label>
-            <Textarea rows={2} value={form.description} onChange={(e) => set("description")(e.target.value)} />
+            <Textarea
+              rows={2}
+              value={form.description}
+              onChange={(e) => set("description")(e.target.value)}
+            />
           </div>
           {/* Schedule display — varies by type */}
           {scheduleType === "repeating" ? (
@@ -5502,45 +7339,90 @@ function EventSettingsSection({
               <div className="text-sm space-y-1 pl-6">
                 {event.repeatDayOfWeek != null && (
                   <p className="text-foreground">
-                    Every <span className="font-medium">{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][event.repeatDayOfWeek]}</span>
+                    Every{" "}
+                    <span className="font-medium">
+                      {
+                        [
+                          "Sunday",
+                          "Monday",
+                          "Tuesday",
+                          "Wednesday",
+                          "Thursday",
+                          "Friday",
+                          "Saturday",
+                        ][event.repeatDayOfWeek]
+                      }
+                    </span>
                     {event.repeatFrequency ? ` (${event.repeatFrequency})` : ""}
                   </p>
                 )}
                 {event.startDate && event.endDate && (
                   <p className="text-muted-foreground">
-                    {format(new Date(event.startDate + "T00:00:00"), "MMM d, yyyy")} – {format(new Date(event.endDate + "T00:00:00"), "MMM d, yyyy")}
+                    {format(
+                      new Date(event.startDate + "T00:00:00"),
+                      "MMM d, yyyy",
+                    )}{" "}
+                    –{" "}
+                    {format(
+                      new Date(event.endDate + "T00:00:00"),
+                      "MMM d, yyyy",
+                    )}
                   </p>
                 )}
                 {event.sessionCount != null && (
-                  <p className="text-muted-foreground">{event.sessionCount} sessions scheduled</p>
+                  <p className="text-muted-foreground">
+                    {event.sessionCount} sessions scheduled
+                  </p>
                 )}
                 {event.nextSessionDate && (
-                  <p className="text-muted-foreground">Next: {format(new Date(event.nextSessionDate + "T00:00:00"), "EEEE, MMM d, yyyy")}</p>
+                  <p className="text-muted-foreground">
+                    Next:{" "}
+                    {format(
+                      new Date(event.nextSessionDate + "T00:00:00"),
+                      "EEEE, MMM d, yyyy",
+                    )}
+                  </p>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground pl-6">To change the schedule, create a new event.</p>
+              <p className="text-xs text-muted-foreground pl-6">
+                To change the schedule, create a new event.
+              </p>
             </div>
           ) : scheduleType === "multi_day" ? (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Start Date</Label>
-                <Input type="date" value={form.startDate}
+                <Input
+                  type="date"
+                  value={form.startDate}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setForm((p) => ({ ...p, startDate: val, endDate: p.endDate && val > p.endDate ? "" : p.endDate }));
+                    setForm((p) => ({
+                      ...p,
+                      startDate: val,
+                      endDate: p.endDate && val > p.endDate ? "" : p.endDate,
+                    }));
                   }}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>End Date</Label>
-                <Input type="date" value={form.endDate} min={form.startDate || undefined}
-                  onChange={(e) => set("endDate")(e.target.value)} />
+                <Input
+                  type="date"
+                  value={form.endDate}
+                  min={form.startDate || undefined}
+                  onChange={(e) => set("endDate")(e.target.value)}
+                />
               </div>
             </div>
           ) : (
             <div className="space-y-1.5">
               <Label>Date</Label>
-              <Input type="date" value={form.startDate} onChange={(e) => set("startDate")(e.target.value)} />
+              <Input
+                type="date"
+                value={form.startDate}
+                onChange={(e) => set("startDate")(e.target.value)}
+              />
             </div>
           )}
         </CardContent>
@@ -5559,14 +7441,19 @@ function EventSettingsSection({
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <CheckSquare className="w-4 h-4 text-primary" /> Attendance &amp; Check-In
+            <CheckSquare className="w-4 h-4 text-primary" /> Attendance &amp;
+            Check-In
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between py-0.5">
             <div>
-              <Label className="text-sm font-medium">Track attendance with check-ins</Label>
-              <p className="text-xs text-muted-foreground">Enable the check-in kiosk for this event</p>
+              <Label className="text-sm font-medium">
+                Track attendance with check-ins
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Enable the check-in kiosk for this event
+              </p>
             </div>
             <Switch
               checked={form.trackAttendance}
@@ -5595,30 +7482,45 @@ function EventSettingsSection({
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-sm font-medium">Print labels at check-in</Label>
-              <p className="text-xs text-muted-foreground">Print a label for each person when they check in.</p>
+              <Label className="text-sm font-medium">
+                Print labels at check-in
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Print a label for each person when they check in.
+              </p>
             </div>
             <Switch
               checked={labelSettings.printLabels}
-              onCheckedChange={(v) => setLabelSettings((p) => ({ ...p, printLabels: v }))}
+              onCheckedChange={(v) =>
+                setLabelSettings((p) => ({ ...p, printLabels: v }))
+              }
             />
           </div>
 
           {labelSettings.printLabels && (
             <div className="space-y-2 pl-3 border-l-2 border-border">
-              <Label className="text-sm text-muted-foreground">Label type</Label>
+              <Label className="text-sm text-muted-foreground">
+                Label type
+              </Label>
               <Select
                 value={labelSettings.labelType}
-                onValueChange={(v) => setLabelSettings((p) => ({ ...p, labelType: v }))}
+                onValueChange={(v) =>
+                  setLabelSettings((p) => ({ ...p, labelType: v }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="simple_name_tag">Simple Name Tag</SelectItem>
-                  <SelectItem value="simple_name">Simple Child Label</SelectItem>
+                  <SelectItem value="simple_name_tag">
+                    Simple Name Tag
+                  </SelectItem>
+                  <SelectItem value="simple_name">
+                    Simple Child Label
+                  </SelectItem>
                   <SelectItem value="child_security" disabled={!isChildCheckin}>
-                    Child security label {!isChildCheckin ? "(kids events only)" : ""}
+                    Child security label{" "}
+                    {!isChildCheckin ? "(kids events only)" : ""}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -5627,10 +7529,16 @@ function EventSettingsSection({
                   <p>Prints only the person's name on a 2″×4″ label.</p>
                 )}
                 {labelSettings.labelType === "simple_name" && (
-                  <p>Prints the child's name, guardian, room, and allergies on a 2″×4″ label.</p>
+                  <p>
+                    Prints the child's name, guardian, room, and allergies on a
+                    2″×4″ label.
+                  </p>
                 )}
                 {labelSettings.labelType === "child_security" && (
-                  <p>Prints child name, guardian, allergies, room, and a unique pickup security code.</p>
+                  <p>
+                    Prints child name, guardian, allergies, room, and a unique
+                    pickup security code.
+                  </p>
                 )}
               </div>
             </div>
@@ -5640,11 +7548,15 @@ function EventSettingsSection({
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-sm font-medium">Require check-out</Label>
-                <p className="text-xs text-muted-foreground">Staff must scan the security code at pickup.</p>
+                <p className="text-xs text-muted-foreground">
+                  Staff must scan the security code at pickup.
+                </p>
               </div>
               <Switch
                 checked={labelSettings.requireCheckout}
-                onCheckedChange={(v) => setLabelSettings((p) => ({ ...p, requireCheckout: v }))}
+                onCheckedChange={(v) =>
+                  setLabelSettings((p) => ({ ...p, requireCheckout: v }))
+                }
               />
             </div>
           )}
@@ -5653,7 +7565,9 @@ function EventSettingsSection({
           <Button
             className="w-full"
             disabled={updateLabels.isPending}
-            onClick={() => updateLabels.mutate({ eventId, data: labelSettings })}
+            onClick={() =>
+              updateLabels.mutate({ eventId, data: labelSettings })
+            }
           >
             {updateLabels.isPending ? "Saving…" : "Save Label Settings"}
           </Button>
@@ -5676,15 +7590,24 @@ function EventSettingsSection({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">Manual — staff assigns rooms</SelectItem>
-                  <SelectItem value="registrant_chooses">Registrant chooses — shown on registration form</SelectItem>
-                  <SelectItem value="auto_assign">Auto-assign — not yet implemented</SelectItem>
+                  <SelectItem value="manual">
+                    Manual — staff assigns rooms
+                  </SelectItem>
+                  <SelectItem value="registrant_chooses">
+                    Registrant chooses — shown on registration form
+                  </SelectItem>
+                  <SelectItem value="auto_assign">
+                    Auto-assign — not yet implemented
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {roomMode === "manual" && "Admins and staff assign rooms to each child individually."}
-                {roomMode === "registrant_chooses" && "Families pick a room when registering. A room selector will appear on the public registration form."}
-                {roomMode === "auto_assign" && "Rooms will be assigned automatically based on age or grade when a registration is submitted."}
+                {roomMode === "manual" &&
+                  "Admins and staff assign rooms to each child individually."}
+                {roomMode === "registrant_chooses" &&
+                  "Families pick a room when registering. A room selector will appear on the public registration form."}
+                {roomMode === "auto_assign" &&
+                  "Rooms will be assigned automatically based on age or grade when a registration is submitted."}
               </p>
             </div>
           </CardContent>
@@ -5692,7 +7615,12 @@ function EventSettingsSection({
             <Button
               className="w-full"
               disabled={updateRoomMode.isPending}
-              onClick={() => updateRoomMode.mutate({ eventId, data: { roomAssignmentMode: roomMode } })}
+              onClick={() =>
+                updateRoomMode.mutate({
+                  eventId,
+                  data: { roomAssignmentMode: roomMode },
+                })
+              }
             >
               {updateRoomMode.isPending ? "Saving…" : "Save Room Settings"}
             </Button>
@@ -5712,14 +7640,18 @@ function EventSettingsSection({
             <div>
               <p className="font-medium text-sm">Delete this event</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Permanently removes this event. The linked registration form and its registrations will not be deleted.
+                Permanently removes this event. The linked registration form and
+                its registrations will not be deleted.
               </p>
             </div>
             <Button
               variant="destructive"
               size="sm"
               className="flex-shrink-0 gap-1.5"
-              onClick={() => { setDeleteConfirmText(""); setDeleteDialogOpen(true); }}
+              onClick={() => {
+                setDeleteConfirmText("");
+                setDeleteDialogOpen(true);
+              }}
             >
               <Trash2 className="w-4 h-4" />
               Delete Event
@@ -5728,22 +7660,36 @@ function EventSettingsSection({
         </CardContent>
       </Card>
 
-      <Dialog open={deleteDialogOpen} onOpenChange={(open) => { setDeleteDialogOpen(open); if (!open) setDeleteConfirmText(""); }}>
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setDeleteConfirmText("");
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-2 mb-1">
               <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center flex-shrink-0">
                 <AlertTriangle className="w-5 h-5 text-destructive" />
               </div>
-              <DialogTitle className="text-destructive">Delete "{event.name}"?</DialogTitle>
+              <DialogTitle className="text-destructive">
+                Delete "{event.name}"?
+              </DialogTitle>
             </div>
             <DialogDescription className="pt-1">
-              This will permanently delete this event. The linked registration form and its registrations will not be deleted. This cannot be undone.
+              This will permanently delete this event. The linked registration
+              form and its registrations will not be deleted. This cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
             <Label htmlFor="delete-event-confirm" className="text-sm">
-              Type <span className="font-mono font-bold text-destructive">DELETE</span> to confirm
+              Type{" "}
+              <span className="font-mono font-bold text-destructive">
+                DELETE
+              </span>{" "}
+              to confirm
             </Label>
             <Input
               id="delete-event-confirm"
@@ -5757,7 +7703,10 @@ function EventSettingsSection({
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"
-              onClick={() => { setDeleteDialogOpen(false); setDeleteConfirmText(""); }}
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setDeleteConfirmText("");
+              }}
             >
               Cancel
             </Button>
@@ -5767,7 +7716,13 @@ function EventSettingsSection({
               onClick={() => deleteEvent.mutate({ eventId })}
               className="gap-1.5"
             >
-              {deleteEvent.isPending ? "Deleting…" : <><Trash2 className="w-4 h-4" /> Delete Event</>}
+              {deleteEvent.isPending ? (
+                "Deleting…"
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" /> Delete Event
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -5791,14 +7746,29 @@ export default function EventWorkspace() {
     query: { enabled: !!eventId, queryKey: getGetEventQueryKey(eventId) },
   });
   const regFormId = event?.formId ?? 0;
-  const { data: registrations, isLoading: regsLoading } = useListRegistrations(regFormId, {
-    query: { enabled: !!event?.formId, queryKey: getListRegistrationsQueryKey(regFormId) },
-  });
-  const { data: checkins, isLoading: checkinsLoading } = useListEventCheckins(eventId, {
-    query: { enabled: !!eventId, queryKey: getListEventCheckinsQueryKey(eventId) },
-  });
+  const { data: registrations, isLoading: regsLoading } = useListRegistrations(
+    regFormId,
+    {
+      query: {
+        enabled: !!event?.formId,
+        queryKey: getListRegistrationsQueryKey(regFormId),
+      },
+    },
+  );
+  const { data: checkins, isLoading: checkinsLoading } = useListEventCheckins(
+    eventId,
+    {
+      query: {
+        enabled: !!eventId,
+        queryKey: getListEventCheckinsQueryKey(eventId),
+      },
+    },
+  );
   const { data: eventSessions } = useListEventSessions(eventId, {
-    query: { enabled: !!eventId, queryKey: getListEventSessionsQueryKey(eventId) },
+    query: {
+      enabled: !!eventId,
+      queryKey: getListEventSessionsQueryKey(eventId),
+    },
   });
 
   const todayStr = getLocalDateKey();
@@ -5809,27 +7779,49 @@ export default function EventWorkspace() {
     const endDate = eventEndDate || eventStartDate;
     return eventSessions
       .filter((session) => {
-        if (session.sessionDate < eventStartDate || session.sessionDate > endDate) return false;
-        if (event?.scheduleType === "repeating" && event.repeatDayOfWeek != null) {
-          return getLocalDateDayOfWeek(session.sessionDate) === event.repeatDayOfWeek;
+        if (
+          session.sessionDate < eventStartDate ||
+          session.sessionDate > endDate
+        )
+          return false;
+        if (
+          event?.scheduleType === "repeating" &&
+          event.repeatDayOfWeek != null
+        ) {
+          return (
+            getLocalDateDayOfWeek(session.sessionDate) === event.repeatDayOfWeek
+          );
         }
         return true;
       })
       .sort((a, b) => a.sessionDate.localeCompare(b.sessionDate));
-  }, [eventSessions, eventStartDate, eventEndDate, event?.scheduleType, event?.repeatDayOfWeek]);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null | undefined>(undefined);
+  }, [
+    eventSessions,
+    eventStartDate,
+    eventEndDate,
+    event?.scheduleType,
+    event?.repeatDayOfWeek,
+  ]);
+  const [selectedSessionId, setSelectedSessionId] = useState<
+    number | null | undefined
+  >(undefined);
   const defaultSessionId = useMemo(() => {
     if (!eventSessionsInRange.length) return null;
     // Exact match for today
-    const todaySession = eventSessionsInRange.find((s) => s.sessionDate === todayStr);
+    const todaySession = eventSessionsInRange.find(
+      (s) => s.sessionDate === todayStr,
+    );
     if (todaySession) return todaySession.id;
     // Next upcoming session (first date strictly after today)
-    const nextSession = eventSessionsInRange.find((s) => s.sessionDate > todayStr);
+    const nextSession = eventSessionsInRange.find(
+      (s) => s.sessionDate > todayStr,
+    );
     if (nextSession) return nextSession.id;
     // All sessions are in the past — use the most recent one
     return eventSessionsInRange[eventSessionsInRange.length - 1]?.id ?? null;
   }, [eventSessionsInRange, todayStr]);
-  const resolvedSessionId = selectedSessionId === undefined ? defaultSessionId : selectedSessionId;
+  const resolvedSessionId =
+    selectedSessionId === undefined ? defaultSessionId : selectedSessionId;
   const previousSectionRef = useRef(section);
 
   useEffect(() => {
@@ -5840,7 +7832,9 @@ export default function EventWorkspace() {
     if (
       selectedSessionId != null &&
       eventSessionsInRange.length > 0 &&
-      !eventSessionsInRange.some((session) => session.id === selectedSessionId) &&
+      !eventSessionsInRange.some(
+        (session) => session.id === selectedSessionId,
+      ) &&
       defaultSessionId != null
     ) {
       setSelectedSessionId(defaultSessionId);
@@ -5850,19 +7844,27 @@ export default function EventWorkspace() {
   useEffect(() => {
     const previousSection = previousSectionRef.current;
     previousSectionRef.current = section;
-    if (section === "checkin" && previousSection !== "checkin" && defaultSessionId != null) {
+    if (
+      section === "checkin" &&
+      previousSection !== "checkin" &&
+      defaultSessionId != null
+    ) {
       setSelectedSessionId(defaultSessionId);
     }
   }, [defaultSessionId, section]);
 
   const attendanceSessions = useMemo(() => {
     if (!checkins?.length && !eventSessionsInRange.length) return [];
-    const sessionDateById = new Map(eventSessionsInRange.map((session) => [session.id, session.sessionDate]));
+    const sessionDateById = new Map(
+      eventSessionsInRange.map((session) => [session.id, session.sessionDate]),
+    );
     const byDate = new Map<string, EventCheckin[]>();
     for (const c of checkins ?? []) {
-      const dateKey = c.sessionId != null
-        ? (sessionDateById.get(c.sessionId) ?? format(new Date(c.checkinAt), "yyyy-MM-dd"))
-        : format(new Date(c.checkinAt), "yyyy-MM-dd");
+      const dateKey =
+        c.sessionId != null
+          ? (sessionDateById.get(c.sessionId) ??
+            format(new Date(c.checkinAt), "yyyy-MM-dd"))
+          : format(new Date(c.checkinAt), "yyyy-MM-dd");
       if (!byDate.has(dateKey)) byDate.set(dateKey, []);
       byDate.get(dateKey)!.push(c);
     }
@@ -5885,31 +7887,61 @@ export default function EventWorkspace() {
       };
 
       const fixedHeaders = [
-        "Registration ID", "Submitted At",
-        "First Name", "Last Name", "Full Name",
-        "Guardian Name", "Guardian Phone", "Guardian Email",
-        "Secondary Guardian First Name", "Secondary Guardian Last Name",
-        "Secondary Guardian Phone", "Secondary Guardian Email", "Secondary Guardian Relationship",
-        "Allergies", "Special Needs", "Room",
-        "Check-In Status", "Checked In At", "Checked Out At",
+        "Registration ID",
+        "Submitted At",
+        "First Name",
+        "Last Name",
+        "Full Name",
+        "Guardian Name",
+        "Guardian Phone",
+        "Guardian Email",
+        "Secondary Guardian First Name",
+        "Secondary Guardian Last Name",
+        "Secondary Guardian Phone",
+        "Secondary Guardian Email",
+        "Secondary Guardian Relationship",
+        "Allergies",
+        "Special Needs",
+        "Room",
+        "Check-In Status",
+        "Checked In At",
+        "Checked Out At",
       ];
       const allHeaders = [...fixedHeaders, ...data.customColumns];
 
       const dataRows = data.rows.map((row) =>
         [
-          cell(row.id), cell(row.submittedAt),
-          cell(row.firstName), cell(row.lastName), cell(row.fullName),
-          cell(row.guardianName), cell(row.guardianPhone), cell(row.guardianEmail),
-          cell(row.secondaryGuardianFirstName), cell(row.secondaryGuardianLastName),
-          cell(row.secondaryGuardianPhone), cell(row.secondaryGuardianEmail), cell(row.secondaryGuardianRelationship),
-          cell(row.allergies), cell(row.specialNeeds), cell(row.room),
-          cell(row.checkinStatus), cell(row.checkedInAt), cell(row.checkedOutAt),
-          ...data.customColumns.map((col) => cell(row.customAnswers[col] ?? "")),
-        ].join(",")
+          cell(row.id),
+          cell(row.submittedAt),
+          cell(row.firstName),
+          cell(row.lastName),
+          cell(row.fullName),
+          cell(row.guardianName),
+          cell(row.guardianPhone),
+          cell(row.guardianEmail),
+          cell(row.secondaryGuardianFirstName),
+          cell(row.secondaryGuardianLastName),
+          cell(row.secondaryGuardianPhone),
+          cell(row.secondaryGuardianEmail),
+          cell(row.secondaryGuardianRelationship),
+          cell(row.allergies),
+          cell(row.specialNeeds),
+          cell(row.room),
+          cell(row.checkinStatus),
+          cell(row.checkedInAt),
+          cell(row.checkedOutAt),
+          ...data.customColumns.map((col) =>
+            cell(row.customAnswers[col] ?? ""),
+          ),
+        ].join(","),
       );
 
-      const csv = "﻿" + [allHeaders.map(cell).join(","), ...dataRows].join("\r\n");
-      const slug = data.eventName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const csv =
+        "﻿" + [allHeaders.map(cell).join(","), ...dataRows].join("\r\n");
+      const slug = data.eventName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -5918,7 +7950,10 @@ export default function EventWorkspace() {
       link.click();
       URL.revokeObjectURL(url);
     } catch {
-      toast({ title: "Export failed. Please try again.", variant: "destructive" });
+      toast({
+        title: "Export failed. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsExporting(false);
     }
@@ -5939,7 +7974,9 @@ export default function EventWorkspace() {
     return (
       <div className="p-10 text-center">
         <p className="text-muted-foreground">Event not found.</p>
-        <Button asChild variant="link" className="mt-2"><Link href="/">Back to Events</Link></Button>
+        <Button asChild variant="link" className="mt-2">
+          <Link href="/">Back to Events</Link>
+        </Button>
       </div>
     );
   }
@@ -5947,10 +7984,13 @@ export default function EventWorkspace() {
   const checkedIn = checkins?.filter((c) => !c.checkoutAt) ?? [];
   const checkedOut = checkins?.filter((c) => !!c.checkoutAt) ?? [];
 
-  const isChildCheckin = !event.registrationType || event.registrationType === "child_checkin";
+  const isChildCheckin =
+    !event.registrationType || event.registrationType === "child_checkin";
   const trackAttendance = event.trackAttendance ?? isChildCheckin;
-  const requireCheckout = event.requireCheckout ?? (isChildCheckin && trackAttendance);
-  const labelType = event.labelType ?? (requireCheckout ? "child_security" : "simple_name_tag");
+  const requireCheckout =
+    event.requireCheckout ?? (isChildCheckin && trackAttendance);
+  const labelType =
+    event.labelType ?? (requireCheckout ? "child_security" : "simple_name_tag");
 
   // ── Check-In Desk ──
   if (section === "checkin") {
@@ -6002,7 +8042,9 @@ export default function EventWorkspace() {
       <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
         <div>
           <h1 className="text-2xl font-serif font-bold">Groups</h1>
-          <p className="text-muted-foreground mt-1">View and manage family and group registrations.</p>
+          <p className="text-muted-foreground mt-1">
+            View and manage family and group registrations.
+          </p>
         </div>
         <FamiliesTabContent eventId={eventId} />
       </div>
@@ -6015,9 +8057,15 @@ export default function EventWorkspace() {
       <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-5">
         <div>
           <h1 className="text-2xl font-serif font-bold">Rooms</h1>
-          <p className="text-muted-foreground mt-1">Create rooms or groups and assign registrants.</p>
+          <p className="text-muted-foreground mt-1">
+            Create rooms or groups and assign registrants.
+          </p>
         </div>
-        <RoomsTabContent eventId={eventId} formId={event.formId} roomAssignmentMode={event.roomAssignmentMode} />
+        <RoomsTabContent
+          eventId={eventId}
+          formId={event.formId}
+          roomAssignmentMode={event.roomAssignmentMode}
+        />
       </div>
     );
   }

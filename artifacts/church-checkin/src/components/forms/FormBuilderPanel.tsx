@@ -86,6 +86,8 @@ const DEFAULT_SECONDARY_GUARDIAN_KEYS = [
 ];
 const DEFAULT_CONFIRMATION_EMAIL_SUBJECT = "Registration confirmed: {{eventName}}";
 const DEFAULT_CONFIRMATION_EMAIL_MESSAGE = "Your registration for {{eventName}} has been received.";
+const DEFAULT_REGISTRATION_COMPLETE_MESSAGE =
+  "Thank you for registering. We look forward to seeing you!";
 
 interface SectionDef {
   key: SectionKey;
@@ -459,6 +461,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     confirmationEmailEnabled: true,
     confirmationEmailSubject: DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
     confirmationEmailMessage: DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
+    registrationCompleteMessage: DEFAULT_REGISTRATION_COMPLETE_MESSAGE,
   });
 
   useEffect(() => {
@@ -477,6 +480,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         confirmationEmailEnabled: form.confirmationEmailEnabled ?? true,
         confirmationEmailSubject: form.confirmationEmailSubject ?? DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
         confirmationEmailMessage: form.confirmationEmailMessage ?? DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
+        registrationCompleteMessage: form.registrationCompleteMessage ?? DEFAULT_REGISTRATION_COMPLETE_MESSAGE,
       });
     }
   }, [form]);
@@ -608,6 +612,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         confirmationEmailEnabled: form.confirmationEmailEnabled ?? true,
         confirmationEmailSubject: form.confirmationEmailSubject ?? DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
         confirmationEmailMessage: form.confirmationEmailMessage ?? DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
+        registrationCompleteMessage: form.registrationCompleteMessage ?? DEFAULT_REGISTRATION_COMPLETE_MESSAGE,
       },
     });
   };
@@ -1071,6 +1076,20 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                 placeholder="Welcome message shown above this form…"
                 value={formSettings.description}
                 onChange={(e) => setFormSettings((p) => ({ ...p, description: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="fb-complete-message">Registration Complete Message</Label>
+              <Textarea
+                id="fb-complete-message"
+                rows={2}
+                value={formSettings.registrationCompleteMessage}
+                onChange={(e) =>
+                  setFormSettings((p) => ({
+                    ...p,
+                    registrationCompleteMessage: e.target.value,
+                  }))
+                }
               />
             </div>
             <div className="flex items-center justify-between py-2 border-t border-border">

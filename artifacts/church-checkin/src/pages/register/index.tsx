@@ -20,6 +20,9 @@ import {
 } from "@/components/registration/RegistrationFormBody";
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
 
+const DEFAULT_REGISTRATION_COMPLETE_MESSAGE =
+  "Thank you for registering. We look forward to seeing you!";
+
 export default function PublicRegistrationForm() {
   const params = useParams<{ embedSlug: string }>();
   const slug = params.embedSlug;
@@ -62,6 +65,11 @@ export default function PublicRegistrationForm() {
   const hasSecondaryGuardianFields = formFields.some(isSecondaryGuardianField);
   const allowSecondGuardian = form?.allowSecondGuardian ?? hasSecondaryGuardianFields;
   const showSectionStepper = !!form && isChildCheckin && !!form.showSectionsOneAtATime;
+  const defaultCompleteMessage =
+    childrenAnswers.length > 1
+      ? `Thank you! ${childrenAnswers.length} ${isChildCheckin ? "children" : "people"} have been registered successfully.`
+      : DEFAULT_REGISTRATION_COMPLETE_MESSAGE;
+  const completeMessage = form?.registrationCompleteMessage?.trim() || defaultCompleteMessage;
   const sectionMeta: Record<FieldSection, { title: string; shortTitle: string }> = {
     guardian_info: { title: "Parent / Guardian", shortTitle: "Parent / Guardian" },
     child_info: {
@@ -274,9 +282,7 @@ export default function PublicRegistrationForm() {
               </div>
               <h2 className="text-3xl font-serif font-bold">Registration Complete!</h2>
               <p className="text-muted-foreground text-lg max-w-md">
-                {childrenAnswers.length > 1
-                  ? `Thank you! ${childrenAnswers.length} ${isChildCheckin ? "children" : "people"} have been registered successfully.`
-                  : "Thank you for registering. We look forward to seeing you!"}
+                {completeMessage}
               </p>
               <Button
                 size="lg"

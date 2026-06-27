@@ -23,4 +23,6 @@ export interface FormInput {
   confirmationEmailSubject?: string | null;
   /** @nullable */
   confirmationEmailMessage?: string | null;
+  /** @nullable */
+  registrationCompleteMessage?: string | null;
 }

@@ -99,6 +99,13 @@
       "when": 1782571200000,
       "tag": "0013_form_start_button",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1782572400000,
+      "tag": "0014_form_registration_complete_message",
+      "breakpoints": true
     }
   ]
 }
