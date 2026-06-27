@@ -19,6 +19,7 @@ import {
   isSecondaryGuardianField,
 } from "@/components/registration/RegistrationFormBody";
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
+import { formattedTextMarkupToHtml } from "@/components/forms/FormattedTextEditor";
 
 const DEFAULT_REGISTRATION_COMPLETE_MESSAGE =
   "Thank you for registering. We look forward to seeing you!";
@@ -37,15 +38,24 @@ function HeaderTextContent({ text }: { text: string }) {
           return (
             <ul key={i} className="list-disc pl-5 space-y-1 text-slate-700 text-sm sm:text-base leading-relaxed">
               {nonEmptyLines.map((line, j) => (
-                <li key={j}>{line.trimStart().slice(2)}</li>
+                <li
+                  key={j}
+                  dangerouslySetInnerHTML={{
+                    __html: formattedTextMarkupToHtml(line.trimStart().slice(2)),
+                  }}
+                />
               ))}
             </ul>
           );
         }
         return (
-          <p key={i} className="whitespace-pre-line text-slate-700 text-sm sm:text-base leading-relaxed">
-            {paragraph.trim()}
-          </p>
+          <p
+            key={i}
+            className="text-slate-700 text-sm sm:text-base leading-relaxed"
+            dangerouslySetInnerHTML={{
+              __html: formattedTextMarkupToHtml(paragraph.trim()),
+            }}
+          />
         );
       })}
     </div>
@@ -357,9 +367,12 @@ export default function PublicRegistrationForm() {
                   <HeaderTextContent text={completeMessage} />
                 </div>
               ) : (
-                <p className="text-muted-foreground text-base max-w-md text-center">
-                  {completeMessage}
-                </p>
+                <p
+                  className="text-muted-foreground text-base max-w-md text-center"
+                  dangerouslySetInnerHTML={{
+                    __html: formattedTextMarkupToHtml(completeMessage),
+                  }}
+                />
               )}
               <Button
                 size="lg"

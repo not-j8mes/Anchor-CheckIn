@@ -68,6 +68,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmationEmailMessageEditor } from "@/components/forms/ConfirmationEmailMessageEditor";
 import {
+  FormattedTextEditor,
+  formattedTextMarkupToHtml,
+} from "@/components/forms/FormattedTextEditor";
+import {
   SYSTEM_FIELDS,
   SYSTEM_FIELD_CATEGORIES,
   getSystemField,
@@ -1068,30 +1072,26 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                 onChange={(e) => setFormSettings((p) => ({ ...p, title: e.target.value }))}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="fb-desc">Header Text</Label>
-              <Textarea
-                id="fb-desc"
-                rows={2}
-                placeholder="Welcome message shown above this form…"
-                value={formSettings.description}
-                onChange={(e) => setFormSettings((p) => ({ ...p, description: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="fb-complete-message">Registration Complete Message</Label>
-              <Textarea
-                id="fb-complete-message"
-                rows={2}
-                value={formSettings.registrationCompleteMessage}
-                onChange={(e) =>
+            <FormattedTextEditor
+              id="fb-desc"
+              label="Header Text"
+              placeholder="Welcome message shown above this form..."
+              minHeightClassName="min-h-[112px]"
+              value={formSettings.description}
+              onChange={(value) => setFormSettings((p) => ({ ...p, description: value }))}
+            />
+            <FormattedTextEditor
+              id="fb-complete-message"
+              label="Registration Complete Message"
+              minHeightClassName="min-h-[112px]"
+              value={formSettings.registrationCompleteMessage}
+              onChange={(value) =>
                   setFormSettings((p) => ({
                     ...p,
-                    registrationCompleteMessage: e.target.value,
+                    registrationCompleteMessage: value,
                   }))
-                }
-              />
-            </div>
+              }
+            />
             <div className="flex items-center justify-between py-2 border-t border-border">
               <div>
                 <Label className="text-sm">Active</Label>
@@ -1567,7 +1567,12 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
             <div className="bg-primary/5 border-b border-border px-6 py-5">
               <h2 className="text-xl font-serif font-bold">{formSettings.title || "Untitled Form"}</h2>
               {formSettings.description && (
-                <p className="mt-1.5 text-sm text-muted-foreground">{formSettings.description}</p>
+                <p
+                  className="mt-1.5 text-sm text-muted-foreground"
+                  dangerouslySetInnerHTML={{
+                    __html: formattedTextMarkupToHtml(formSettings.description),
+                  }}
+                />
               )}
             </div>
 

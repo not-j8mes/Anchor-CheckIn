@@ -135,6 +135,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { FormBuilderPanel } from "@/components/forms/FormBuilderPanel";
 import { ConfirmationEmailMessageEditor } from "@/components/forms/ConfirmationEmailMessageEditor";
+import { FormattedTextEditor } from "@/components/forms/FormattedTextEditor";
 import {
   RegistrationFormBody,
   getFieldSection,
@@ -6855,33 +6856,31 @@ function RegistrationFormSection({
                     }
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Header Text</Label>
-                  <Textarea
-                    rows={2}
-                    placeholder="Optional intro shown at the top of the form"
-                    value={formSettings.description}
-                    onChange={(e) =>
+                <FormattedTextEditor
+                  id="registration-header-text"
+                  label="Header Text"
+                  placeholder="Optional intro shown at the top of the form"
+                  minHeightClassName="min-h-[112px]"
+                  value={formSettings.description}
+                  onChange={(value) =>
                       setFormSettings((p) => ({
                         ...p,
-                        description: e.target.value,
+                        description: value,
                       }))
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Registration Complete Message</Label>
-                  <Textarea
-                    rows={2}
-                    value={formSettings.registrationCompleteMessage}
-                    onChange={(e) =>
+                  }
+                />
+                <FormattedTextEditor
+                  id="registration-complete-message"
+                  label="Registration Complete Message"
+                  minHeightClassName="min-h-[112px]"
+                  value={formSettings.registrationCompleteMessage}
+                  onChange={(value) =>
                       setFormSettings((p) => ({
                         ...p,
-                        registrationCompleteMessage: e.target.value,
+                        registrationCompleteMessage: value,
                       }))
-                    }
-                  />
-                </div>
+                  }
+                />
               </CardContent>
             </Card>
 
