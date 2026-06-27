@@ -321,20 +321,20 @@ export default function PublicRegistrationForm() {
   };
 
   const pageClassName = isEmbedded
-    ? "public-form-page public-form-page--embedded flex-1 min-h-screen overflow-x-hidden bg-white px-3 py-3 sm:px-4 sm:py-5"
-    : "public-form-page flex-1 min-h-screen overflow-x-hidden bg-white px-4 py-6 sm:px-6 sm:py-10 lg:px-8";
+    ? "public-form-page public-form-page--embedded flex-1 min-h-screen overflow-x-hidden bg-white px-2 py-2 sm:px-4 sm:py-5"
+    : "public-form-page flex-1 min-h-screen overflow-x-hidden bg-white px-3 py-4 sm:px-6 sm:py-10 lg:px-8";
   const contentClassName = isEmbedded
-    ? "mx-auto w-full max-w-3xl min-w-0 space-y-4"
-    : "mx-auto w-full max-w-3xl min-w-0 space-y-6";
+    ? "mx-auto w-full max-w-3xl min-w-0 space-y-3 sm:space-y-4"
+    : "mx-auto w-full max-w-3xl min-w-0 space-y-4 sm:space-y-6";
   const logoClassName = isEmbedded
     ? "mx-auto h-12 object-contain sm:h-14"
-    : "mx-auto h-16 object-contain sm:h-20";
+    : "mx-auto h-14 object-contain sm:h-20";
   const defaultLogoClassName = isEmbedded
     ? "mx-auto h-12 w-12 object-contain sm:h-14 sm:w-14"
-    : "mx-auto h-16 w-16 object-contain sm:h-20 sm:w-20";
+    : "mx-auto h-14 w-14 object-contain sm:h-20 sm:w-20";
   const orgNameClassName = isEmbedded
     ? "mx-auto mt-2 max-w-[calc(100vw-2rem)] break-words text-xl font-serif font-bold text-foreground sm:text-2xl"
-    : "mx-auto mt-3 max-w-[calc(100vw-2rem)] break-words text-2xl font-serif font-bold text-foreground sm:text-3xl";
+    : "mx-auto mt-2 max-w-[calc(100vw-2rem)] break-words text-xl font-serif font-bold text-foreground sm:mt-3 sm:text-3xl";
   const primaryRegistrationButtonClassName =
     "rounded-xl border-[1.5px] border-slate-900/80 bg-primary font-bold text-primary-foreground shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-px hover:bg-[hsl(38_90%_46%)] hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)] focus-visible:ring-2 focus-visible:ring-slate-900/35 focus-visible:ring-offset-2";
 
@@ -356,14 +356,14 @@ export default function PublicRegistrationForm() {
         </div>
 
         {isSubmitted ? (
-          <Card className="overflow-hidden rounded-2xl border-card-border bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
-            <CardContent className="flex flex-col items-center justify-center space-y-4 px-6 py-10 sm:px-10 sm:py-14">
-              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2">
-                <CheckCircle2 className="w-10 h-10" />
+          <Card className="overflow-hidden rounded-xl border-card-border bg-white shadow-[0_14px_36px_rgba(15,23,42,0.08)] sm:rounded-2xl sm:shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+            <CardContent className="flex flex-col items-center justify-center space-y-4 px-4 py-8 sm:px-10 sm:py-14">
+              <div className="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-1 sm:h-16 sm:w-16 sm:mb-2">
+                <CheckCircle2 className="w-8 h-8 sm:h-10 sm:w-10" />
               </div>
-              <h2 className="text-3xl font-serif font-bold text-center">Registration Complete!</h2>
+              <h2 className="text-2xl font-serif font-bold text-center sm:text-3xl">Registration Complete!</h2>
               {completeMessage.includes("\n") ? (
-                <div className="w-full rounded-xl border border-slate-100 bg-slate-50 px-5 py-4 text-left">
+                <div className="w-full rounded-xl border border-slate-100 bg-slate-50 px-4 py-4 text-left sm:px-5">
                   <HeaderTextContent text={completeMessage} />
                 </div>
               ) : (
@@ -377,7 +377,7 @@ export default function PublicRegistrationForm() {
               <Button
                 size="lg"
                 variant="outline"
-                className="mt-4 h-12 gap-2 rounded-lg border-border bg-white px-6 text-base shadow-sm"
+                className="mt-3 min-h-12 w-full gap-2 rounded-lg border-border bg-white px-4 text-base shadow-sm sm:mt-4 sm:w-auto sm:px-6"
                 onClick={handleReset}
               >
                 <Plus className="w-4 h-4" />
@@ -386,9 +386,9 @@ export default function PublicRegistrationForm() {
             </CardContent>
           </Card>
         ) : !hasStartedRegistration ? (
-          <Card className="overflow-hidden rounded-2xl border-card-border bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
-            <CardContent className="flex flex-col items-center justify-center space-y-5 px-6 py-10 sm:px-10 sm:py-14">
-              <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-center text-2xl font-serif font-bold text-foreground sm:text-3xl">
+          <Card className="overflow-hidden rounded-xl border-card-border bg-white shadow-[0_14px_36px_rgba(15,23,42,0.08)] sm:rounded-2xl sm:shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+            <CardContent className="flex flex-col items-center justify-center space-y-4 px-4 py-7 sm:space-y-5 sm:px-10 sm:py-14">
+              <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-center text-[1.55rem] font-serif font-bold leading-tight text-foreground sm:text-3xl">
                 {form.title}
               </h2>
               {form.description && (
@@ -401,7 +401,7 @@ export default function PublicRegistrationForm() {
               )}
               <Button
                 size="lg"
-                className={`min-h-[60px] w-full max-w-[390px] justify-center gap-3 px-8 text-lg sm:text-xl ${primaryRegistrationButtonClassName}`}
+                className={`min-h-[58px] w-full max-w-[390px] justify-center gap-3 px-5 text-lg sm:min-h-[60px] sm:px-8 sm:text-xl ${primaryRegistrationButtonClassName}`}
                 onClick={() => setHasStartedRegistration(true)}
                 data-testid="button-start-registration"
               >
@@ -414,12 +414,12 @@ export default function PublicRegistrationForm() {
           <form
             ref={formRef}
             onSubmit={handleSubmit}
-            className="min-w-0 space-y-5"
+            className="min-w-0 space-y-4 sm:space-y-5"
             data-testid="registration-form"
           >
             {form.description ? (
-              <div className="rounded-2xl border border-card-border bg-white px-6 py-5 shadow-[0_12px_36px_rgba(15,23,42,0.07)] space-y-4">
-                <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-center text-xl font-serif font-bold text-foreground sm:text-2xl">{form.title}</h2>
+              <div className="rounded-xl border border-card-border bg-white px-4 py-4 shadow-[0_10px_28px_rgba(15,23,42,0.06)] space-y-3 sm:rounded-2xl sm:px-6 sm:py-5 sm:shadow-[0_12px_36px_rgba(15,23,42,0.07)] sm:space-y-4">
+                <h2 className="mx-auto max-w-[calc(100vw-2rem)] break-words text-center text-xl font-serif font-bold leading-tight text-foreground sm:text-2xl">{form.title}</h2>
                 <div className="border-t border-slate-100" />
                 <HeaderTextContent text={form.description} />
               </div>
@@ -430,8 +430,8 @@ export default function PublicRegistrationForm() {
             )}
 
             {showSectionStepper && stepSections.length > 1 && (
-              <div className="min-w-0 overflow-x-auto rounded-2xl border border-card-border bg-white px-3 py-4 shadow-[0_12px_36px_rgba(15,23,42,0.07)] sm:px-5">
-                <div className="grid min-w-[520px] items-start sm:min-w-0" style={{ gridTemplateColumns: `repeat(${stepSections.length}, minmax(0, 1fr))` }}>
+              <div className="min-w-0 overflow-x-auto rounded-xl border border-card-border bg-white px-2 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.06)] sm:rounded-2xl sm:px-5 sm:py-4 sm:shadow-[0_12px_36px_rgba(15,23,42,0.07)]">
+                <div className="grid min-w-0 items-start" style={{ gridTemplateColumns: `repeat(${stepSections.length}, minmax(0, 1fr))` }}>
                   {stepSections.map((section, index) => {
                     const isComplete = index < activeSectionIndex;
                     const isCurrent = index === activeSectionIndex;
@@ -515,12 +515,12 @@ export default function PublicRegistrationForm() {
             )}
 
             {showSectionStepper && stepSections.length > 1 ? (
-              <div className="grid min-w-0 gap-3 rounded-2xl border border-card-border bg-white p-3 shadow-[0_12px_36px_rgba(15,23,42,0.06)] sm:grid-cols-2">
+              <div className="grid min-w-0 gap-3 rounded-xl border border-card-border bg-white p-3 shadow-[0_10px_28px_rgba(15,23,42,0.06)] sm:rounded-2xl sm:grid-cols-2 sm:shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
                 <Button
                   type="button"
                   size="lg"
                   variant="outline"
-                  className="h-12 rounded-lg border-border bg-white font-semibold shadow-sm"
+                  className="min-h-[52px] rounded-lg border-border bg-white font-semibold shadow-sm"
                   onClick={handlePreviousSection}
                   disabled={activeSectionIndex === 0 || isSubmitting}
                 >
@@ -531,7 +531,7 @@ export default function PublicRegistrationForm() {
                   <Button
                     type="submit"
                     size="lg"
-                    className={`min-h-[58px] justify-center gap-2 text-base sm:text-lg ${primaryRegistrationButtonClassName}`}
+                    className={`min-h-[56px] justify-center gap-2 text-base sm:min-h-[58px] sm:text-lg ${primaryRegistrationButtonClassName}`}
                     disabled={isSubmitting}
                     data-testid="button-submit-registration"
                   >
@@ -541,7 +541,7 @@ export default function PublicRegistrationForm() {
                   <Button
                     type="button"
                     size="lg"
-                    className={`min-h-[58px] justify-center gap-2 text-base sm:text-lg ${primaryRegistrationButtonClassName}`}
+                    className={`min-h-[56px] justify-center gap-2 text-base sm:min-h-[58px] sm:text-lg ${primaryRegistrationButtonClassName}`}
                     onClick={handleNextSection}
                   >
                     Next
@@ -553,7 +553,7 @@ export default function PublicRegistrationForm() {
               <Button
                 type="submit"
                 size="lg"
-                className={`min-h-[60px] w-full justify-center text-lg sm:text-xl ${primaryRegistrationButtonClassName}`}
+                className={`min-h-[58px] w-full justify-center px-4 text-lg sm:min-h-[60px] sm:text-xl ${primaryRegistrationButtonClassName}`}
                 disabled={isSubmitting}
                 data-testid="button-submit-registration"
               >

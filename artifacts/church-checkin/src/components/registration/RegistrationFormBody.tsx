@@ -174,7 +174,7 @@ export function DateOfBirthSelect({
           event.currentTarget.setCustomValidity("Please select the child's full date of birth.");
         }}
       />
-      <div className="grid gap-3 sm:grid-cols-[1.3fr_0.8fr_1fr]">
+      <div className="grid gap-2 sm:grid-cols-[1.3fr_0.8fr_1fr] sm:gap-3">
         <Select
           value={parts.month}
           onValueChange={(selected) => updatePart("month", selected)}
@@ -182,7 +182,7 @@ export function DateOfBirthSelect({
         >
           <SelectTrigger
             aria-label="Birth month"
-            className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25"
+            className="min-h-[52px] w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25"
           >
             <SelectValue placeholder="Month" />
           </SelectTrigger>
@@ -207,7 +207,7 @@ export function DateOfBirthSelect({
         >
           <SelectTrigger
             aria-label="Birth day"
-            className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25"
+            className="min-h-[52px] w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25"
           >
             <SelectValue placeholder="Day" />
           </SelectTrigger>
@@ -232,7 +232,7 @@ export function DateOfBirthSelect({
         >
           <SelectTrigger
             aria-label="Birth year"
-            className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25"
+            className="min-h-[52px] w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25"
           >
             <SelectValue placeholder="Year" />
           </SelectTrigger>
@@ -281,7 +281,7 @@ export function FieldInput({
   if (field.systemKey === "room_assignment") {
     return (
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25">
+        <SelectTrigger className="min-h-[52px] w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25">
           <SelectValue placeholder="Select a room or group" />
         </SelectTrigger>
         <SelectContent>
@@ -302,7 +302,7 @@ export function FieldInput({
         placeholder={placeholder ?? ""}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="min-h-24 w-full min-w-0 resize-y rounded-lg border-border bg-white text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/25"
+        className="min-h-28 w-full min-w-0 resize-y rounded-lg border-border bg-white text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/25 sm:min-h-24"
         rows={3}
       />
     );
@@ -311,7 +311,7 @@ export function FieldInput({
   if ((fieldType === "select" || fieldType === "multiselect") && options) {
     return (
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25">
+        <SelectTrigger className="min-h-[52px] w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus:ring-2 focus:ring-primary/25">
           <SelectValue placeholder={placeholder ?? "Select an option"} />
         </SelectTrigger>
         <SelectContent>
@@ -327,7 +327,7 @@ export function FieldInput({
 
   if (fieldType === "checkbox") {
     return (
-      <div className="flex items-center space-x-2 mt-2">
+      <div className="flex items-center space-x-2 mt-2 rounded-lg border border-border/70 bg-white px-3 py-3">
         <Checkbox
           id={`field-${field.id}`}
           checked={value === "true"}
@@ -380,7 +380,7 @@ export function FieldInput({
       placeholder={placeholder ?? ""}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-12 w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/25"
+      className="min-h-[52px] w-full min-w-0 rounded-lg border-border bg-white text-base shadow-sm focus-visible:ring-2 focus-visible:ring-primary/25"
     />
   );
 }
@@ -434,17 +434,17 @@ function SectionCard({
   }[tone];
 
   return (
-    <Card className="w-full max-w-full min-w-0 overflow-hidden rounded-2xl border-card-border bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-      <div className="flex items-start gap-3 border-b border-border/70 px-5 py-5 sm:px-6">
-        <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${toneClasses}`}>
-          <Icon className="h-5 w-5" />
+    <Card className="w-full max-w-full min-w-0 overflow-hidden rounded-xl border-card-border bg-white shadow-[0_12px_34px_rgba(15,23,42,0.07)] sm:rounded-2xl sm:shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
+      <div className="flex items-start gap-3 border-b border-border/70 px-4 py-4 sm:px-6 sm:py-5">
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full sm:h-11 sm:w-11 ${toneClasses}`}>
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </span>
         <div className="min-w-0">
-          <h3 className="text-wrap text-lg font-serif font-bold leading-6 text-foreground">{title}</h3>
+          <h3 className="text-wrap text-base font-serif font-bold leading-6 text-foreground sm:text-lg">{title}</h3>
           <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
         </div>
       </div>
-      <CardContent className="p-5 sm:p-6">{children}</CardContent>
+      <CardContent className="p-4 sm:p-6">{children}</CardContent>
     </Card>
   );
 }
@@ -503,8 +503,8 @@ export function RegistrationFormBody({
   const isSectionVisible = (section: FieldSection) =>
     !visibleSections || visibleSections.includes(section);
   const nestedShellClassName = embedded
-    ? "space-y-5 rounded-xl border border-border bg-white p-4"
-    : "space-y-5 rounded-xl border border-border bg-[#fffcf5] p-4";
+    ? "space-y-4 rounded-xl border border-border bg-white p-3 sm:space-y-5 sm:p-4"
+    : "space-y-4 rounded-xl border border-border bg-[#fffcf5] p-3 sm:space-y-5 sm:p-4";
 
   const removeSecondaryGuardian = () => {
     secondaryGuardianFields.forEach((field) => onGuardianChange(field.id, ""));
@@ -512,7 +512,7 @@ export function RegistrationFormBody({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       {/* Parent / Guardian section */}
       {isSectionVisible("guardian_info") && guardianFields.length > 0 && (
         <SectionCard
@@ -520,7 +520,7 @@ export function RegistrationFormBody({
           title="Parent / Guardian Information"
           description="Tell us who we should contact about this registration."
         >
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             {primaryGuardianFields.map((field) => (
               <FieldBlock
                 key={field.id}
@@ -534,7 +534,7 @@ export function RegistrationFormBody({
               <Button
                 type="button"
                 variant="outline"
-                className="h-auto min-h-12 w-full min-w-0 whitespace-normal rounded-lg border-dashed border-amber-300 bg-amber-50/70 px-3 py-3 text-sm font-semibold leading-5 text-foreground shadow-sm hover:border-primary hover:bg-amber-100/80 sm:text-base"
+                className="h-auto min-h-[52px] w-full min-w-0 whitespace-normal rounded-lg border-dashed border-amber-300 bg-amber-50/70 px-3 py-3 text-sm font-semibold leading-5 text-foreground shadow-sm hover:border-primary hover:bg-amber-100/80 sm:text-base"
                 onClick={() => setShowSecondaryGuardian(true)}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -556,7 +556,7 @@ export function RegistrationFormBody({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-9 rounded-md text-muted-foreground hover:bg-white hover:text-destructive"
+                    className="h-auto min-h-9 rounded-md px-2 text-muted-foreground hover:bg-white hover:text-destructive"
                     onClick={removeSecondaryGuardian}
                   >
                     <Trash2 className="w-4 h-4 mr-1" /> Remove
@@ -593,11 +593,11 @@ export function RegistrationFormBody({
               : `Provide details about your ${isChildCheckin ? "child" : "attendee"}.`
           }
         >
-          <div className="space-y-5">
+          <div className="space-y-4 sm:space-y-5">
             {childrenAnswers.map((childAnswerMap, idx) => {
               const showChildCard = childrenAnswers.length > 1;
               const fields = childFields.length > 0 ? (
-                <div className="space-y-5">
+                <div className="space-y-4 sm:space-y-5">
                   {childFields.map((field) => (
                     <FieldBlock
                       key={field.id}
@@ -618,7 +618,7 @@ export function RegistrationFormBody({
 
               return (
                 <div key={idx} className="overflow-hidden rounded-xl border border-border bg-white">
-                  <div className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3 border-b border-amber-100 bg-amber-50 px-3 py-3 sm:px-4">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-amber-800" />
                       <h4 className="text-sm font-bold text-foreground">
@@ -630,14 +630,14 @@ export function RegistrationFormBody({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 rounded-md text-xs text-muted-foreground hover:bg-white hover:text-destructive"
+                        className="h-auto min-h-8 rounded-md px-2 text-xs text-muted-foreground hover:bg-white hover:text-destructive"
                         onClick={() => onRemoveChild(idx)}
                       >
                         <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove
                       </Button>
                     )}
                   </div>
-                  <div className="p-4">{fields}</div>
+                  <div className="p-3 sm:p-4">{fields}</div>
                 </div>
               );
             })}
@@ -646,7 +646,7 @@ export function RegistrationFormBody({
               <Button
                 type="button"
                 variant="outline"
-                className="h-auto min-h-12 w-full min-w-0 whitespace-normal rounded-lg border-dashed border-amber-300 bg-amber-50/70 px-3 py-3 text-sm font-semibold leading-5 text-foreground shadow-sm hover:border-primary hover:bg-amber-100/80 sm:text-base"
+                className="h-auto min-h-[52px] w-full min-w-0 whitespace-normal rounded-lg border-dashed border-amber-300 bg-amber-50/70 px-3 py-3 text-sm font-semibold leading-5 text-foreground shadow-sm hover:border-primary hover:bg-amber-100/80 sm:text-base"
                 onClick={onAddChild}
               >
                 <Plus className="w-4 h-4 mr-2" />
