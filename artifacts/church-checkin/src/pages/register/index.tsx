@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import "@iframe-resizer/child";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "wouter";
 import {
   useSubmitRegistration,
@@ -24,7 +23,6 @@ import { formattedTextMarkupToHtml } from "@/components/forms/FormattedTextEdito
 
 const DEFAULT_REGISTRATION_COMPLETE_MESSAGE =
   "Thank you for registering. We look forward to seeing you!";
-const IFRAME_HEIGHT_MESSAGE_TYPE = "ANCHOR_EVENTS_IFRAME_HEIGHT";
 
 function HeaderTextContent({ text }: { text: string }) {
   const paragraphs = text.split(/\n{2,}/);
@@ -68,8 +66,6 @@ export default function PublicRegistrationForm() {
   const params = useParams<{ embedSlug: string }>();
   const slug = params.embedSlug;
   const formRef = useRef<HTMLFormElement>(null);
-  const pageRef = useRef<HTMLDivElement>(null);
-  const postEmbedHeightRef = useRef<(() => void) | null>(null);
   const isEmbedded =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("embed") === "true";
@@ -138,13 +134,6 @@ export default function PublicRegistrationForm() {
   const activeSection = stepSections[activeSectionIndex] ?? stepSections[0];
   const isLastSection = activeSectionIndex >= stepSections.length - 1;
 
-  const requestEmbedHeightUpdate = useCallback(() => {
-    if (!isEmbedded) return;
-    postEmbedHeightRef.current?.();
-    window.setTimeout(() => postEmbedHeightRef.current?.(), 50);
-    window.setTimeout(() => postEmbedHeightRef.current?.(), 250);
-  }, [isEmbedded]);
-
   useEffect(() => {
     setActiveSectionIndex((index) => Math.min(index, Math.max(stepSections.length - 1, 0)));
   }, [stepSections.length]);
@@ -165,82 +154,6 @@ export default function PublicRegistrationForm() {
       document.body.classList.remove("public-form-body--embedded");
     };
   }, [isEmbedded]);
-
-  useEffect(() => {
-    if (!isEmbedded) return;
-
-    let animationFrame = 0;
-    const timeouts: number[] = [];
-
-    const postHeight = () => {
-      window.cancelAnimationFrame(animationFrame);
-      animationFrame = window.requestAnimationFrame(() => {
-        const page = pageRef.current;
-        const height = Math.ceil(
-          Math.max(
-            page?.scrollHeight ?? 0,
-            page?.offsetHeight ?? 0,
-            page?.getBoundingClientRect().height ?? 0,
-            document.body.scrollHeight,
-            document.body.offsetHeight,
-            document.documentElement.scrollHeight,
-            document.documentElement.offsetHeight,
-          ) + 2,
-        );
-
-        window.parent?.postMessage(
-          { type: IFRAME_HEIGHT_MESSAGE_TYPE, height },
-          "*",
-        );
-      });
-    };
-
-    postEmbedHeightRef.current = postHeight;
-    postHeight();
-    [0, 100, 300, 1000].forEach((delay) => {
-      timeouts.push(window.setTimeout(postHeight, delay));
-    });
-
-    const resizeObserver =
-      "ResizeObserver" in window ? new ResizeObserver(postHeight) : null;
-    resizeObserver?.observe(document.documentElement);
-    resizeObserver?.observe(document.body);
-    if (pageRef.current) resizeObserver?.observe(pageRef.current);
-
-    const mutationObserver = new MutationObserver(postHeight);
-    if (pageRef.current) {
-      mutationObserver.observe(pageRef.current, {
-        attributes: true,
-        childList: true,
-        characterData: true,
-        subtree: true,
-      });
-    }
-
-    window.addEventListener("resize", postHeight);
-
-    return () => {
-      postEmbedHeightRef.current = null;
-      window.cancelAnimationFrame(animationFrame);
-      timeouts.forEach((timeout) => window.clearTimeout(timeout));
-      resizeObserver?.disconnect();
-      mutationObserver.disconnect();
-      window.removeEventListener("resize", postHeight);
-    };
-  }, [form?.id, formLoading, isEmbedded]);
-
-  useEffect(() => {
-    requestEmbedHeightUpdate();
-  }, [
-    activeSectionIndex,
-    childrenAnswers.length,
-    form?.id,
-    guardianAnswers,
-    hasStartedRegistration,
-    isSubmitted,
-    requestEmbedHeightUpdate,
-    submitError,
-  ]);
 
   if (formLoading) {
     return (
@@ -426,7 +339,7 @@ export default function PublicRegistrationForm() {
     "rounded-xl border-[1.5px] border-slate-900/80 bg-primary font-bold text-primary-foreground shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-px hover:bg-[hsl(38_90%_46%)] hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)] focus-visible:ring-2 focus-visible:ring-slate-900/35 focus-visible:ring-offset-2";
 
   return (
-    <div ref={pageRef} className={pageClassName}>
+    <div className={pageClassName}>
       <div className={contentClassName}>
         {/* Org header */}
         <div className="text-center">
@@ -593,7 +506,6 @@ export default function PublicRegistrationForm() {
               onRemoveChild={(index) =>
                 setChildrenAnswers((prev) => prev.filter((_, i) => i !== index))
               }
-              onLayoutChange={requestEmbedHeightUpdate}
               visibleSections={showSectionStepper && activeSection ? [activeSection] : undefined}
               embedded={isEmbedded}
             />
