@@ -156,6 +156,8 @@ export default function PublicRegistrationForm() {
   useEffect(() => {
     if (!isEmbedded) return;
 
+    void import("@iframe-resizer/child");
+
     document.documentElement.classList.add("public-form-document--embedded");
     document.body.classList.add("public-form-body--embedded");
 

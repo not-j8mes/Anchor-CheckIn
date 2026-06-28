@@ -1,4 +1,6 @@
 const IFRAME_HEIGHT_MESSAGE_TYPE = "ANCHOR_EVENTS_IFRAME_HEIGHT";
+const FALLBACK_IFRAME_HEIGHT = 2400;
+const IFRAME_RESIZER_VERSION = "5.5.9";
 
 export function buildRegistrationEmbedCode(
   embedUrl: string,
@@ -6,19 +8,24 @@ export function buildRegistrationEmbedCode(
 ) {
   const allowedOrigin = new URL(embedUrl).origin;
 
-  return `<iframe
+  return `<div id="${iframeId}-container" style="width: 100%; overflow: visible;">
+<iframe
   id="${iframeId}"
   src="${embedUrl}"
+  title="Registration form"
   width="100%"
-  height="900"
-  style="display: block; width: 100%; height: 900px; border: 0; overflow: hidden;"
+  height="${FALLBACK_IFRAME_HEIGHT}"
+  style="display: block; width: 1px; min-width: 100%; height: ${FALLBACK_IFRAME_HEIGHT}px; border: 0; overflow: hidden;"
   scrolling="no"
 ></iframe>
+</div>
 
+<script src="https://cdn.jsdelivr.net/npm/@iframe-resizer/parent@${IFRAME_RESIZER_VERSION}"></script>
 <script>
   (function () {
     var iframe = document.getElementById(${JSON.stringify(iframeId)});
     if (!iframe) return;
+    var allowedOrigin = ${JSON.stringify(allowedOrigin)};
 
     function setIframeHeight(height) {
       height = Number(height);
@@ -28,8 +35,16 @@ export function buildRegistrationEmbedCode(
       iframe.setAttribute("height", String(nextHeight));
     }
 
+    if (typeof iframeResize === "function") {
+      iframeResize({
+        license: "GPLv3",
+        checkOrigin: [allowedOrigin],
+        direction: "vertical"
+      }, iframe);
+    }
+
     window.addEventListener("message", function (event) {
-      if (event.origin !== ${JSON.stringify(allowedOrigin)}) return;
+      if (event.origin !== allowedOrigin) return;
       if (!event.data || event.data.type !== ${JSON.stringify(IFRAME_HEIGHT_MESSAGE_TYPE)}) return;
       setIframeHeight(event.data.height);
     });
