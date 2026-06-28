@@ -131,6 +131,7 @@ function buildEmail(
     subjectTemplate?: string;
     messageTemplate?: string;
     footerText?: string;
+    titleText?: string;
   },
 ): EmailPayload | null {
   const apiKey = process.env["RESEND_API_KEY"]?.trim();
@@ -161,6 +162,7 @@ function buildEmail(
       "Registration confirmed: {{eventName}}",
     templateValues,
   );
+  const hasCustomMessage = Boolean(input.messageTemplate?.trim());
   const message = renderTemplate(
     input.messageTemplate?.trim() ||
       defaults?.messageTemplate ||
@@ -168,44 +170,105 @@ function buildEmail(
     templateValues,
   );
   const plainMessage = stripFormatting(message);
+  const titleText = defaults?.titleText ?? "Registration confirmed";
+  const greetingName = input.primaryContactName?.trim();
+  const greeting = greetingName ? `Hi ${greetingName},` : "Hello,";
+  const replyInstruction = replyTo
+    ? "If you have questions, you can reply directly to this email."
+    : "If you have questions, please contact the event organizer.";
   const footerText =
     defaults?.footerText ??
     "Thanks. We have your registration and will follow up if anything else is needed.";
 
-  const lines = [
-    plainMessage,
-    "",
-    `Organization: ${input.organizationName}`,
+  const summaryLines = [
     `Event: ${input.eventName}`,
+    `Organization: ${input.organizationName}`,
     eventDate ? `Event date: ${eventDate}` : null,
-    input.primaryContactName?.trim() ? `Primary contact: ${input.primaryContactName.trim()}` : null,
+    greetingName ? `Primary contact: ${greetingName}` : null,
     participantNames.length > 0 ? `Registered participants: ${formatNameList(participantNames)}` : null,
     appBaseUrl ? `Website: ${appBaseUrl}` : null,
-    "",
-    footerText,
   ].filter((line): line is string => line !== null);
 
+  const lines = hasCustomMessage
+    ? [
+        plainMessage,
+        "",
+        "This email was sent because a registration was submitted.",
+      ]
+    : [
+        titleText,
+        "",
+        greeting,
+        "",
+        plainMessage,
+        "",
+        ...summaryLines,
+        "",
+        replyInstruction,
+        "",
+        footerText,
+        "",
+        "This email was sent because a registration was submitted.",
+      ];
+
   const details = [
-    ["Organization", input.organizationName],
     ["Event", input.eventName],
+    ["Organization", input.organizationName],
     eventDate ? ["Event date", eventDate] : null,
-    input.primaryContactName?.trim() ? ["Primary contact", input.primaryContactName.trim()] : null,
+    greetingName ? ["Primary contact", greetingName] : null,
     participantNames.length > 0 ? ["Registered participants", formatNameList(participantNames)] : null,
     appBaseUrl ? ["Website", appBaseUrl] : null,
   ].filter((row): row is [string, string] => row !== null);
 
   const html = [
     "<!doctype html>",
-    "<html>",
-    "<body style=\"font-family: Arial, sans-serif; color: #111827; line-height: 1.5;\">",
-    `<p>${renderFormattedHtml(message)}</p>`,
-    "<table cellpadding=\"0\" cellspacing=\"0\" style=\"border-collapse: collapse;\">",
-    ...details.map(
-      ([label, value]) =>
-        `<tr><td style=\"padding: 4px 16px 4px 0; color: #4b5563;\">${escapeHtml(label)}</td><td style=\"padding: 4px 0;\">${escapeHtml(value)}</td></tr>`,
-    ),
+    "<html lang=\"en\">",
+    "<head>",
+    "<meta charset=\"utf-8\">",
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">",
+    `<title>${escapeHtml(titleText)}</title>`,
+    "</head>",
+    "<body style=\"margin: 0; padding: 0; background: #f6f7f9; font-family: Arial, Helvetica, sans-serif; color: #111827; line-height: 1.5;\">",
+    "<div style=\"display: none; max-height: 0; overflow: hidden; opacity: 0; color: transparent;\">",
+    `${escapeHtml(stripFormatting(message)).slice(0, 160)}`,
+    "</div>",
+    "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"width: 100%; border-collapse: collapse; background: #f6f7f9;\">",
+    "<tr>",
+    "<td align=\"center\" style=\"padding: 28px 16px;\">",
+    "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"width: 100%; max-width: 640px; border-collapse: collapse;\">",
+    "<tr>",
+    "<td style=\"padding: 0 0 14px; color: #475569; font-size: 14px; font-weight: 700; letter-spacing: 0;\">",
+    `${escapeHtml(input.organizationName)}`,
+    "</td>",
+    "</tr>",
+    "<tr>",
+    "<td style=\"background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px;\">",
+    `<h1 style=\"margin: 0 0 18px; color: #0f172a; font-size: 28px; line-height: 1.2; font-weight: 700;\">${escapeHtml(titleText)}</h1>`,
+    hasCustomMessage ? "" : `<p style=\"margin: 0 0 16px; font-size: 16px; color: #334155;\">${escapeHtml(greeting)}</p>`,
+    `<p style=\"margin: 0 0 24px; font-size: 16px; color: #334155;\">${renderFormattedHtml(message)}</p>`,
+    hasCustomMessage
+      ? ""
+      : [
+          "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"width: 100%; border-collapse: collapse; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; margin: 0 0 24px;\">",
+          ...details.map(
+            ([label, value]) =>
+              `<tr><td style=\"padding: 10px 16px 10px 0; color: #64748b; font-size: 14px; vertical-align: top; width: 34%;\">${escapeHtml(label)}</td><td style=\"padding: 10px 0; color: #0f172a; font-size: 14px; vertical-align: top;\">${escapeHtml(value)}</td></tr>`,
+          ),
+          "</table>",
+          `<p style=\"margin: 0 0 16px; font-size: 15px; color: #334155;\">${escapeHtml(replyInstruction)}</p>`,
+          `<p style=\"margin: 0; font-size: 15px; color: #334155;\">${escapeHtml(footerText)}</p>`,
+        ].join(""),
+    "</td>",
+    "</tr>",
+    "<tr>",
+    "<td style=\"padding: 18px 0 0; color: #64748b; font-size: 12px; line-height: 1.5;\">",
+    `This email was sent because a registration was submitted for ${escapeHtml(input.organizationName)}.`,
+    "</td>",
+    "</tr>",
     "</table>",
-    `<p>${escapeHtml(footerText)}</p>`,
+    "</td>",
+    "</tr>",
+    "</table>",
     "</body>",
     "</html>",
   ].join("");
@@ -227,6 +290,7 @@ export async function sendRegistrationConfirmationEmail(input: RegistrationConfi
 
 export async function sendEventRegistrantEmail(input: EventRegistrantEmailInput) {
   const payload = buildEmail(input, {
+    titleText: "Event update",
     subjectTemplate: "Update for {{eventName}}",
     messageTemplate: "Here is an update about {{eventName}}.",
     footerText: "Thanks.",

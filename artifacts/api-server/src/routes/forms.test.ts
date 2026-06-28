@@ -480,6 +480,63 @@ describe("GET /api/forms/by-slug/:embedSlug — public org field safety", () => 
         (sent[0] as { subject: string }).subject,
         `Registration confirmed: ${fixture.event.name}`,
       );
+      assert.match((sent[0] as { html: string }).html, /<!doctype html>/);
+      assert.match((sent[0] as { html: string }).html, /<meta charset="utf-8">/);
+      assert.match((sent[0] as { html: string }).html, /<title>Registration confirmed<\/title>/);
+      assert.match((sent[0] as { html: string }).html, /This email was sent because a registration was submitted/);
+      assert.match((sent[0] as { text: string }).text, /If you have questions/);
+      assert.match((sent[0] as { text: string }).text, /This email was sent because a registration was submitted/);
+    } finally {
+      await db.delete(organizationsTable).where(eq(organizationsTable.id, fixture.organization.id));
+    }
+  });
+
+  it("uses EMAIL_REPLY_TO for confirmation email replies", async () => {
+    const fixture = await createRegistrationEmailFixture();
+    const sent: unknown[] = [];
+    process.env["RESEND_API_KEY"] = "test-resend-key";
+    process.env["EMAIL_FROM"] = "registrations@example.com";
+    process.env["EMAIL_REPLY_TO"] = " communicationsoakwood@gmail.com ";
+    emailModule.setEmailTransportForTests({
+      async send(payload) {
+        sent.push(payload);
+      },
+    });
+
+    try {
+      const result = await postJson(`/api/forms/${fixture.form.id}/register`, {
+        fields: fixture.fieldsPayload,
+      });
+
+      assert.equal(result.status, 201);
+      assert.equal(sent.length, 1);
+      assert.equal((sent[0] as { from: string }).from, "registrations@example.com");
+      assert.equal((sent[0] as { replyTo?: string }).replyTo, "communicationsoakwood@gmail.com");
+    } finally {
+      await db.delete(organizationsTable).where(eq(organizationsTable.id, fixture.organization.id));
+    }
+  });
+
+  it("omits replyTo when EMAIL_REPLY_TO is blank", async () => {
+    const fixture = await createRegistrationEmailFixture();
+    const sent: unknown[] = [];
+    process.env["RESEND_API_KEY"] = "test-resend-key";
+    process.env["EMAIL_FROM"] = "registrations@example.com";
+    process.env["EMAIL_REPLY_TO"] = "   ";
+    emailModule.setEmailTransportForTests({
+      async send(payload) {
+        sent.push(payload);
+      },
+    });
+
+    try {
+      const result = await postJson(`/api/forms/${fixture.form.id}/register`, {
+        fields: fixture.fieldsPayload,
+      });
+
+      assert.equal(result.status, 201);
+      assert.equal(sent.length, 1);
+      assert.equal("replyTo" in (sent[0] as Record<string, unknown>), false);
     } finally {
       await db.delete(organizationsTable).where(eq(organizationsTable.id, fixture.organization.id));
     }
@@ -515,6 +572,14 @@ describe("GET /api/forms/by-slug/:embedSlug — public org field safety", () => 
         (sent[0] as { text: string }).text,
         /Hi Taylor Rivera, we received Jamie Rivera for July 12, 2026\./,
       );
+      assert.doesNotMatch((sent[0] as { text: string }).text, /Organization:/);
+      assert.doesNotMatch((sent[0] as { text: string }).text, /Registered participants:/);
+      assert.doesNotMatch(
+        (sent[0] as { text: string }).text,
+        /Thanks\. We have your registration and will follow up/,
+      );
+      assert.doesNotMatch((sent[0] as { html: string }).html, />Organization<\/td>/);
+      assert.doesNotMatch((sent[0] as { html: string }).html, />Registered participants<\/td>/);
     } finally {
       await db.delete(organizationsTable).where(eq(organizationsTable.id, fixture.organization.id));
     }
