@@ -167,12 +167,17 @@ export default function PublicRegistrationForm() {
       window.cancelAnimationFrame(animationFrame);
       animationFrame = window.requestAnimationFrame(() => {
         const page = pageRef.current;
-        const height = page
-          ? Math.ceil(Math.max(page.scrollHeight, page.getBoundingClientRect().height))
-          : Math.max(
-              document.body.scrollHeight,
-              document.documentElement.scrollHeight,
-            );
+        const height = Math.ceil(
+          Math.max(
+            page?.scrollHeight ?? 0,
+            page?.offsetHeight ?? 0,
+            page?.getBoundingClientRect().height ?? 0,
+            document.body.scrollHeight,
+            document.body.offsetHeight,
+            document.documentElement.scrollHeight,
+            document.documentElement.offsetHeight,
+          ) + 2,
+        );
 
         window.parent?.postMessage(
           { type: IFRAME_HEIGHT_MESSAGE_TYPE, height },

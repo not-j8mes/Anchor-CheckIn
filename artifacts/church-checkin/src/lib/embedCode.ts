@@ -9,19 +9,30 @@ export function buildRegistrationEmbedCode(
   return `<iframe
   id="${iframeId}"
   src="${embedUrl}"
-  style="width: 100%; border: 0; overflow: hidden;"
+  width="100%"
+  height="900"
+  style="display: block; width: 100%; height: 900px; border: 0; overflow: hidden;"
   scrolling="no"
 ></iframe>
 
 <script>
-  window.addEventListener("message", function (event) {
-    if (event.origin !== ${JSON.stringify(allowedOrigin)}) return;
-    if (!event.data || event.data.type !== ${JSON.stringify(IFRAME_HEIGHT_MESSAGE_TYPE)}) return;
+  (function () {
     var iframe = document.getElementById(${JSON.stringify(iframeId)});
     if (!iframe) return;
-    var height = Number(event.data.height);
-    if (!Number.isFinite(height) || height <= 0) return;
-    iframe.style.height = Math.ceil(height) + "px";
-  });
+
+    function setIframeHeight(height) {
+      height = Number(height);
+      if (!Number.isFinite(height) || height <= 0) return;
+      var nextHeight = Math.ceil(height);
+      iframe.style.height = nextHeight + "px";
+      iframe.setAttribute("height", String(nextHeight));
+    }
+
+    window.addEventListener("message", function (event) {
+      if (event.origin !== ${JSON.stringify(allowedOrigin)}) return;
+      if (!event.data || event.data.type !== ${JSON.stringify(IFRAME_HEIGHT_MESSAGE_TYPE)}) return;
+      setIframeHeight(event.data.height);
+    });
+  })();
 </script>`;
 }
