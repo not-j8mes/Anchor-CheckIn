@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "wouter";
 import {
   useSubmitRegistration,
@@ -68,6 +68,7 @@ export default function PublicRegistrationForm() {
   const slug = params.embedSlug;
   const formRef = useRef<HTMLFormElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const postEmbedHeightRef = useRef<(() => void) | null>(null);
   const isEmbedded =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("embed") === "true";
@@ -136,6 +137,13 @@ export default function PublicRegistrationForm() {
   const activeSection = stepSections[activeSectionIndex] ?? stepSections[0];
   const isLastSection = activeSectionIndex >= stepSections.length - 1;
 
+  const requestEmbedHeightUpdate = useCallback(() => {
+    if (!isEmbedded) return;
+    postEmbedHeightRef.current?.();
+    window.setTimeout(() => postEmbedHeightRef.current?.(), 50);
+    window.setTimeout(() => postEmbedHeightRef.current?.(), 250);
+  }, [isEmbedded]);
+
   useEffect(() => {
     setActiveSectionIndex((index) => Math.min(index, Math.max(stepSections.length - 1, 0)));
   }, [stepSections.length]);
@@ -186,6 +194,7 @@ export default function PublicRegistrationForm() {
       });
     };
 
+    postEmbedHeightRef.current = postHeight;
     postHeight();
     [0, 100, 300, 1000].forEach((delay) => {
       timeouts.push(window.setTimeout(postHeight, delay));
@@ -210,6 +219,7 @@ export default function PublicRegistrationForm() {
     window.addEventListener("resize", postHeight);
 
     return () => {
+      postEmbedHeightRef.current = null;
       window.cancelAnimationFrame(animationFrame);
       timeouts.forEach((timeout) => window.clearTimeout(timeout));
       resizeObserver?.disconnect();
@@ -217,6 +227,19 @@ export default function PublicRegistrationForm() {
       window.removeEventListener("resize", postHeight);
     };
   }, [form?.id, formLoading, isEmbedded]);
+
+  useEffect(() => {
+    requestEmbedHeightUpdate();
+  }, [
+    activeSectionIndex,
+    childrenAnswers.length,
+    form?.id,
+    guardianAnswers,
+    hasStartedRegistration,
+    isSubmitted,
+    requestEmbedHeightUpdate,
+    submitError,
+  ]);
 
   if (formLoading) {
     return (
@@ -569,6 +592,7 @@ export default function PublicRegistrationForm() {
               onRemoveChild={(index) =>
                 setChildrenAnswers((prev) => prev.filter((_, i) => i !== index))
               }
+              onLayoutChange={requestEmbedHeightUpdate}
               visibleSections={showSectionStepper && activeSection ? [activeSection] : undefined}
               embedded={isEmbedded}
             />

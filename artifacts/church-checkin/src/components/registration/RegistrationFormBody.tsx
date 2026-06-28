@@ -467,6 +467,7 @@ export interface RegistrationFormBodyProps {
   onAdditionalChange: (fieldId: number, value: string) => void;
   onAddChild: () => void;
   onRemoveChild: (index: number) => void;
+  onLayoutChange?: () => void;
   visibleSections?: FieldSection[];
   embedded?: boolean;
 }
@@ -487,6 +488,7 @@ export function RegistrationFormBody({
   onAdditionalChange,
   onAddChild,
   onRemoveChild,
+  onLayoutChange,
   visibleSections,
   embedded = false,
 }: RegistrationFormBodyProps) {
@@ -506,9 +508,16 @@ export function RegistrationFormBody({
     ? "space-y-4 rounded-xl border border-border bg-white p-3 sm:space-y-5 sm:p-4"
     : "space-y-4 rounded-xl border border-border bg-[#fffcf5] p-3 sm:space-y-5 sm:p-4";
 
+  const requestLayoutChange = () => {
+    onLayoutChange?.();
+    window.setTimeout(() => onLayoutChange?.(), 50);
+    window.setTimeout(() => onLayoutChange?.(), 250);
+  };
+
   const removeSecondaryGuardian = () => {
     secondaryGuardianFields.forEach((field) => onGuardianChange(field.id, ""));
     setShowSecondaryGuardian(false);
+    requestLayoutChange();
   };
 
   return (
@@ -535,7 +544,10 @@ export function RegistrationFormBody({
                 type="button"
                 variant="outline"
                 className="h-auto min-h-[52px] w-full min-w-0 whitespace-normal rounded-lg border-dashed border-amber-300 bg-amber-50/70 px-3 py-3 text-sm font-semibold leading-5 text-foreground shadow-sm hover:border-primary hover:bg-amber-100/80 sm:text-base"
-                onClick={() => setShowSecondaryGuardian(true)}
+                onClick={() => {
+                  setShowSecondaryGuardian(true);
+                  requestLayoutChange();
+                }}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Second Parent / Guardian
@@ -631,7 +643,10 @@ export function RegistrationFormBody({
                         variant="ghost"
                         size="sm"
                         className="h-auto min-h-8 rounded-md px-2 text-xs text-muted-foreground hover:bg-white hover:text-destructive"
-                        onClick={() => onRemoveChild(idx)}
+                        onClick={() => {
+                          onRemoveChild(idx);
+                          requestLayoutChange();
+                        }}
                       >
                         <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove
                       </Button>
@@ -647,7 +662,10 @@ export function RegistrationFormBody({
                 type="button"
                 variant="outline"
                 className="h-auto min-h-[52px] w-full min-w-0 whitespace-normal rounded-lg border-dashed border-amber-300 bg-amber-50/70 px-3 py-3 text-sm font-semibold leading-5 text-foreground shadow-sm hover:border-primary hover:bg-amber-100/80 sm:text-base"
-                onClick={onAddChild}
+                onClick={() => {
+                  onAddChild();
+                  requestLayoutChange();
+                }}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 {isChildCheckin ? "Add Another Child" : "Add Another Person"}
