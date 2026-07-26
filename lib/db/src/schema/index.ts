@@ -9,3 +9,4 @@ export * from "./event_sessions";
 export * from "./checkins";
 export * from "./rooms";
 export * from "./event_categories";
+export * from "./event_staff";

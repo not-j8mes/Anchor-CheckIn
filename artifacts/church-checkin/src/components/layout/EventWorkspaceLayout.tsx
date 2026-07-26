@@ -24,8 +24,12 @@ import {
   Settings,
   Users,
   LogOut,
+  ContactRound,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import {
+  useAuth,
+  type OrganizationPermission,
+} from "@/lib/auth";
 import { APP_NAME, DEFAULT_APP_LOGO } from "@/lib/branding";
 
 function registrationTypeBadge(type?: string | null) {
@@ -78,7 +82,7 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
   const eventId = Number(id);
   const [location] = useLocation();
   const { setOpenMobile } = useSidebar();
-  const { user, logout } = useAuth();
+  const { user, organization, logout } = useAuth();
 
   const { data: event } = useGetEvent(eventId, {
     query: { enabled: !!eventId, queryKey: getGetEventQueryKey(eventId) },
@@ -104,33 +108,42 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
   }
 
   // Build nav based on registration type
-  type NavItem = { href: string; icon: React.ComponentType<{ className?: string }>; label: string };
+  type NavItem = {
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    permission: OrganizationPermission;
+  };
   const nav: NavItem[] = [];
+  const can = (permission: OrganizationPermission) =>
+    organization?.role === "owner" ||
+    organization?.permissions.includes(permission);
 
-  nav.push({ href: base, icon: LayoutDashboard, label: "Dashboard" });
+  nav.push({ href: base, icon: LayoutDashboard, label: "Dashboard", permission: "events" });
+  nav.push({ href: `${base}/staff`, icon: ContactRound, label: "Staff", permission: "staff" });
 
   if (isChildCheckin) {
-    nav.push({ href: `${base}/checkin`, icon: CheckSquare, label: "Check-In Desk" });
-    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations" });
-    nav.push({ href: `${base}/rooms`, icon: DoorOpen, label: "Rooms" });
-    nav.push({ href: `${base}/form`, icon: FileEdit, label: "Registration Form" });
-    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports" });
+    nav.push({ href: `${base}/checkin`, icon: CheckSquare, label: "Check-In Desk", permission: "checkin" });
+    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations", permission: "registrations" });
+    nav.push({ href: `${base}/rooms`, icon: DoorOpen, label: "Rooms", permission: "rooms" });
+    nav.push({ href: `${base}/form`, icon: FileEdit, label: "Registration Form", permission: "forms" });
+    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports", permission: "reports" });
   } else if (isFamilyGroup) {
-    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations" });
-    nav.push({ href: `${base}/groups`, icon: Users, label: "Groups" });
+    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations", permission: "registrations" });
+    nav.push({ href: `${base}/groups`, icon: Users, label: "Groups", permission: "registrations" });
     if (trackAttendance) {
-      nav.push({ href: `${base}/checkin`, icon: CheckSquare, label: "Check-In Desk" });
+      nav.push({ href: `${base}/checkin`, icon: CheckSquare, label: "Check-In Desk", permission: "checkin" });
     }
-    nav.push({ href: `${base}/form`, icon: FileEdit, label: "Registration Form" });
-    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports" });
+    nav.push({ href: `${base}/form`, icon: FileEdit, label: "Registration Form", permission: "forms" });
+    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports", permission: "reports" });
   } else {
     // Individual
-    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations" });
+    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations", permission: "registrations" });
     if (trackAttendance) {
-      nav.push({ href: `${base}/checkin`, icon: CheckSquare, label: "Check-In Desk" });
+      nav.push({ href: `${base}/checkin`, icon: CheckSquare, label: "Check-In Desk", permission: "checkin" });
     }
-    nav.push({ href: `${base}/form`, icon: FileEdit, label: "Registration Form" });
-    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports" });
+    nav.push({ href: `${base}/form`, icon: FileEdit, label: "Registration Form", permission: "forms" });
+    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports", permission: "reports" });
   }
 
   return (
@@ -167,7 +180,7 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
 
         <SidebarContent className="px-2 mt-3">
           <SidebarMenu>
-            {nav.map((item) => (
+            {nav.filter((item) => can(item.permission)).map((item) => (
               <NavLink
                 key={item.href}
                 href={item.href}
@@ -190,13 +203,15 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
                 <p className="text-xs text-sidebar-foreground/60 truncate">{user.email || user.username}</p>
               </SidebarMenuItem>
             )}
-            <NavLink
-              href={`${base}/settings`}
-              icon={Settings}
-              label="Event Settings"
-              active={isActive(`${base}/settings`)}
-              onClick={close}
-            />
+            {can("event_settings") && (
+              <NavLink
+                href={`${base}/settings`}
+                icon={Settings}
+                label="Event Settings"
+                active={isActive(`${base}/settings`)}
+                onClick={close}
+              />
+            )}
             <SidebarMenuItem className="mt-1">
               <button
                 type="button"

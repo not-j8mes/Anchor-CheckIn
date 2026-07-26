@@ -20,9 +20,25 @@ interface AuthOrganization {
   id: number;
   name: string;
   role: "owner" | "admin" | "staff";
+  permissions: OrganizationPermission[];
   subscriptionStatus: string;
   plan: string;
 }
+
+export const ORGANIZATION_PERMISSIONS = [
+  "events",
+  "checkin",
+  "registrations",
+  "rooms",
+  "staff",
+  "forms",
+  "reports",
+  "event_settings",
+  "org_settings",
+] as const;
+
+export type OrganizationPermission =
+  (typeof ORGANIZATION_PERMISSIONS)[number];
 
 interface AuthResponse {
   user: AuthUser;
@@ -116,4 +132,13 @@ export function useAuth() {
   const value = useContext(AuthContext);
   if (!value) throw new Error("useAuth must be used inside AuthProvider");
   return value;
+}
+
+export function usePermission(permission: OrganizationPermission): boolean {
+  const { organization } = useAuth();
+  return Boolean(
+    organization &&
+      (organization.role === "owner" ||
+        organization.permissions.includes(permission)),
+  );
 }

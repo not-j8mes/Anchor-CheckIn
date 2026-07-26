@@ -120,6 +120,7 @@ import {
   Repeat,
   MoreHorizontal,
   PowerOff,
+  Save,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -142,6 +143,7 @@ import {
 } from "@/components/registration/RegistrationFormBody";
 import { cn } from "@/lib/utils";
 import { RoomsTabContent } from "./detail/RoomsTabContent";
+import { StaffTabContent } from "./detail/StaffTabContent";
 import { getEventRegistrationsExport } from "./detail/registrationExport";
 import { buildRegistrationEmbedCode } from "@/lib/embedCode";
 
@@ -436,6 +438,8 @@ function ManualRegistrationDialog({
   embedSlug,
   isChildCheckin,
   eventId,
+  allowCheckIn = false,
+  selectedSessionId,
   open,
   onOpenChange,
 }: {
@@ -443,6 +447,8 @@ function ManualRegistrationDialog({
   embedSlug: string | null | undefined;
   isChildCheckin: boolean;
   eventId: number;
+  allowCheckIn?: boolean;
+  selectedSessionId?: number | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
@@ -475,9 +481,13 @@ function ManualRegistrationDialog({
   const [additionalAnswers, setAdditionalAnswers] = useState<
     Record<number, string>
   >({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionAction, setSubmissionAction] = useState<
+    "save" | "check-in" | null
+  >(null);
+  const isSubmitting = submissionAction !== null;
 
   const submitReg = useSubmitRegistration();
+  const createCheckin = useCreateCheckin();
 
   const resetForm = () => {
     setGuardianAnswers({});
@@ -495,8 +505,21 @@ function ManualRegistrationDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resolvedFormId) return;
-    setIsSubmitting(true);
+    const submitter = (e.nativeEvent as SubmitEvent)
+      .submitter as HTMLButtonElement | null;
+    const shouldCheckIn =
+      allowCheckIn && submitter?.value === "add-and-check-in";
+    if (shouldCheckIn && selectedSessionId == null) {
+      toast({
+        title: "Select an event session before checking in",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSubmissionAction(shouldCheckIn ? "check-in" : "save");
+    let registrationsCreated = false;
     try {
+      const createdRegistrations: Registration[] = [];
       for (const childAnswerMap of childrenAnswers) {
         const fields: { fieldId: number; value: string }[] = [];
         for (const f of formFields.filter(
@@ -522,10 +545,23 @@ function ManualRegistrationDialog({
         const selectedRoom = roomAssignmentFieldId
           ? (childAnswerMap[roomAssignmentFieldId] ?? "")
           : "";
-        await submitReg.mutateAsync({
+        const registration = await submitReg.mutateAsync({
           formId: resolvedFormId,
           data: { fields, ...(selectedRoom ? { room: selectedRoom } : {}) },
         });
+        createdRegistrations.push(registration);
+      }
+      registrationsCreated = true;
+      if (shouldCheckIn) {
+        for (const registration of createdRegistrations) {
+          await createCheckin.mutateAsync({
+            data: {
+              registrationId: registration.id,
+              room: registration.room ?? undefined,
+              sessionId: selectedSessionId!,
+            },
+          });
+        }
       }
       queryClient.invalidateQueries({
         queryKey: getListRegistrationsQueryKey(resolvedFormId),
@@ -538,20 +574,38 @@ function ManualRegistrationDialog({
       });
       const count = childrenAnswers.length;
       toast({
-        title: isChildCheckin
+        title: shouldCheckIn
           ? count > 1
-            ? `${count} children added successfully.`
-            : "Child added successfully."
-          : count > 1
-            ? `${count} registrants added successfully.`
-            : "Registrant added successfully.",
+            ? `${count} ${isChildCheckin ? "children" : "registrants"} added and checked in.`
+            : `${isChildCheckin ? "Child" : "Registrant"} added and checked in.`
+          : isChildCheckin
+            ? count > 1
+              ? `${count} children added successfully.`
+              : "Child added successfully."
+            : count > 1
+              ? `${count} registrants added successfully.`
+              : "Registrant added successfully.",
       });
       onOpenChange(false);
       resetForm();
     } catch {
-      toast({ title: "Failed to add registration", variant: "destructive" });
+      queryClient.invalidateQueries({
+        queryKey: getListRegistrationsQueryKey(resolvedFormId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: getListEventCheckinsQueryKey(eventId),
+      });
+      toast({
+        title: registrationsCreated
+          ? "Registration added, but check-in failed"
+          : "Failed to add registration",
+        description: registrationsCreated
+          ? "The registrant is saved and can be checked in from the desk."
+          : undefined,
+        variant: "destructive",
+      });
     } finally {
-      setIsSubmitting(false);
+      setSubmissionAction(null);
     }
   };
 
@@ -565,8 +619,8 @@ function ManualRegistrationDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="grid max-h-[90vh] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="px-6 pb-4 pt-6">
           <DialogTitle className="text-xl font-serif">
             Add {isChildCheckin ? "Child" : "Registrant"}
           </DialogTitle>
@@ -581,40 +635,71 @@ function ManualRegistrationDialog({
             <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-6 pt-1">
-            <RegistrationFormBody
-              formFields={formFields}
-              rooms={rooms}
-              isChildCheckin={isChildCheckin}
-              guardianAnswers={guardianAnswers}
-              childrenAnswers={childrenAnswers}
-              emergencyAnswers={emergencyAnswers}
-              additionalAnswers={additionalAnswers}
-              onGuardianChange={(fieldId, value) =>
-                setGuardianAnswers((prev) => ({ ...prev, [fieldId]: value }))
-              }
-              onChildChange={(childIndex, fieldId, value) =>
-                setChildrenAnswers((prev) => {
-                  const next = [...prev];
-                  next[childIndex] = { ...next[childIndex], [fieldId]: value };
-                  return next;
-                })
-              }
-              onEmergencyChange={(fieldId, value) =>
-                setEmergencyAnswers((prev) => ({ ...prev, [fieldId]: value }))
-              }
-              onAdditionalChange={(fieldId, value) =>
-                setAdditionalAnswers((prev) => ({ ...prev, [fieldId]: value }))
-              }
-              onAddChild={() => setChildrenAnswers((prev) => [...prev, {}])}
-              onRemoveChild={(index) =>
-                setChildrenAnswers((prev) => prev.filter((_, i) => i !== index))
-              }
-            />
-            <DialogFooter className="pt-2">
+          <form
+            onSubmit={handleSubmit}
+            className="flex min-h-0 flex-col overflow-hidden"
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-1">
+              <RegistrationFormBody
+                formFields={formFields}
+                rooms={rooms}
+                isChildCheckin={isChildCheckin}
+                addAnotherPersonLabel={
+                  allowCheckIn && isChildCheckin
+                    ? "Add Another Child to This Family"
+                    : undefined
+                }
+                guardianAnswers={guardianAnswers}
+                childrenAnswers={childrenAnswers}
+                emergencyAnswers={emergencyAnswers}
+                additionalAnswers={additionalAnswers}
+                onGuardianChange={(fieldId, value) =>
+                  setGuardianAnswers((prev) => ({
+                    ...prev,
+                    [fieldId]: value,
+                  }))
+                }
+                onChildChange={(childIndex, fieldId, value) =>
+                  setChildrenAnswers((prev) => {
+                    const next = [...prev];
+                    next[childIndex] = {
+                      ...next[childIndex],
+                      [fieldId]: value,
+                    };
+                    return next;
+                  })
+                }
+                onEmergencyChange={(fieldId, value) =>
+                  setEmergencyAnswers((prev) => ({
+                    ...prev,
+                    [fieldId]: value,
+                  }))
+                }
+                onAdditionalChange={(fieldId, value) =>
+                  setAdditionalAnswers((prev) => ({
+                    ...prev,
+                    [fieldId]: value,
+                  }))
+                }
+                onAddChild={() =>
+                  setChildrenAnswers((prev) => [...prev, {}])
+                }
+                onRemoveChild={(index) =>
+                  setChildrenAnswers((prev) =>
+                    prev.filter((_, i) => i !== index),
+                  )
+                }
+              />
+            </div>
+            <DialogFooter className="z-10 shrink-0 gap-2 border-t border-border bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[0_-4px_12px_rgba(15,23,42,0.04)] sm:px-6 sm:space-x-0">
               <Button
                 type="button"
-                variant="outline"
+                variant={allowCheckIn ? "ghost" : "outline"}
+                className={cn(
+                  "min-h-11",
+                  allowCheckIn &&
+                    "w-full text-muted-foreground hover:text-foreground sm:w-auto",
+                )}
                 onClick={() => {
                   onOpenChange(false);
                   resetForm();
@@ -622,14 +707,51 @@ function ManualRegistrationDialog({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="gap-2">
-                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {isSubmitting
+              {allowCheckIn && (
+                <div className="hidden flex-1 sm:block" aria-hidden="true" />
+              )}
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                variant={allowCheckIn ? "outline" : "default"}
+                className={cn(
+                  "min-h-11 gap-2",
+                  allowCheckIn &&
+                    "w-full border-foreground/70 bg-background text-foreground hover:bg-muted sm:w-auto",
+                )}
+              >
+                {submissionAction === "save" && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                {allowCheckIn && submissionAction !== "save" && (
+                  <Save className="h-4 w-4" />
+                )}
+                {submissionAction === "save"
                   ? "Saving…"
-                  : childrenAnswers.length > 1
-                    ? `Add ${childrenAnswers.length} ${isChildCheckin ? "Children" : "Registrants"}`
-                    : `Add ${isChildCheckin ? "Child" : "Registrant"}`}
+                  : allowCheckIn
+                    ? "Save Without Check-In"
+                    : childrenAnswers.length > 1
+                      ? `Add ${childrenAnswers.length} ${isChildCheckin ? "Children" : "Registrants"}`
+                      : `Add ${isChildCheckin ? "Child" : "Registrant"}`}
               </Button>
+              {allowCheckIn && (
+                <Button
+                  type="submit"
+                  name="submitAction"
+                  value="add-and-check-in"
+                  disabled={isSubmitting || selectedSessionId == null}
+                  className="min-h-11 w-full gap-2 px-5 sm:w-auto"
+                >
+                  {submissionAction === "check-in" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <LogIn className="h-4 w-4" />
+                  )}
+                  {submissionAction === "check-in"
+                    ? "Saving & Checking In…"
+                    : "Add & Check In"}
+                </Button>
+              )}
             </DialogFooter>
           </form>
         )}
@@ -4456,7 +4578,7 @@ function CheckInDeskContent({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<DeskFilter>("all");
+  const [filter, setFilter] = useState<DeskFilter>("not_checked_in");
   const [loadingId, setLoadingId] = useState<number | null>(null);
   const [showAttendance, setShowAttendance] = useState(false);
   const [selectedRegId, setSelectedRegId] = useState<number | null>(null);
@@ -5565,6 +5687,8 @@ function CheckInDeskContent({
         embedSlug={embedSlug}
         isChildCheckin={isChildEvent}
         eventId={eventId}
+        allowCheckIn
+        selectedSessionId={selectedSessionId}
         open={addRegOpen}
         onOpenChange={setAddRegOpen}
       />
@@ -5722,6 +5846,12 @@ function EventDashboardSection({
   isExporting: boolean;
 }) {
   const { toast } = useToast();
+  const { data: rooms = [] } = useListRooms(eventId, {
+    query: {
+      enabled: !!eventId,
+      queryKey: getListRoomsQueryKey(eventId),
+    },
+  });
   const registrationUrl = event.formEmbedSlug
     ? `${window.location.origin}/register/${event.formEmbedSlug}`
     : null;
@@ -5749,6 +5879,61 @@ function EventDashboardSection({
         new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime(),
     )
     .slice(0, 5);
+
+  const roomAttendance = useMemo(() => {
+    const registrationsById = new Map(
+      (registrations ?? []).map((registration) => [
+        registration.id,
+        registration,
+      ]),
+    );
+    const configuredRoomNames = new Set(rooms.map((room) => room.name));
+    const counts = new Map<
+      string,
+      { checkedIn: number; registered: number }
+    >();
+
+    for (const room of rooms) {
+      counts.set(room.name, { checkedIn: 0, registered: 0 });
+    }
+
+    let unassignedRegistered = 0;
+    for (const registration of registrations ?? []) {
+      const roomName = registration.room?.trim();
+      if (roomName && configuredRoomNames.has(roomName)) {
+        counts.get(roomName)!.registered += 1;
+      } else {
+        unassignedRegistered += 1;
+      }
+    }
+
+    let unassignedCheckedIn = 0;
+    for (const checkin of checkedIn) {
+      const roomName = registrationsById
+        .get(checkin.registrationId)
+        ?.room?.trim();
+      if (roomName && configuredRoomNames.has(roomName)) {
+        counts.get(roomName)!.checkedIn += 1;
+      } else {
+        unassignedCheckedIn += 1;
+      }
+    }
+
+    const rows = rooms.map((room) => ({
+      id: String(room.id),
+      name: room.name,
+      ...counts.get(room.name)!,
+    }));
+    if (unassignedRegistered > 0 || unassignedCheckedIn > 0) {
+      rows.push({
+        id: "unassigned",
+        name: "Unassigned",
+        checkedIn: unassignedCheckedIn,
+        registered: unassignedRegistered,
+      });
+    }
+    return rows;
+  }, [checkedIn, registrations, rooms]);
 
   // ── Dynamic stat cards ──────────────────────────────────────────────────────
   const regType = event.registrationType ?? "child_checkin";
@@ -6130,7 +6315,67 @@ function EventDashboardSection({
         </div>
       </div>
 
-      {/* 4 — Recent Activity */}
+      {/* 4 — Room Attendance */}
+      {trackAttendance && rooms.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <h2 className="text-base font-semibold">Room Attendance</h2>
+            <p className="shrink-0 text-sm text-muted-foreground">
+              {checkedIn.length} currently checked in
+            </p>
+          </div>
+          <Card className="overflow-hidden shadow-none">
+            <CardContent className="divide-y divide-border p-0">
+              {roomAttendance.map((room) => {
+                const progress =
+                  room.registered > 0
+                    ? Math.min(
+                        100,
+                        Math.round(
+                          (room.checkedIn / room.registered) * 100,
+                        ),
+                      )
+                    : 0;
+                return (
+                  <div
+                    key={room.id}
+                    className="grid gap-2 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-6"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">
+                        {room.name}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {room.checkedIn} currently checked in
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 sm:min-w-56">
+                      <div
+                        className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+                        role="progressbar"
+                        aria-label={`${room.name} attendance`}
+                        aria-valuemin={0}
+                        aria-valuemax={room.registered}
+                        aria-valuenow={room.checkedIn}
+                      >
+                        <div
+                          className="h-full rounded-full bg-primary transition-[width]"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <span className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
+                        {room.checkedIn} / {room.registered}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
+      {/* 5 — Recent Activity */}
       <div className="space-y-4">
         {/* Recent Registrations */}
         <div>
@@ -6274,7 +6519,7 @@ function EventDashboardSection({
         )}
       </div>
 
-      {/* 5 — Quick Actions */}
+      {/* 6 — Quick Actions */}
       <div className="space-y-4">
         <h2 className="text-lg font-serif font-bold">Quick Actions</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -8124,6 +8369,30 @@ export default function EventWorkspace() {
 
   const checkedIn = checkins?.filter((c) => !c.checkoutAt) ?? [];
   const checkedOut = checkins?.filter((c) => !!c.checkoutAt) ?? [];
+  const dashboardSessionCheckins =
+    resolvedSessionId != null
+      ? (checkins ?? []).filter(
+          (checkin) => checkin.sessionId === resolvedSessionId,
+        )
+      : [];
+  const latestDashboardCheckinByRegistration = new Map<
+    number,
+    EventCheckin
+  >();
+  for (const checkin of dashboardSessionCheckins) {
+    if (!latestDashboardCheckinByRegistration.has(checkin.registrationId)) {
+      latestDashboardCheckinByRegistration.set(
+        checkin.registrationId,
+        checkin,
+      );
+    }
+  }
+  const dashboardCheckedIn = [
+    ...latestDashboardCheckinByRegistration.values(),
+  ].filter((checkin) => !checkin.checkoutAt);
+  const dashboardCheckedOut = [
+    ...latestDashboardCheckinByRegistration.values(),
+  ].filter((checkin) => !!checkin.checkoutAt);
 
   const isChildCheckin =
     !event.registrationType || event.registrationType === "child_checkin";
@@ -8211,6 +8480,15 @@ export default function EventWorkspace() {
     );
   }
 
+  // ── Staff ──
+  if (section === "staff") {
+    return (
+      <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full">
+        <StaffTabContent eventId={eventId} eventName={event.name} />
+      </div>
+    );
+  }
+
   // ── Registration Form (Build / Share / Settings tabs) ──
   if (section === "form") {
     return <RegistrationFormSection event={event} eventId={eventId} />;
@@ -8242,8 +8520,8 @@ export default function EventWorkspace() {
       eventId={eventId}
       registrations={registrations}
       checkins={checkins}
-      checkedIn={checkedIn}
-      checkedOut={checkedOut}
+      checkedIn={dashboardCheckedIn}
+      checkedOut={dashboardCheckedOut}
       isChildCheckin={isChildCheckin}
       trackAttendance={trackAttendance}
       requireCheckout={requireCheckout}

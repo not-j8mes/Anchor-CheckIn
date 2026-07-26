@@ -27,6 +27,10 @@ export const eventsTable = pgTable("events", {
   requireCheckout: boolean("require_checkout"),
   printLabels: boolean("print_labels"),
   labelType: text("label_type"), // 'simple_name' | 'child_security'
+  staffLabelShowLastName: boolean("staff_label_show_last_name").notNull().default(true),
+  staffLabelShowRole: boolean("staff_label_show_role").notNull().default(true),
+  staffLabelShowEventName: boolean("staff_label_show_event_name").notNull().default(true),
+  staffLabelShowOrganization: boolean("staff_label_show_organization").notNull().default(true),
   roomAssignmentMode: text("room_assignment_mode"), // 'manual' | 'registrant_chooses' | 'auto_assign'
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

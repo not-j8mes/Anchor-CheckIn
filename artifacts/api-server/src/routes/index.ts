@@ -16,6 +16,7 @@ import eventCategoriesRouter from "./event-categories";
 import eventSessionsRouter from "./event-sessions";
 import registrationGroupsRouter from "./registration-groups";
 import platformRouter from "./platform";
+import eventStaffRouter from "./event-staff";
 const router: IRouter = Router();
 
 router.use(healthRouter);
@@ -35,5 +36,6 @@ router.use(roomsRouter);
 router.use(eventCategoriesRouter);
 router.use(registrationGroupsRouter);
 router.use(platformRouter);
+router.use(eventStaffRouter);
 
 export default router;

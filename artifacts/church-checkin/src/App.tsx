@@ -5,7 +5,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { EventWorkspaceLayout } from "@/components/layout/EventWorkspaceLayout";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import {
+  AuthProvider,
+  useAuth,
+  type OrganizationPermission,
+} from "@/lib/auth";
 
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
@@ -48,6 +52,29 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  return <>{children}</>;
+}
+
+function PermissionGate({
+  permission,
+  children,
+}: {
+  permission: OrganizationPermission;
+  children: React.ReactNode;
+}) {
+  const { organization, isLoading } = useAuth();
+  const [, navigate] = useLocation();
+  const allowed = Boolean(
+    organization &&
+      (organization.role === "owner" ||
+        organization.permissions.includes(permission)),
+  );
+
+  useEffect(() => {
+    if (!isLoading && organization && !allowed) navigate("/events");
+  }, [allowed, isLoading, navigate, organization]);
+
+  if (!allowed) return null;
   return <>{children}</>;
 }
 
@@ -95,7 +122,9 @@ function ProtectedEventSelectionScreen() {
 function ProtectedEventSetupWizard() {
   return (
     <AuthGate>
-      <EventSetupWizard />
+      <PermissionGate permission="event_settings">
+        <EventSetupWizard />
+      </PermissionGate>
     </AuthGate>
   );
 }
@@ -103,18 +132,51 @@ function ProtectedEventSetupWizard() {
 function ProtectedSettingsPage() {
   return (
     <AuthGate>
-      <SettingsPage />
+      <PermissionGate permission="org_settings">
+        <SettingsPage />
+      </PermissionGate>
     </AuthGate>
   );
 }
 
-function ProtectedEventWorkspaceRoute() {
+function EventWorkspaceWithPermission({
+  permission,
+}: {
+  permission: OrganizationPermission;
+}) {
   return (
     <AuthGate>
-      <EventWorkspaceRoute />
+      <PermissionGate permission={permission}>
+        <EventWorkspaceRoute />
+      </PermissionGate>
     </AuthGate>
   );
 }
+
+const EventDashboardRoute = () => (
+  <EventWorkspaceWithPermission permission="events" />
+);
+const CheckinRoute = () => (
+  <EventWorkspaceWithPermission permission="checkin" />
+);
+const RegistrationsRoute = () => (
+  <EventWorkspaceWithPermission permission="registrations" />
+);
+const RoomsRoute = () => (
+  <EventWorkspaceWithPermission permission="rooms" />
+);
+const StaffRoute = () => (
+  <EventWorkspaceWithPermission permission="staff" />
+);
+const FormsRoute = () => (
+  <EventWorkspaceWithPermission permission="forms" />
+);
+const ReportsRoute = () => (
+  <EventWorkspaceWithPermission permission="reports" />
+);
+const EventSettingsRoute = () => (
+  <EventWorkspaceWithPermission permission="event_settings" />
+);
 
 function Router() {
   return (
@@ -127,14 +189,15 @@ function Router() {
       <Route path="/events/new" component={ProtectedEventSetupWizard} />
 
       {/* Event workspace — all sections under /events/:id/* */}
-      <Route path="/events/:id/checkin" component={ProtectedEventWorkspaceRoute} />
-      <Route path="/events/:id/registrations" component={ProtectedEventWorkspaceRoute} />
-      <Route path="/events/:id/groups" component={ProtectedEventWorkspaceRoute} />
-      <Route path="/events/:id/rooms" component={ProtectedEventWorkspaceRoute} />
-      <Route path="/events/:id/form" component={ProtectedEventWorkspaceRoute} />
-      <Route path="/events/:id/reports" component={ProtectedEventWorkspaceRoute} />
-      <Route path="/events/:id/settings" component={ProtectedEventWorkspaceRoute} />
-      <Route path="/events/:id" component={ProtectedEventWorkspaceRoute} />
+      <Route path="/events/:id/checkin" component={CheckinRoute} />
+      <Route path="/events/:id/registrations" component={RegistrationsRoute} />
+      <Route path="/events/:id/groups" component={RegistrationsRoute} />
+      <Route path="/events/:id/rooms" component={RoomsRoute} />
+      <Route path="/events/:id/staff" component={StaffRoute} />
+      <Route path="/events/:id/form" component={FormsRoute} />
+      <Route path="/events/:id/reports" component={ReportsRoute} />
+      <Route path="/events/:id/settings" component={EventSettingsRoute} />
+      <Route path="/events/:id" component={EventDashboardRoute} />
 
       {/* Event selection home screen */}
       <Route path="/events" component={ProtectedEventSelectionScreen} />

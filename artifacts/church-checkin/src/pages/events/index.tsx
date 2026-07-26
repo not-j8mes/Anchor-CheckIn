@@ -765,7 +765,7 @@ export default function EventSelectionScreen() {
   const { data: events, isLoading } = useListEvents();
   const { data: categories = [] } = useListEventCategories();
   const { data: org } = useGetOrganization();
-  const { user, logout } = useAuth();
+  const { user, organization, logout } = useAuth();
   const [, navigate] = useLocation();
 
   const [editEvent, setEditEvent] = useState<ChurchEvent | null>(null);
@@ -823,12 +823,14 @@ export default function EventSelectionScreen() {
                 </Link>
               </Button>
             )}
-            <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
-              <Link href="/settings">
-                <Settings className="w-4 h-4" />
-                <span className="sr-only sm:not-sr-only sm:ml-1.5">Org Settings</span>
-              </Link>
-            </Button>
+            {(organization?.role === "owner" || organization?.permissions.includes("org_settings")) && (
+              <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
+                <Link href="/settings">
+                  <Settings className="w-4 h-4" />
+                  <span className="sr-only sm:not-sr-only sm:ml-1.5">Org Settings</span>
+                </Link>
+              </Button>
+            )}
             {user && (
               <span className="hidden sm:block text-sm text-muted-foreground border-l border-border pl-2 sm:pl-3">
                 {user.firstName} {user.lastName}
@@ -844,12 +846,14 @@ export default function EventSelectionScreen() {
               <LogOut className="w-4 h-4" />
               <span className="sr-only sm:not-sr-only sm:ml-1.5">Logout</span>
             </Button>
-            <Button asChild size="sm" className="px-2 sm:px-3" data-testid="button-create-event">
-              <Link href="/events/new">
-                <Plus className="w-4 h-4" />
-                <span className="ml-1 sm:ml-1.5"><span className="sm:hidden">New</span><span className="hidden sm:inline">New Event</span></span>
-              </Link>
-            </Button>
+            {(organization?.role === "owner" || organization?.permissions.includes("event_settings")) && (
+              <Button asChild size="sm" className="px-2 sm:px-3" data-testid="button-create-event">
+                <Link href="/events/new">
+                  <Plus className="w-4 h-4" />
+                  <span className="ml-1 sm:ml-1.5"><span className="sm:hidden">New</span><span className="hidden sm:inline">New Event</span></span>
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>

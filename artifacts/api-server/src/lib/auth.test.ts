@@ -36,6 +36,7 @@ function authContext(
     userId: 1,
     organizationId: organization?.id ?? null,
     role,
+    permissions: role ? ["events"] : [],
     isSuperAdmin,
     user: {
       id: 1,

@@ -11,7 +11,7 @@ import { hashPassword } from "../lib/passwords";
 
 const router = Router();
 
-router.use(requireAuth, requireSuperAdmin);
+router.use("/platform", requireAuth, requireSuperAdmin);
 
 router.get("/platform/organizations", async (req, res) => {
   try {

@@ -457,6 +457,7 @@ export interface RegistrationFormBodyProps {
   isChildCheckin: boolean;
   allowAdditionalPeople?: boolean;
   allowSecondGuardian?: boolean;
+  addAnotherPersonLabel?: string;
   guardianAnswers: Record<number, string>;
   childrenAnswers: Record<number, string>[];
   emergencyAnswers: Record<number, string>;
@@ -477,6 +478,7 @@ export function RegistrationFormBody({
   isChildCheckin,
   allowAdditionalPeople = false,
   allowSecondGuardian = true,
+  addAnotherPersonLabel,
   guardianAnswers,
   childrenAnswers,
   emergencyAnswers,
@@ -650,7 +652,10 @@ export function RegistrationFormBody({
                 onClick={onAddChild}
               >
                 <Plus className="w-4 h-4 mr-2" />
-                {isChildCheckin ? "Add Another Child" : "Add Another Person"}
+                {addAnotherPersonLabel ??
+                  (isChildCheckin
+                    ? "Add Another Child"
+                    : "Add Another Person")}
               </Button>
             )}
           </div>

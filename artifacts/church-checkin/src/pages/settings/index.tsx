@@ -41,7 +41,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, ChevronDown, Database, KeyRound, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Upload, UserPlus, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, Database, KeyRound, LockKeyhole, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Upload, UserPlus, Users } from "lucide-react";
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
 import { TrimmedLogo } from "@/components/branding/TrimmedLogo";
 import { useDarkMode } from "@/hooks/use-dark-mode";
@@ -68,8 +68,44 @@ type OrganizationMember = {
   email: string | null;
   username: string | null;
   role: "owner" | "admin" | "staff";
+  permissions: OrganizationPermission[] | null;
   createdAt: string;
 };
+
+type OrganizationPermission =
+  | "events"
+  | "checkin"
+  | "registrations"
+  | "rooms"
+  | "staff"
+  | "forms"
+  | "reports"
+  | "event_settings"
+  | "org_settings";
+
+const PERMISSION_OPTIONS: Array<{
+  id: OrganizationPermission;
+  label: string;
+  description: string;
+}> = [
+  { id: "events", label: "Events & dashboards", description: "See the event list and event overview." },
+  { id: "checkin", label: "Check-in desk", description: "Check people in and out and print labels." },
+  { id: "registrations", label: "Registrations & groups", description: "View and update registrants and groups." },
+  { id: "rooms", label: "Rooms", description: "View and manage room assignments." },
+  { id: "staff", label: "Event staff", description: "View and manage event staff and roles." },
+  { id: "forms", label: "Registration forms", description: "Build and edit registration forms." },
+  { id: "reports", label: "Reports", description: "View attendance and registration reports." },
+  { id: "event_settings", label: "Event management", description: "Create, edit, and delete events and categories." },
+  { id: "org_settings", label: "Organization settings", description: "Edit branding, contact details, and organization tools." },
+];
+
+function memberPermissions(member: OrganizationMember): OrganizationPermission[] {
+  if (member.role === "owner") return PERMISSION_OPTIONS.map(({ id }) => id);
+  if (member.permissions) return member.permissions;
+  return member.role === "admin"
+    ? PERMISSION_OPTIONS.map(({ id }) => id)
+    : ["events", "checkin", "registrations", "rooms"];
+}
 
 async function memberRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -91,6 +127,8 @@ function OrganizationMembersCard({ currentUserId, currentRole }: { currentUserId
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [resetMember, setResetMember] = useState<OrganizationMember | null>(null);
+  const [permissionMember, setPermissionMember] = useState<OrganizationMember | null>(null);
+  const [editPermissions, setEditPermissions] = useState<OrganizationPermission[]>([]);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ role: "staff", firstName: "", lastName: "", username: "", email: "", password: "" });
   const [newPassword, setNewPassword] = useState("");
@@ -161,6 +199,30 @@ function OrganizationMembersCard({ currentUserId, currentRole }: { currentUserId
     }
   };
 
+  const savePermissions = async () => {
+    if (!permissionMember) return;
+    setSaving(true);
+    try {
+      const result = await memberRequest<{ permissions: OrganizationPermission[] }>(
+        `/api/organizations/current/members/${permissionMember.id}/permissions`,
+        { method: "PUT", body: JSON.stringify({ permissions: editPermissions }) },
+      );
+      setMembers((current) =>
+        current.map((member) =>
+          member.id === permissionMember.id
+            ? { ...member, permissions: result.permissions }
+            : member,
+        ),
+      );
+      setPermissionMember(null);
+      toast({ title: `Access updated for ${permissionMember.firstName}` });
+    } catch (error) {
+      toast({ title: "Could not update access", description: error instanceof Error ? error.message : undefined, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const canManage = (member: OrganizationMember) => member.userId !== currentUserId
     && member.role !== "owner"
     && (currentRole === "owner" || member.role === "staff");
@@ -193,6 +255,20 @@ function OrganizationMembersCard({ currentUserId, currentRole }: { currentUserId
                   </div>
                   {canManage(member) && (
                     <div className="flex shrink-0 gap-2">
+                      {currentRole === "owner" && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={() => {
+                            setPermissionMember(member);
+                            setEditPermissions(memberPermissions(member));
+                          }}
+                        >
+                          <LockKeyhole className="h-3.5 w-3.5" /> Access
+                        </Button>
+                      )}
                       <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => { setResetMember(member); setNewPassword(""); setEditUsername(member.username ?? ""); }}>
                         <KeyRound className="h-3.5 w-3.5" /> {member.username ? "Manage Login" : "Reset Password"}
                       </Button>
@@ -254,6 +330,44 @@ function OrganizationMembersCard({ currentUserId, currentRole }: { currentUserId
             <div className="space-y-1.5"><Label>New Password {resetMember?.username && <span className="font-normal text-muted-foreground">(optional)</span>}</Label><Input type="text" autoComplete="off" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={resetMember?.username ? "Leave blank to keep current password" : "At least 8 characters"} /></div>
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setResetMember(null)}>Cancel</Button><Button onClick={() => void resetPassword()} disabled={saving || (resetMember?.username ? editUsername.length < 3 || (!!newPassword && newPassword.length < 8) : newPassword.length < 8)}>{saving ? "Saving…" : "Save Login"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!permissionMember} onOpenChange={(open) => { if (!open) setPermissionMember(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Access for {permissionMember?.firstName}</DialogTitle>
+            <DialogDescription>
+              Choose which parts of the organization this account can open. Changes apply on their next request.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] divide-y divide-border overflow-y-auto rounded-lg border border-border">
+            {PERMISSION_OPTIONS.map((permission) => (
+              <div key={permission.id} className="flex items-center justify-between gap-4 p-3">
+                <div className="min-w-0">
+                  <Label htmlFor={`permission-${permission.id}`} className="font-medium">{permission.label}</Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{permission.description}</p>
+                </div>
+                <Switch
+                  id={`permission-${permission.id}`}
+                  checked={editPermissions.includes(permission.id)}
+                  onCheckedChange={(checked) =>
+                    setEditPermissions((current) =>
+                      checked
+                        ? [...new Set([...current, permission.id])]
+                        : current.filter((item) => item !== permission.id),
+                    )
+                  }
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPermissionMember(null)}>Cancel</Button>
+            <Button onClick={() => void savePermissions()} disabled={saving}>
+              {saving ? "Saving…" : "Save Access"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

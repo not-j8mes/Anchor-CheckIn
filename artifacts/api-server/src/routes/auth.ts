@@ -8,9 +8,12 @@ import {
 } from "@workspace/db";
 import {
   clearSessionCookie,
+  defaultPermissionsForRole,
+  ORGANIZATION_PERMISSIONS,
   requireAuth,
   serializeAuthContext,
   setSessionCookie,
+  type OrganizationPermission,
 } from "../lib/auth";
 import { verifyPassword } from "../lib/passwords";
 import { loginRateLimiter } from "../lib/rateLimits";
@@ -57,6 +60,7 @@ router.post("/auth/login", loginRateLimiter, async (req, res) => {
       .select({
         organizationId: organizationMembersTable.organizationId,
         role: organizationMembersTable.role,
+        permissions: organizationMembersTable.permissions,
         organizationName: organizationsTable.name,
         subscriptionStatus: organizationsTable.subscriptionStatus,
         plan: organizationsTable.plan,
@@ -85,12 +89,27 @@ router.post("/auth/login", loginRateLimiter, async (req, res) => {
       membership?.organizationId ?? null,
       staySignedIn,
     );
+    const role =
+      (membership?.role as "owner" | "admin" | "staff" | undefined) ?? null;
+    const storedPermissions = Array.isArray(membership?.permissions)
+      ? membership.permissions.filter(
+          (permission): permission is OrganizationPermission =>
+            ORGANIZATION_PERMISSIONS.includes(
+              permission as OrganizationPermission,
+            ),
+        )
+      : null;
+    const permissions =
+      role === "owner"
+        ? [...ORGANIZATION_PERMISSIONS]
+        : (storedPermissions ?? defaultPermissionsForRole(role));
+
     res.json(
       serializeAuthContext({
         userId: user.id,
         organizationId: membership?.organizationId ?? null,
-        role:
-          (membership?.role as "owner" | "admin" | "staff" | undefined) ?? null,
+        role,
+        permissions,
         isSuperAdmin: user.isSuperAdmin,
         user: {
           id: user.id,

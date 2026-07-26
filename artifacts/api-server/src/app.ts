@@ -10,7 +10,12 @@ import {
   isSameHostOrigin,
   parseAllowedOrigins,
 } from "./lib/httpGuards";
-import { attachAuth, requireAuth } from "./lib/auth";
+import {
+  attachAuth,
+  hasOrganizationPermission,
+  requireAuth,
+  type OrganizationPermission,
+} from "./lib/auth";
 
 const app: Express = express();
 const allowedOrigins = parseAllowedOrigins(process.env["CORS_ORIGIN"]);
@@ -127,12 +132,77 @@ function isPublicApiRoute(req: express.Request): boolean {
   return false;
 }
 
+function permissionForApiRoute(
+  req: express.Request,
+): OrganizationPermission | null {
+  const path = req.path;
+
+  if (/^\/organizations\/current\/members(?:\/|$)/.test(path)) return null;
+  if (path === "/organizations/current" && req.method === "PUT")
+    return "org_settings";
+  if (path === "/organizations/current") return null;
+  if (/^\/checkins(?:\/|$)/.test(path)) return "checkin";
+  if (/^\/forms\/\d+\/registrations(?:\/|$)/.test(path))
+    return "registrations";
+  if (
+    /^\/(?:registrations|children|registration-groups)(?:\/|$)/.test(path)
+  )
+    return "registrations";
+  if (/^\/events\/\d+\/rooms(?:\/|$)/.test(path)) return "rooms";
+  if (/^\/events\/\d+\/staff(?:\/|$)/.test(path)) return "staff";
+  if (
+    /^\/(?:forms|questions|form-fields)(?:\/|$)/.test(path) ||
+    /^\/forms\/\d+\/(?:questions|fields)(?:\/|$)/.test(path)
+  )
+    return "forms";
+  if (path === "/stats/dashboard") return "events";
+  if (/^\/stats(?:\/|$)/.test(path)) return "reports";
+  if (
+    /^\/admin(?:\/|$)/.test(path) ||
+    (req.method !== "GET" && /^\/event-categories(?:\/|$)/.test(path)) ||
+    (req.method !== "GET" && /^\/events(?:\/\d+)?\/?$/.test(path))
+  )
+    return "event_settings";
+  if (/^\/event-categories(?:\/|$)/.test(path)) return "events";
+  if (/^\/events(?:\/|$)/.test(path)) return "events";
+  return null;
+}
+
+const EVENT_WORKSPACE_PERMISSIONS: OrganizationPermission[] = [
+  "events",
+  "checkin",
+  "registrations",
+  "rooms",
+  "staff",
+  "forms",
+  "reports",
+  "event_settings",
+];
+
 app.use("/api", attachAuth, (req, res, next) => {
   if (isPublicApiRoute(req)) {
     next();
     return;
   }
-  requireAuth(req, res, next);
+  requireAuth(req, res, () => {
+    const permission = permissionForApiRoute(req);
+    const canReadEventMetadata =
+      permission === "events" &&
+      req.method === "GET" &&
+      /^\/events(?:\/\d+)?\/?$/.test(req.path) &&
+      EVENT_WORKSPACE_PERMISSIONS.some((candidate) =>
+        hasOrganizationPermission(req.auth, candidate),
+      );
+    if (
+      permission &&
+      !canReadEventMetadata &&
+      !hasOrganizationPermission(req.auth, permission)
+    ) {
+      res.status(403).json({ error: "You do not have access to this area" });
+      return;
+    }
+    next();
+  });
 });
 app.use("/api", router);
 

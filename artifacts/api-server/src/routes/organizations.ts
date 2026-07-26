@@ -2,7 +2,12 @@ import { Router } from "express";
 import { and, eq, or } from "drizzle-orm";
 import { db, organizationMembersTable, organizationsTable, usersTable } from "@workspace/db";
 import { UpdateOrganizationBody } from "@workspace/api-zod";
-import { requireOrganizationRole } from "../lib/auth";
+import {
+  ORGANIZATION_PERMISSIONS,
+  defaultPermissionsForRole,
+  requireOrganizationRole,
+  type OrganizationPermission,
+} from "../lib/auth";
 import { requireAuthContext } from "../lib/auth";
 import { hashPassword } from "../lib/passwords";
 import { isPgUniqueViolation } from "../lib/httpGuards";
@@ -56,6 +61,7 @@ router.get("/organizations/current/members", requireOrganizationRole("owner", "a
         email: usersTable.email,
         username: usersTable.username,
         role: organizationMembersTable.role,
+        permissions: organizationMembersTable.permissions,
         createdAt: organizationMembersTable.createdAt,
       })
       .from(organizationMembersTable)
@@ -78,6 +84,7 @@ router.post("/organizations/current/members", requireOrganizationRole("owner", "
   const username = typeof body["username"] === "string" ? body["username"].trim().toLowerCase() : "";
   const email = typeof body["email"] === "string" ? body["email"].trim().toLowerCase() : "";
   const password = typeof body["password"] === "string" ? body["password"] : "";
+  const permissions = parsePermissions(body["permissions"], role);
 
   if (role === "admin" && auth.role !== "owner") {
     res.status(403).json({ error: "Only an owner can add an administrator" });
@@ -121,7 +128,12 @@ router.post("/organizations/current/members", requireOrganizationRole("owner", "
         .returning();
       const [membership] = await tx
         .insert(organizationMembersTable)
-        .values({ userId: user.id, organizationId: auth.organizationId, role })
+        .values({
+          userId: user.id,
+          organizationId: auth.organizationId,
+          role,
+          permissions,
+        })
         .returning();
       return { user, membership };
     });
@@ -134,6 +146,7 @@ router.post("/organizations/current/members", requireOrganizationRole("owner", "
       email: result.user.email,
       username: result.user.username,
       role,
+      permissions,
       createdAt: result.membership.createdAt,
     });
   } catch (err) {
@@ -160,6 +173,20 @@ async function getManagedMember(memberId: number, organizationId: number) {
     ))
     .limit(1);
   return member;
+}
+
+function parsePermissions(
+  value: unknown,
+  role: "admin" | "staff",
+): OrganizationPermission[] {
+  if (!Array.isArray(value)) return defaultPermissionsForRole(role);
+  return [...new Set(value)].filter(
+    (permission): permission is OrganizationPermission =>
+      typeof permission === "string" &&
+      ORGANIZATION_PERMISSIONS.includes(
+        permission as OrganizationPermission,
+      ),
+  );
 }
 
 function canManageMember(auth: ReturnType<typeof requireAuthContext>, member: { userId: number; role: string }): boolean {
@@ -208,6 +235,40 @@ router.put("/organizations/current/members/:memberId/password", requireOrganizat
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+router.put(
+  "/organizations/current/members/:memberId/permissions",
+  requireOrganizationRole("owner"),
+  async (req, res) => {
+    const memberId = Number(req.params["memberId"]);
+    if (!Number.isInteger(memberId)) {
+      res.status(400).json({ error: "Invalid member" });
+      return;
+    }
+    try {
+      const auth = requireAuthContext(req);
+      const member = await getManagedMember(memberId, auth.organizationId);
+      if (!member) {
+        res.status(404).json({ error: "Member not found" });
+        return;
+      }
+      if (!canManageMember(auth, member)) {
+        res.status(403).json({ error: "You cannot manage this member" });
+        return;
+      }
+      const permissions = parsePermissions(req.body?.permissions, member.role as "admin" | "staff");
+      const [updated] = await db
+        .update(organizationMembersTable)
+        .set({ permissions, updatedAt: new Date() })
+        .where(eq(organizationMembersTable.id, member.id))
+        .returning({ permissions: organizationMembersTable.permissions });
+      res.json({ permissions: updated.permissions ?? permissions });
+    } catch (err) {
+      req.log.error({ err }, "Failed to update organization member permissions");
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 router.delete("/organizations/current/members/:memberId", requireOrganizationRole("owner", "admin"), async (req, res) => {
   const memberId = Number(req.params["memberId"]);

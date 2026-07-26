@@ -15,6 +15,7 @@ export interface AuthContext {
   userId: number;
   organizationId: number | null;
   role: "owner" | "admin" | "staff" | null;
+  permissions: OrganizationPermission[];
   isSuperAdmin: boolean;
   user: {
     id: number;
@@ -36,6 +37,33 @@ export interface OrganizationAuthContext extends AuthContext {
   organizationId: number;
   role: "owner" | "admin" | "staff";
   organization: NonNullable<AuthContext["organization"]>;
+}
+
+export const ORGANIZATION_PERMISSIONS = [
+  "events",
+  "checkin",
+  "registrations",
+  "rooms",
+  "staff",
+  "forms",
+  "reports",
+  "event_settings",
+  "org_settings",
+] as const;
+
+export type OrganizationPermission =
+  (typeof ORGANIZATION_PERMISSIONS)[number];
+
+export function defaultPermissionsForRole(
+  role: AuthContext["role"],
+): OrganizationPermission[] {
+  if (role === "owner" || role === "admin") {
+    return [...ORGANIZATION_PERMISSIONS];
+  }
+  if (role === "staff") {
+    return ["events", "checkin", "registrations", "rooms"];
+  }
+  return [];
 }
 
 declare global {
@@ -191,6 +219,7 @@ export async function getAuthContext(
             subscriptionStatus: organizationsTable.subscriptionStatus,
             plan: organizationsTable.plan,
             role: organizationMembersTable.role,
+            permissions: organizationMembersTable.permissions,
           })
           .from(organizationMembersTable)
           .innerJoin(
@@ -216,10 +245,24 @@ export async function getAuthContext(
   if (membership && !["owner", "admin", "staff"].includes(membership.role))
     return null;
 
+  const role = (membership?.role as AuthContext["role"]) ?? null;
+  const storedPermissions = Array.isArray(membership?.permissions)
+    ? membership.permissions.filter(
+        (permission): permission is OrganizationPermission =>
+          ORGANIZATION_PERMISSIONS.includes(
+            permission as OrganizationPermission,
+          ),
+      )
+    : null;
+
   return {
     userId: user.userId,
     organizationId: membership?.organizationId ?? null,
-    role: (membership?.role as AuthContext["role"]) ?? null,
+    role,
+    permissions:
+      role === "owner"
+        ? [...ORGANIZATION_PERMISSIONS]
+        : (storedPermissions ?? defaultPermissionsForRole(role)),
     isSuperAdmin: user.isSuperAdmin,
     user: {
       id: user.userId,
@@ -247,6 +290,7 @@ export function serializeAuthContext(auth: AuthContext) {
       ? {
           ...auth.organization,
           role: auth.role,
+          permissions: auth.permissions,
         }
       : null,
   };
@@ -303,6 +347,33 @@ export function requireOrganizationRole(
     }
     if (!allowedRoles.includes(req.auth.role)) {
       res.status(403).json({ error: "Insufficient permissions" });
+      return;
+    }
+    next();
+  };
+}
+
+export function hasOrganizationPermission(
+  auth: AuthContext | undefined,
+  permission: OrganizationPermission,
+): boolean {
+  return Boolean(
+    auth?.organizationId &&
+      auth.role &&
+      (auth.role === "owner" || auth.permissions.includes(permission)),
+  );
+}
+
+export function requireOrganizationPermission(
+  permission: OrganizationPermission,
+) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.auth) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    if (!hasOrganizationPermission(req.auth, permission)) {
+      res.status(403).json({ error: "You do not have access to this area" });
       return;
     }
     next();
