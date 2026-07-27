@@ -4124,7 +4124,7 @@ function FamilyGroupDeskCard({
   const showBatchCheckout = checkedIn.length > 1 && requireCheckout;
 
   return (
-    <div className="rounded-xl border border-blue-200 dark:border-slate-600 shadow-sm overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-[#263957] shadow-sm dark:border-slate-500">
       {/* Family header */}
       <div className="px-3 pt-2 pb-2 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-200 dark:border-blue-900/40">
         <div className="flex items-center justify-between gap-3">
