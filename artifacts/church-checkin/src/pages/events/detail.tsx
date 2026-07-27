@@ -146,6 +146,7 @@ import { RoomsTabContent } from "./detail/RoomsTabContent";
 import { StaffTabContent } from "./detail/StaffTabContent";
 import { getEventRegistrationsExport } from "./detail/registrationExport";
 import { buildRegistrationEmbedCode } from "@/lib/embedCode";
+import { summarizeRoomAttendance } from "@/lib/roomAttendance";
 
 const BULK_CHECKOUT_REASON_LABELS: Record<string, string> = {
   end_of_event: "End of event",
@@ -5827,6 +5828,7 @@ function EventDashboardSection({
   checkins,
   checkedIn,
   checkedOut,
+  selectedSessionId,
   isChildCheckin,
   trackAttendance,
   requireCheckout,
@@ -5839,6 +5841,7 @@ function EventDashboardSection({
   checkins: EventCheckin[] | undefined;
   checkedIn: EventCheckin[];
   checkedOut: EventCheckin[];
+  selectedSessionId: number | null | undefined;
   isChildCheckin: boolean;
   trackAttendance: boolean;
   requireCheckout: boolean;
@@ -5880,60 +5883,16 @@ function EventDashboardSection({
     )
     .slice(0, 5);
 
-  const roomAttendance = useMemo(() => {
-    const registrationsById = new Map(
-      (registrations ?? []).map((registration) => [
-        registration.id,
-        registration,
-      ]),
-    );
-    const configuredRoomNames = new Set(rooms.map((room) => room.name));
-    const counts = new Map<
-      string,
-      { checkedIn: number; registered: number }
-    >();
-
-    for (const room of rooms) {
-      counts.set(room.name, { checkedIn: 0, registered: 0 });
-    }
-
-    let unassignedRegistered = 0;
-    for (const registration of registrations ?? []) {
-      const roomName = registration.room?.trim();
-      if (roomName && configuredRoomNames.has(roomName)) {
-        counts.get(roomName)!.registered += 1;
-      } else {
-        unassignedRegistered += 1;
-      }
-    }
-
-    let unassignedCheckedIn = 0;
-    for (const checkin of checkedIn) {
-      const roomName = registrationsById
-        .get(checkin.registrationId)
-        ?.room?.trim();
-      if (roomName && configuredRoomNames.has(roomName)) {
-        counts.get(roomName)!.checkedIn += 1;
-      } else {
-        unassignedCheckedIn += 1;
-      }
-    }
-
-    const rows = rooms.map((room) => ({
-      id: String(room.id),
-      name: room.name,
-      ...counts.get(room.name)!,
-    }));
-    if (unassignedRegistered > 0 || unassignedCheckedIn > 0) {
-      rows.push({
-        id: "unassigned",
-        name: "Unassigned",
-        checkedIn: unassignedCheckedIn,
-        registered: unassignedRegistered,
-      });
-    }
-    return rows;
-  }, [checkedIn, registrations, rooms]);
+  const roomAttendance = useMemo(
+    () =>
+      summarizeRoomAttendance({
+        rooms,
+        registrations: registrations ?? [],
+        checkins: checkins ?? [],
+        selectedSessionId,
+      }),
+    [checkins, registrations, rooms, selectedSessionId],
+  );
 
   // ── Dynamic stat cards ──────────────────────────────────────────────────────
   const regType = event.registrationType ?? "child_checkin";
@@ -6321,55 +6280,52 @@ function EventDashboardSection({
           <div className="mb-3 flex items-center justify-between gap-4">
             <h2 className="text-base font-semibold">Room Attendance</h2>
             <p className="shrink-0 text-sm text-muted-foreground">
-              {checkedIn.length} currently checked in
+              {roomAttendance.totals.inNowCount}{" "}
+              {roomAttendance.totals.inNowCount === 1 ? "child" : "children"}{" "}
+              present now
             </p>
           </div>
           <Card className="overflow-hidden shadow-none">
             <CardContent className="divide-y divide-border p-0">
-              {roomAttendance.map((room) => {
-                const progress =
-                  room.registered > 0
-                    ? Math.min(
-                        100,
-                        Math.round(
-                          (room.checkedIn / room.registered) * 100,
-                        ),
-                      )
-                    : 0;
-                return (
-                  <div
-                    key={room.id}
-                    className="grid gap-2 px-4 py-3.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-6"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {room.name}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {room.checkedIn} currently checked in
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 sm:min-w-56">
-                      <div
-                        className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
-                        role="progressbar"
-                        aria-label={`${room.name} attendance`}
-                        aria-valuemin={0}
-                        aria-valuemax={room.registered}
-                        aria-valuenow={room.checkedIn}
-                      >
-                        <div
-                          className="h-full rounded-full bg-primary transition-[width]"
-                          style={{ width: `${progress}%` }}
+              {roomAttendance.rooms.map((room) => (
+                <div
+                  key={room.roomId ?? "unassigned"}
+                  className="flex min-h-16 items-center justify-between gap-4 px-4 py-3"
+                  aria-label={`${room.roomName}: ${room.inNowCount} present, ${room.registeredCount} registered`}
+                >
+                  <div className="min-w-0">
+                    <p
+                      className={cn(
+                        "flex items-center gap-1.5 truncate text-sm font-semibold",
+                        room.roomId == null
+                          ? "text-amber-800"
+                          : "text-foreground",
+                      )}
+                    >
+                      {room.roomId == null && (
+                        <AlertTriangle
+                          className="h-3.5 w-3.5 shrink-0"
+                          aria-hidden="true"
                         />
-                      </div>
-                      <span className="w-12 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
-                        {room.checkedIn} / {room.registered}
-                      </span>
-                    </div>
+                      )}
+                      {room.roomName}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {room.registeredCount} registered
+                    </p>
                   </div>
-                );
-              })}
+                  <p
+                    className={cn(
+                      "shrink-0 text-base font-bold tabular-nums",
+                      room.inNowCount > 0
+                        ? "text-green-800"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {room.inNowCount} present
+                  </p>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </section>
@@ -8522,6 +8478,7 @@ export default function EventWorkspace() {
       checkins={checkins}
       checkedIn={dashboardCheckedIn}
       checkedOut={dashboardCheckedOut}
+      selectedSessionId={resolvedSessionId}
       isChildCheckin={isChildCheckin}
       trackAttendance={trackAttendance}
       requireCheckout={requireCheckout}
