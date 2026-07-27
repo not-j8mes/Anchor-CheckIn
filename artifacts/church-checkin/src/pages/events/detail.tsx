@@ -434,6 +434,20 @@ function EventEditChildDialog({
 
 // ─── Manual Registration Dialog ───────────────────────────────────────────────
 
+type ExistingFamilyRegistration = {
+  registrationGroupId: number;
+  familyName: string;
+  sourceRegistration: Registration;
+};
+
+function splitDisplayName(name: string | null | undefined) {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts.length > 1 ? parts.slice(0, -1).join(" ") : parts[0] ?? "",
+    lastName: parts.length > 1 ? parts.at(-1) ?? "" : "",
+  };
+}
+
 function ManualRegistrationDialog({
   formId,
   embedSlug,
@@ -441,6 +455,7 @@ function ManualRegistrationDialog({
   eventId,
   allowCheckIn = false,
   selectedSessionId,
+  existingFamily,
   open,
   onOpenChange,
 }: {
@@ -450,6 +465,7 @@ function ManualRegistrationDialog({
   eventId: number;
   allowCheckIn?: boolean;
   selectedSessionId?: number | null;
+  existingFamily?: ExistingFamilyRegistration | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
@@ -485,6 +501,7 @@ function ManualRegistrationDialog({
   const [submissionAction, setSubmissionAction] = useState<
     "save" | "check-in" | null
   >(null);
+  const appliedFamilyPrefillRef = useRef<string | null>(null);
   const isSubmitting = submissionAction !== null;
 
   const submitReg = useSubmitRegistration();
@@ -495,7 +512,51 @@ function ManualRegistrationDialog({
     setChildrenAnswers([{}]);
     setEmergencyAnswers({});
     setAdditionalAnswers({});
+    appliedFamilyPrefillRef.current = null;
   };
+
+  useEffect(() => {
+    if (!open || !existingFamily || formFields.length === 0) return;
+
+    const prefillKey = `${existingFamily.registrationGroupId}:${form?.id ?? formId ?? ""}`;
+    if (appliedFamilyPrefillRef.current === prefillKey) return;
+
+    const source = existingFamily.sourceRegistration;
+    const guardianName = splitDisplayName(source.guardianName);
+    const valuesBySystemKey: Record<string, string> = {
+      guardian_first_name: guardianName.firstName,
+      guardian_last_name: guardianName.lastName,
+      guardian_email: source.guardianEmail ?? "",
+      guardian_phone: source.guardianPhone ?? "",
+      secondary_guardian_first_name:
+        source.secondaryGuardianFirstName ?? "",
+      secondary_guardian_last_name: source.secondaryGuardianLastName ?? "",
+      secondary_guardian_phone: source.secondaryGuardianPhone ?? "",
+      secondary_guardian_email: source.secondaryGuardianEmail ?? "",
+      secondary_guardian_relationship:
+        source.secondaryGuardianRelationship ?? "",
+      emergency_contact_name: source.emergencyContactName ?? "",
+      emergency_contact_phone: source.emergencyContactPhone ?? "",
+      emergency_contact_relationship:
+        source.emergencyContactRelationship ?? "",
+    };
+
+    const sharedAnswers = (section: "guardian_info" | "emergency_contact") =>
+      Object.fromEntries(
+        formFields
+          .filter((field) => getFieldSection(field) === section)
+          .map((field) => [
+            field.id,
+            field.systemKey ? (valuesBySystemKey[field.systemKey] ?? "") : "",
+          ]),
+      );
+
+    setGuardianAnswers(sharedAnswers("guardian_info"));
+    setEmergencyAnswers(sharedAnswers("emergency_contact"));
+    setChildrenAnswers([{}]);
+    setAdditionalAnswers({});
+    appliedFamilyPrefillRef.current = prefillKey;
+  }, [existingFamily, form?.id, formFields, formId, open]);
 
   const roomAssignmentFieldId = formFields.find(
     (f) => f.systemKey === "room_assignment",
@@ -548,7 +609,13 @@ function ManualRegistrationDialog({
           : "";
         const registration = await submitReg.mutateAsync({
           formId: resolvedFormId,
-          data: { fields, ...(selectedRoom ? { room: selectedRoom } : {}) },
+          data: {
+            fields,
+            ...(selectedRoom ? { room: selectedRoom } : {}),
+            ...(existingFamily
+              ? { registrationGroupId: existingFamily.registrationGroupId }
+              : {}),
+          },
         });
         createdRegistrations.push(registration);
       }
@@ -623,7 +690,9 @@ function ManualRegistrationDialog({
       <DialogContent className="grid max-h-[90vh] grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="px-6 pb-4 pt-6">
           <DialogTitle className="text-xl font-serif">
-            Add {isChildCheckin ? "Child" : "Registrant"}
+            {existingFamily
+              ? `Add Child to ${existingFamily.familyName}`
+              : `Add ${isChildCheckin ? "Child" : "Registrant"}`}
           </DialogTitle>
         </DialogHeader>
 
@@ -763,6 +832,65 @@ function ManualRegistrationDialog({
 
 // ─── Registration detail sheet ────────────────────────────────────────────────
 
+function ContactDetails({
+  label,
+  name,
+  relationship,
+  phone,
+  email,
+}: {
+  label?: string;
+  name?: string | null;
+  relationship?: string | null;
+  phone?: string | null;
+  email?: string | null;
+}) {
+  const hasDetails = Boolean(name || relationship || phone || email);
+
+  return (
+    <div className="min-w-0 space-y-2">
+      {label && <p className="text-xs font-semibold text-foreground">{label}</p>}
+      {!hasDetails ? (
+        <p className="text-sm text-muted-foreground">Not provided.</p>
+      ) : (
+        <>
+          {name && (
+            <div className="flex items-center gap-2.5 text-sm">
+              <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span>{name}</span>
+            </div>
+          )}
+          {relationship && (
+            <div className="flex items-center gap-2.5 text-sm">
+              <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span>{relationship}</span>
+            </div>
+          )}
+          {phone && (
+            <div className="flex items-center gap-2.5 text-sm">
+              <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <a className="hover:underline" href={`tel:${phone}`}>
+                {phone}
+              </a>
+            </div>
+          )}
+          {email && (
+            <div className="flex min-w-0 items-center gap-2.5 text-sm">
+              <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <a
+                className="min-w-0 break-all hover:underline"
+                href={`mailto:${email}`}
+              >
+                {email}
+              </a>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function RegistrationDetailSheet({
   reg,
   open,
@@ -837,7 +965,12 @@ function RegistrationDetailSheet({
     },
   });
 
-  const { data: regDetail } = useGetRegistration(reg.id, {
+  const {
+    data: regDetail,
+    isLoading: detailLoading,
+    isError: detailError,
+    refetch: refetchDetail,
+  } = useGetRegistration(reg.id, {
     query: { enabled: open, queryKey: [`/api/registrations/${reg.id}`] },
   });
 
@@ -848,11 +981,17 @@ function RegistrationDetailSheet({
         queryKey: getListRegistrationsQueryKey(formId),
       });
     }
+    if (!v) {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/registrations/${reg.id}`],
+      });
+    }
   };
 
-  const age = reg.childDateOfBirth
+  const profile = regDetail ?? reg;
+  const age = profile.childDateOfBirth
     ? (() => {
-        const birth = new Date(reg.childDateOfBirth);
+        const birth = new Date(profile.childDateOfBirth);
         const today = new Date();
         let years = today.getFullYear() - birth.getFullYear();
         const m = today.getMonth() - birth.getMonth();
@@ -861,16 +1000,45 @@ function RegistrationDetailSheet({
           const months =
             (today.getFullYear() - birth.getFullYear()) * 12 +
             (today.getMonth() - birth.getMonth());
-          return `${Math.max(0, months)} mo`;
+          const count = Math.max(0, months);
+          return `${count} ${count === 1 ? "month" : "months"}`;
         }
-        return `${years} yr`;
+        return `${years} ${years === 1 ? "year" : "years"}`;
       })()
     : null;
+  const secondaryGuardianName = [
+    profile.secondaryGuardianFirstName,
+    profile.secondaryGuardianLastName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const hasSecondaryGuardian = Boolean(
+    secondaryGuardianName ||
+      profile.secondaryGuardianPhone ||
+      profile.secondaryGuardianEmail ||
+      profile.secondaryGuardianRelationship,
+  );
+  const hasEmergencyContact = Boolean(
+    profile.emergencyContactName ||
+      profile.emergencyContactPhone ||
+      profile.emergencyContactRelationship,
+  );
+  const hasSafetyInformation = Boolean(
+    profile.allergies || profile.medicalNotes || profile.specialNeeds,
+  );
+  const customAnswers = [...(regDetail?.customAnswers ?? [])].sort(
+    (a, b) => a.sortOrder - b.sortOrder,
+  );
+  const readableAnswer = (value: string) => {
+    if (value === "true") return "Yes";
+    if (value === "false") return "No";
+    return value.trim() || "Not provided";
+  };
 
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-lg flex flex-col p-0 gap-0">
+        <SheetContent className="flex w-full max-w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[580px] lg:max-w-[min(580px,50vw)]">
           <SheetTitle className="sr-only">
             {reg.childFirstName} {reg.childLastName}
           </SheetTitle>
@@ -878,30 +1046,35 @@ function RegistrationDetailSheet({
           {/* Header */}
           <div className="flex items-start gap-3 px-5 pt-5 pb-4 pr-14 border-b shrink-0">
             <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-lg shrink-0">
-              {reg.childFirstName[0]}
-              {reg.childLastName[0]}
+              {profile.childFirstName[0]}
+              {profile.childLastName[0]}
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-xl font-bold font-serif truncate">
-                {reg.childFirstName} {reg.childLastName}
+                {profile.childFirstName} {profile.childLastName}
               </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Registered {format(new Date(reg.createdAt), "MMM d, yyyy")}
+                Registered {format(new Date(profile.createdAt), "MMM d, yyyy")}
               </p>
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {reg.room && (
+                {profile.room && (
                   <Badge variant="outline" className="text-xs">
-                    {reg.room}
+                    {profile.room}
                   </Badge>
                 )}
-                {reg.allergies && (
+                {profile.allergies && (
                   <Badge className="text-xs bg-red-100 text-red-800 border-none hover:bg-red-100 gap-1">
                     <AlertTriangle className="w-3 h-3" /> Allergy
                   </Badge>
                 )}
-                {reg.specialNeeds && (
+                {profile.medicalNotes && (
                   <Badge className="text-xs bg-amber-100 text-amber-800 border-none hover:bg-amber-100 gap-1">
-                    <Info className="w-3 h-3" /> Special Needs
+                    <Info className="w-3 h-3" /> Medical
+                  </Badge>
+                )}
+                {profile.specialNeeds && (
+                  <Badge className="text-xs bg-blue-100 text-blue-800 border-none hover:bg-blue-100 gap-1">
+                    <Info className="w-3 h-3" /> Accommodations
                   </Badge>
                 )}
               </div>
@@ -909,153 +1082,248 @@ function RegistrationDetailSheet({
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-6">
-            {/* Child / participant info */}
-            <section className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                {isChildCheckin
-                  ? "Child Information"
-                  : "Participant Information"}
-              </p>
-              {age && (
-                <div className="flex justify-between text-sm py-1.5 border-b border-border/50">
-                  <span className="text-muted-foreground">Date of Birth</span>
-                  <span>
-                    {format(
-                      new Date(reg.childDateOfBirth! + "T00:00:00"),
-                      "MMM d, yyyy",
-                    )}{" "}
-                    · {age}
-                  </span>
-                </div>
-              )}
-              {isChildCheckin && rooms && rooms.length > 0 && (
-                <div className="flex justify-between items-center text-sm py-1.5 border-b border-border/50">
-                  <span className="text-muted-foreground">Room / Group</span>
-                  <Select
-                    value={reg.room ?? "__none__"}
-                    disabled={assigningRoom || updateRoom.isPending}
-                    onValueChange={(v) => {
-                      setAssigningRoom(true);
-                      updateRoom.mutate({
-                        registrationId: reg.id,
-                        data: { room: v === "__none__" ? null : v },
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="h-7 w-auto min-w-28 text-xs border-dashed">
-                      <SelectValue placeholder="Unassigned" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Unassigned</SelectItem>
-                      {rooms
-                        .filter((r) => r.isActive)
-                        .map((r) => (
-                          <SelectItem key={r.id} value={r.name}>
-                            {r.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {(!isChildCheckin || !rooms?.length) && reg.room && (
-                <div className="flex justify-between text-sm py-1.5 border-b border-border/50">
-                  <span className="text-muted-foreground">Room / Group</span>
-                  <span>{reg.room}</span>
-                </div>
-              )}
-              {reg.allergies && (
-                <div className="space-y-1 py-1">
-                  <p className="text-xs text-muted-foreground">Allergies</p>
-                  <p className="text-sm bg-red-50 text-red-900 rounded-md px-3 py-2">
-                    {reg.allergies}
-                  </p>
-                </div>
-              )}
-              {reg.specialNeeds && (
-                <div className="space-y-1 py-1">
-                  <p className="text-xs text-muted-foreground">
-                    Special Needs / Accommodations
-                  </p>
-                  <p className="text-sm bg-amber-50 text-amber-900 rounded-md px-3 py-2">
-                    {reg.specialNeeds}
-                  </p>
-                </div>
-              )}
-              {!age && !reg.room && !reg.allergies && !reg.specialNeeds && (
-                <p className="text-sm text-muted-foreground">
-                  No additional details on record.
-                </p>
-              )}
-            </section>
-
-            {/* Guardian / contact */}
-            {(reg.guardianName || reg.guardianPhone || reg.guardianEmail) && (
-              <section className="space-y-2.5">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  {isChildCheckin ? "Parent / Guardian" : "Contact"}
-                </p>
-                {reg.guardianName && (
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <User className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <span>{reg.guardianName}</span>
-                  </div>
-                )}
-                {reg.guardianPhone && (
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <a
-                      href={`tel:${reg.guardianPhone}`}
-                      className="hover:underline"
-                    >
-                      {reg.guardianPhone}
-                    </a>
-                  </div>
-                )}
-                {reg.guardianEmail && (
-                  <div className="flex items-center gap-2.5 text-sm">
-                    <Mail className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <a
-                      href={`mailto:${reg.guardianEmail}`}
-                      className="hover:underline truncate"
-                    >
-                      {reg.guardianEmail}
-                    </a>
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* Custom answers */}
-            {(regDetail?.customAnswers?.length ?? 0) > 0 && (
-              <section className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Additional Information
-                </p>
-                {regDetail!.customAnswers.map((a) => (
-                  <div
-                    key={a.id}
-                    className="py-1.5 border-b border-border/50 last:border-0"
-                  >
-                    <p className="text-xs text-muted-foreground">
-                      {a.fieldLabel}
-                    </p>
-                    <p className="text-sm mt-0.5">{a.value}</p>
+          <div className="flex-1 space-y-7 overflow-y-auto overflow-x-hidden px-5 py-5">
+            {detailLoading ? (
+              <div aria-label="Loading registrant details" className="space-y-7">
+                {[3, 3, 2, 3].map((rows, sectionIndex) => (
+                  <div key={sectionIndex} className="space-y-3">
+                    <div className="h-3 w-36 animate-pulse rounded bg-muted" />
+                    {Array.from({ length: rows }).map((_, rowIndex) => (
+                      <div
+                        key={rowIndex}
+                        className="h-10 animate-pulse rounded-md bg-muted/70"
+                      />
+                    ))}
                   </div>
                 ))}
-              </section>
+              </div>
+            ) : detailError ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5 text-center">
+                <p className="text-sm font-medium">
+                  Registrant details could not be loaded.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => refetchDetail()}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <>
+                <section aria-labelledby="safety-information-heading">
+                  <h3
+                    id="safety-information-heading"
+                    className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    Safety Information
+                  </h3>
+                  {!hasSafetyInformation ? (
+                    <p className="text-sm text-muted-foreground">
+                      No safety information provided.
+                    </p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {profile.allergies && (
+                        <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-red-950">
+                          <p className="text-xs font-semibold">Allergies</p>
+                          <p className="mt-1 whitespace-pre-wrap text-sm">
+                            {profile.allergies}
+                          </p>
+                        </div>
+                      )}
+                      {profile.medicalNotes && (
+                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-amber-950">
+                          <p className="text-xs font-semibold">Medical Notes</p>
+                          <p className="mt-1 whitespace-pre-wrap text-sm">
+                            {profile.medicalNotes}
+                          </p>
+                        </div>
+                      )}
+                      {profile.specialNeeds && (
+                        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2.5 text-blue-950">
+                          <p className="text-xs font-semibold">
+                            Special Needs / Accommodations
+                          </p>
+                          <p className="mt-1 whitespace-pre-wrap text-sm">
+                            {profile.specialNeeds}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </section>
+
+                <section
+                  aria-labelledby="child-information-heading"
+                  className="border-t pt-5"
+                >
+                  <h3
+                    id="child-information-heading"
+                    className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    {isChildCheckin
+                      ? "Child Information"
+                      : "Participant Information"}
+                  </h3>
+                  <dl className="divide-y divide-border/60 text-sm">
+                    <div className="grid grid-cols-1 gap-1 py-2 sm:grid-cols-[160px_1fr]">
+                      <dt className="text-muted-foreground">Date of Birth</dt>
+                      <dd>
+                        {profile.childDateOfBirth
+                          ? format(
+                              new Date(
+                                profile.childDateOfBirth + "T00:00:00",
+                              ),
+                              "MMM d, yyyy",
+                            )
+                          : "Not provided"}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1 py-2 sm:grid-cols-[160px_1fr]">
+                      <dt className="text-muted-foreground">Age</dt>
+                      <dd>{age ?? "Not provided"}</dd>
+                    </div>
+                    <div className="grid grid-cols-1 items-center gap-1 py-2 sm:grid-cols-[160px_1fr]">
+                      <dt className="text-muted-foreground">Room / Group</dt>
+                      <dd>
+                        {isChildCheckin && rooms && rooms.length > 0 ? (
+                          <Select
+                            value={profile.room ?? "__none__"}
+                            disabled={assigningRoom || updateRoom.isPending}
+                            onValueChange={(value) => {
+                              setAssigningRoom(true);
+                              updateRoom.mutate({
+                                registrationId: reg.id,
+                                data: {
+                                  room: value === "__none__" ? null : value,
+                                },
+                              });
+                            }}
+                          >
+                            <SelectTrigger
+                              aria-label="Quick room assignment"
+                              className="h-8 w-full border-dashed text-xs sm:w-auto sm:min-w-36"
+                            >
+                              <SelectValue placeholder="Unassigned" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">
+                                Unassigned
+                              </SelectItem>
+                              {rooms
+                                .filter((room) => room.isActive)
+                                .map((room) => (
+                                  <SelectItem key={room.id} value={room.name}>
+                                    {room.name}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          profile.room || "Unassigned"
+                        )}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section
+                  aria-labelledby="guardian-heading"
+                  className="border-t pt-5"
+                >
+                  <h3
+                    id="guardian-heading"
+                    className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    {isChildCheckin ? "Parent / Guardian" : "Contact"}
+                  </h3>
+                  <div className="space-y-5">
+                    <ContactDetails
+                      label={isChildCheckin ? "Primary Guardian" : "Contact"}
+                      name={profile.guardianName}
+                      phone={profile.guardianPhone}
+                      email={profile.guardianEmail}
+                    />
+                    {isChildCheckin && hasSecondaryGuardian && (
+                      <ContactDetails
+                        label="Second Parent / Guardian"
+                        name={secondaryGuardianName}
+                        relationship={profile.secondaryGuardianRelationship}
+                        phone={profile.secondaryGuardianPhone}
+                        email={profile.secondaryGuardianEmail}
+                      />
+                    )}
+                  </div>
+                </section>
+
+                <section
+                  aria-labelledby="emergency-heading"
+                  className="border-t pt-5"
+                >
+                  <h3
+                    id="emergency-heading"
+                    className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    Emergency Contact
+                  </h3>
+                  {hasEmergencyContact ? (
+                    <ContactDetails
+                      name={profile.emergencyContactName}
+                      relationship={profile.emergencyContactRelationship}
+                      phone={profile.emergencyContactPhone}
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No emergency contact provided.
+                    </p>
+                  )}
+                </section>
+
+                <section
+                  aria-labelledby="additional-heading"
+                  className="border-t pt-5"
+                >
+                  <h3
+                    id="additional-heading"
+                    className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    Additional Information
+                  </h3>
+                  {customAnswers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No additional information was requested.
+                    </p>
+                  ) : (
+                    <dl className="divide-y divide-border/60">
+                      {customAnswers.map((answer) => (
+                        <div key={answer.id} className="py-2.5">
+                          <dt className="text-xs text-muted-foreground">
+                            {answer.fieldLabel}
+                          </dt>
+                          <dd className="mt-1 whitespace-pre-wrap break-words text-sm">
+                            {readableAnswer(answer.value)}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                </section>
+              </>
             )}
           </div>
 
           {/* Footer */}
-          <div className="border-t p-4 shrink-0 flex gap-2">
+          <div className="flex shrink-0 gap-2 border-t bg-background p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <Button
               variant="outline"
               className="flex-1 gap-2"
               onClick={() => setEditOpen(true)}
             >
-              <Pencil className="w-4 h-4" /> Edit
+              <Pencil className="w-4 h-4" /> Edit Registrant
             </Button>
             <Button
               variant="outline"
@@ -4055,6 +4323,7 @@ interface FamilyGroupDeskCardProps {
   loadingId: number | null;
   labelType: string;
   requireCheckout: boolean;
+  onAddChild: () => void;
   onCheckinSelected: (regs: Registration[]) => void;
   onIndividualCheckin: (reg: Registration) => void;
   onOpenDetail: (regId: number) => void;
@@ -4076,6 +4345,7 @@ function FamilyGroupDeskCard({
   loadingId,
   labelType,
   requireCheckout,
+  onAddChild,
   onCheckinSelected,
   onIndividualCheckin,
   onOpenDetail,
@@ -4136,6 +4406,21 @@ function FamilyGroupDeskCard({
             <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
               {childCount} {childCount === 1 ? "child" : "children"}
             </Badge>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1 px-2 text-xs text-[#263957] hover:bg-blue-100 hover:text-[#16243d] focus-visible:ring-2 focus-visible:ring-primary dark:text-slate-200 dark:hover:bg-blue-900/40"
+              aria-label={`Add another child to ${familyLastName} Family`}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onAddChild();
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              Add child
+            </Button>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {notCheckedIn.length > 0 && (
@@ -4584,6 +4869,8 @@ function CheckInDeskContent({
   const [showAttendance, setShowAttendance] = useState(false);
   const [selectedRegId, setSelectedRegId] = useState<number | null>(null);
   const [addRegOpen, setAddRegOpen] = useState(false);
+  const [existingFamily, setExistingFamily] =
+    useState<ExistingFamilyRegistration | null>(null);
   const [printLabels, setPrintLabels] = useState(initialPrintLabels ?? true);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [pendingPrintLabel, setPendingPrintLabel] = useState<LabelData | null>(
@@ -5182,7 +5469,10 @@ function CheckInDeskContent({
           {isChildEvent && (
             <Button
               className="shrink-0 gap-2 h-12 px-5 text-base font-semibold"
-              onClick={() => setAddRegOpen(true)}
+              onClick={() => {
+                setExistingFamily(null);
+                setAddRegOpen(true);
+              }}
             >
               <Plus className="w-5 h-5" /> Add Registrant
             </Button>
@@ -5234,6 +5524,30 @@ function CheckInDeskContent({
                   loadingId={loadingId}
                   labelType={labelType}
                   requireCheckout={requireCheckout}
+                  onAddChild={() => {
+                    const sourceRegistration = group.items[0]!.reg;
+                    const registrationGroupId =
+                      group.groupId ??
+                      sourceRegistration.registrationGroupId ??
+                      null;
+
+                    if (registrationGroupId == null) {
+                      toast({
+                        title: "This family cannot accept another child yet",
+                        description:
+                          "Open the registration and save its family information first.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    setExistingFamily({
+                      registrationGroupId,
+                      familyName: `${group.guardian.split(" ").slice(-1)[0]} Family`,
+                      sourceRegistration,
+                    });
+                    setAddRegOpen(true);
+                  }}
                   onCheckinSelected={(regs) =>
                     handleGroupCheckin(groupKey, regs)
                   }
@@ -5690,8 +6004,12 @@ function CheckInDeskContent({
         eventId={eventId}
         allowCheckIn
         selectedSessionId={selectedSessionId}
+        existingFamily={existingFamily}
         open={addRegOpen}
-        onOpenChange={setAddRegOpen}
+        onOpenChange={(nextOpen) => {
+          setAddRegOpen(nextOpen);
+          if (!nextOpen) setExistingFamily(null);
+        }}
       />
 
       <LabelPrintDialog
