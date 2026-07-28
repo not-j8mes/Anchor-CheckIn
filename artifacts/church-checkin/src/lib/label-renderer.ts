@@ -185,6 +185,51 @@ export function renderParentPickupLabelHtml(labels: LabelData[], pageNum = 1, pa
 </div>`.trim();
 }
 
+export function renderPrintPagesHtml(
+  labels: LabelData[],
+  labelType?: string,
+): string[] {
+  const isSecurityLabel = labelType === "child_security";
+  const printableLabels = labels.map((label) =>
+    labelDataForType(label, labelType),
+  );
+  const pages = printableLabels.map(
+    (label, index) =>
+      `<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderLabelHtml(label, index, printableLabels.length)}</div>`,
+  );
+
+  if (isSecurityLabel) {
+    const codeGroups = new Map<string, LabelData[]>();
+    printableLabels.forEach((label) => {
+      if (!label.labelCode) return;
+      if (!codeGroups.has(label.labelCode))
+        codeGroups.set(label.labelCode, []);
+      codeGroups.get(label.labelCode)!.push(label);
+    });
+    codeGroups.forEach((groupLabels) => {
+      const chunks: LabelData[][] = [];
+      for (let index = 0; index < groupLabels.length; index += MAX_NAMES_PER_PARENT_LABEL) {
+        chunks.push(
+          groupLabels.slice(index, index + MAX_NAMES_PER_PARENT_LABEL),
+        );
+      }
+      chunks.forEach((chunk, index) => {
+        pages.push(
+          `<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderParentPickupLabelHtml(chunk, index + 1, chunks.length)}</div>`,
+        );
+      });
+    });
+  }
+
+  if (pages.length > 0) {
+    pages[pages.length - 1] = pages[pages.length - 1].replace(
+      /page-break-after:always;break-after:always;/,
+      "",
+    );
+  }
+  return pages;
+}
+
 /**
  * Prints labels from the current app window.
  *
@@ -196,51 +241,19 @@ export function renderParentPickupLabelHtml(labels: LabelData[], pageNum = 1, pa
 export function printLabels(labels: LabelData[], labelType?: string): void {
   if (labels.length === 0) return;
 
-  const isSecurityLabel = labelType === "child_security";
-  const printableLabels = labels.map((label) =>
-    labelDataForType(label, labelType),
-  );
-
   // Remove any stale container from a previous print (afterprint may not have fired).
   const stale = document.getElementById("single-label-print-root");
   if (stale) stale.remove();
 
   const container = document.createElement("div");
   container.id = "single-label-print-root";
-  // line-height/font-size:0 prevents whitespace text nodes from adding phantom height.
-  container.style.cssText = "margin:0;padding:0;line-height:0;font-size:0;";
+  // Keep normal inherited typography so print engines do not collapse text in
+  // the header and guardian footer. Each page already has an exact fixed size.
+  container.style.cssText =
+    "margin:0;padding:0;line-height:normal;font-size:16px;";
   document.body.appendChild(container);
 
-  const pages: string[] = [];
-  printableLabels.forEach((label, i) => {
-    pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderLabelHtml(label, i, printableLabels.length)}</div>`);
-  });
-  if (isSecurityLabel) {
-    const codeGroups = new Map<string, LabelData[]>();
-    printableLabels.forEach((label) => {
-      if (label.labelCode) {
-        if (!codeGroups.has(label.labelCode)) codeGroups.set(label.labelCode, []);
-        codeGroups.get(label.labelCode)!.push(label);
-      }
-    });
-    codeGroups.forEach((groupLabels) => {
-      const chunks: LabelData[][] = [];
-      for (let i = 0; i < groupLabels.length; i += MAX_NAMES_PER_PARENT_LABEL) {
-        chunks.push(groupLabels.slice(i, i + MAX_NAMES_PER_PARENT_LABEL));
-      }
-      chunks.forEach((chunk, idx) => {
-        pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderParentPickupLabelHtml(chunk, idx + 1, chunks.length)}</div>`);
-      });
-    });
-  }
-
-  // Remove trailing page-break from the last page to avoid a blank extra page.
-  if (pages.length > 0) {
-    pages[pages.length - 1] = pages[pages.length - 1]
-      .replace(/page-break-after:always;break-after:always;/, "");
-  }
-
-  container.innerHTML = pages.join("");
+  container.innerHTML = renderPrintPagesHtml(labels, labelType).join("");
 
   // Let the browser finish layout before opening the print dialog.
   setTimeout(() => window.print(), 0);

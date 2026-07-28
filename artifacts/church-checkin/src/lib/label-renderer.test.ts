@@ -1,0 +1,83 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import type { LabelData } from "@workspace/api-client-react";
+import {
+  renderLabelHtml,
+  renderParentPickupLabelHtml,
+  renderPrintPagesHtml,
+} from "./label-renderer";
+
+const sampleLabel: LabelData = {
+  childName: "Charlotte Thomas",
+  guardianName: "Elizabeth Thomas",
+  labelCode: "A7K4",
+  checkinDate: "2026-07-28T18:19:00.000Z",
+  room: "Nursery",
+  allergies: "Tree nuts",
+  organizationName: "  Oakwood Bible Chapel  ",
+};
+
+test("child labels render the trimmed organization and guardian footer", () => {
+  const html = renderLabelHtml(sampleLabel, 0, 1);
+  assert.match(html, /Oakwood Bible Chapel/);
+  assert.doesNotMatch(html, /  Oakwood Bible Chapel  /);
+  assert.match(
+    html,
+    /Parent\/Guardian:<\/strong>&nbsp;Elizabeth Thomas/,
+  );
+  assert.doesNotMatch(html, /Anchor Events/);
+});
+
+test("empty organization and guardian values never render invalid text", () => {
+  const html = renderLabelHtml(
+    {
+      ...sampleLabel,
+      organizationName: "   ",
+      guardianName: undefined,
+    },
+    0,
+    1,
+  );
+  assert.doesNotMatch(html, /undefined|null|Anchor Events/);
+  assert.doesNotMatch(html, /Parent\/Guardian:/);
+  assert.match(html, /justify-content:space-between/);
+});
+
+test("parent pickup labels retain organization, children, and pickup code", () => {
+  const sibling = { ...sampleLabel, childName: "Henry Thomas" };
+  const html = renderParentPickupLabelHtml([sampleLabel, sibling]);
+  assert.match(html, /Oakwood Bible Chapel/);
+  assert.match(html, /Charlotte Thomas/);
+  assert.match(html, /Henry Thomas/);
+  for (const character of sampleLabel.labelCode) {
+    assert.match(html, new RegExp(`>${character}<`));
+  }
+});
+
+test("family security printing produces one child page per child and one shared parent page", () => {
+  const sibling = { ...sampleLabel, childName: "Henry Thomas" };
+  const pages = renderPrintPagesHtml(
+    [sampleLabel, sibling],
+    "child_security",
+  );
+  assert.equal(pages.length, 3);
+  assert.match(pages[0]!, /Elizabeth Thomas/);
+  assert.match(pages[1]!, /Elizabeth Thomas/);
+  assert.match(pages[2]!, /Charlotte Thomas/);
+  assert.match(pages[2]!, /Henry Thomas/);
+});
+
+test("long organization names are constrained before the timestamp", () => {
+  const html = renderLabelHtml(
+    {
+      ...sampleLabel,
+      organizationName:
+        "A Very Long Organization Name That Must Not Overlap The Timestamp",
+    },
+    0,
+    1,
+  );
+  assert.match(html, /max-width:50mm;min-width:0/);
+  assert.match(html, /text-overflow:ellipsis/);
+  assert.match(html, /flex-shrink:0/);
+});

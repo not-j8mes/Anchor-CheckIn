@@ -4971,6 +4971,26 @@ function CheckInDeskContent({
       queryKey: getListEventCheckinsQueryKey(eventId),
     });
 
+  const completeLabelData = (
+    label: LabelData,
+    registrationId?: number,
+  ): LabelData => {
+    const registration = registrations?.find(
+      (candidate) => candidate.id === registrationId,
+    );
+    return {
+      ...label,
+      organizationName:
+        organization?.name?.trim() ||
+        label.organizationName?.trim() ||
+        undefined,
+      guardianName:
+        registration?.guardianName?.trim() ||
+        label.guardianName?.trim() ||
+        undefined,
+    };
+  };
+
   const handleEndSession = (count: number) => {
     toast({
       title: `${count} ${count === 1 ? "child" : "children"} checked out.`,
@@ -4986,19 +5006,23 @@ function CheckInDeskContent({
         setLoadingId(null);
         setPendingCheckinReg(null);
         if (data.labelData) {
+          const completedLabel = completeLabelData(
+            data.labelData,
+            data.checkin.childId,
+          );
           const labelToPrint =
             labelType === "child_security"
-              ? data.labelData
+              ? completedLabel
               : labelType === "simple_name_tag"
                 ? {
-                    ...data.labelData,
+                    ...completedLabel,
                     labelCode: "",
                     room: null,
                     allergies: null,
                     specialNeeds: null,
                     guardianName: undefined,
                   }
-                : { ...data.labelData, labelCode: "" };
+                : { ...completedLabel, labelCode: "" };
           setPendingPrintLabel(labelToPrint);
           if (printLabels) {
             printLabelDirectly([labelToPrint], labelType);
@@ -5100,11 +5124,23 @@ function CheckInDeskContent({
       invalidate();
       if (printLabels && result.labels?.length) {
         printLabelDirectly(
-          result.labels.map((l) => ({
-            ...l,
-            labelCode: labelType !== "child_security" ? "" : l.labelCode,
-            room: labelType === "simple_name_tag" ? null : l.room,
-          })),
+          result.labels.map((label, index) => {
+            const completedLabel = completeLabelData(
+              label,
+              result.checkins[index]?.childId,
+            );
+            return {
+              ...completedLabel,
+              labelCode:
+                labelType !== "child_security"
+                  ? ""
+                  : completedLabel.labelCode,
+              room:
+                labelType === "simple_name_tag"
+                  ? null
+                  : completedLabel.room,
+            };
+          }),
           labelType,
         );
       }
