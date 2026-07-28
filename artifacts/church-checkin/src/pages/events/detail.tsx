@@ -185,6 +185,15 @@ function normalizedAllergyValue(value: string | null | undefined) {
   return value?.trim() ?? "";
 }
 
+function getLabelHeaderName(
+  organizationName: string | null | undefined,
+  eventName: string | null | undefined,
+) {
+  return [organizationName?.trim(), eventName?.trim()]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function RegistrationAllergyBadge({
   allergies,
 }: {
@@ -3445,6 +3454,12 @@ function ChildDetailSheet({
   onCheckout: () => void;
 }) {
   const { data: organization } = useGetOrganization();
+  const { data: labelEvent } = useGetEvent(eventId, {
+    query: {
+      enabled: open && !!eventId,
+      queryKey: getGetEventQueryKey(eventId),
+    },
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [noteText, setNoteText] = useState("");
@@ -3534,7 +3549,8 @@ function ChildDetailSheet({
         room: reg.room ?? null,
         allergies: reg.allergies ?? null,
         specialNeeds: reg.specialNeeds ?? null,
-        organizationName: organization?.name?.trim() || undefined,
+        organizationName:
+          getLabelHeaderName(organization?.name, labelEvent?.name) || undefined,
       }
     : null;
 
@@ -4981,9 +4997,10 @@ function CheckInDeskContent({
     return {
       ...label,
       organizationName:
-        organization?.name?.trim() ||
-        label.organizationName?.trim() ||
-        undefined,
+        getLabelHeaderName(
+          organization?.name || label.organizationName,
+          eventName,
+        ) || undefined,
       guardianName:
         registration?.guardianName?.trim() ||
         label.guardianName?.trim() ||
@@ -5654,7 +5671,9 @@ function CheckInDeskContent({
                       room: reg.room ?? null,
                       allergies: reg.allergies ?? null,
                       specialNeeds: reg.specialNeeds ?? null,
-                      organizationName: organization?.name?.trim() || undefined,
+                      organizationName:
+                        getLabelHeaderName(organization?.name, eventName) ||
+                        undefined,
                     };
                     printLabelDirectly([reprintData], labelType);
                   }}
@@ -5863,7 +5882,10 @@ function CheckInDeskContent({
                                 allergies: reg.allergies ?? null,
                                 specialNeeds: reg.specialNeeds ?? null,
                                 organizationName:
-                                  organization?.name?.trim() || undefined,
+                                  getLabelHeaderName(
+                                    organization?.name,
+                                    eventName,
+                                  ) || undefined,
                               };
                               printLabelDirectly([reprintData], labelType);
                             }}
@@ -8313,6 +8335,7 @@ function EventSettingsSection({
               labelType={labelSettings.labelType}
               printingEnabled={labelSettings.printLabels}
               organizationName={organization?.name}
+              eventName={event.name}
             />
             </div>
           </div>

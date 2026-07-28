@@ -43,10 +43,12 @@ export function LabelSettingsPreview({
   labelType,
   printingEnabled,
   organizationName,
+  eventName,
 }: {
   labelType: string;
   printingEnabled: boolean;
   organizationName?: string | null;
+  eventName?: string | null;
 }) {
   const [securityTab, setSecurityTab] = useState<"child" | "parent">("child");
   const isSecurity = labelType === "child_security";
@@ -55,11 +57,14 @@ export function LabelSettingsPreview({
       labelDataForType(
         {
           ...SAMPLE_LABEL,
-          organizationName: organizationName?.trim() || "Your Organization",
+          organizationName:
+            [organizationName?.trim() || "Your Organization", eventName?.trim()]
+              .filter(Boolean)
+              .join(" · "),
         },
         labelType,
       ),
-    [labelType, organizationName],
+    [eventName, labelType, organizationName],
   );
 
   useEffect(() => setSecurityTab("child"), [labelType]);
