@@ -27,6 +27,7 @@ import {
   useEmailEventRegistrants,
   useListEventCategories,
   useCreateEventCategory,
+  useGetOrganization,
   useBulkCheckout,
   useBatchCheckin,
   getFormBySlug,
@@ -131,6 +132,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
+import { LabelSettingsPreview } from "@/components/checkin/LabelSettingsPreview";
 import { printLabels as printLabelDirectly } from "@/lib/label-renderer";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -3442,6 +3444,7 @@ function ChildDetailSheet({
   onCheckin: () => void;
   onCheckout: () => void;
 }) {
+  const { data: organization } = useGetOrganization();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [noteText, setNoteText] = useState("");
@@ -3531,6 +3534,7 @@ function ChildDetailSheet({
         room: reg.room ?? null,
         allergies: reg.allergies ?? null,
         specialNeeds: reg.specialNeeds ?? null,
+        organizationName: organization?.name?.trim() || undefined,
       }
     : null;
 
@@ -4898,6 +4902,7 @@ function CheckInDeskContent({
   initialPrintLabels?: boolean;
 }) {
   const { toast } = useToast();
+  const { data: organization } = useGetOrganization();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<DeskFilter>("not_checked_in");
@@ -5613,6 +5618,7 @@ function CheckInDeskContent({
                       room: reg.room ?? null,
                       allergies: reg.allergies ?? null,
                       specialNeeds: reg.specialNeeds ?? null,
+                      organizationName: organization?.name?.trim() || undefined,
                     };
                     printLabelDirectly([reprintData], labelType);
                   }}
@@ -5820,6 +5826,8 @@ function CheckInDeskContent({
                                 room: reg.room ?? null,
                                 allergies: reg.allergies ?? null,
                                 specialNeeds: reg.specialNeeds ?? null,
+                                organizationName:
+                                  organization?.name?.trim() || undefined,
                               };
                               printLabelDirectly([reprintData], labelType);
                             }}
@@ -7805,6 +7813,7 @@ function EventSettingsSection({
   eventId: number;
 }) {
   const { toast } = useToast();
+  const { data: organization } = useGetOrganization();
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -7921,7 +7930,7 @@ function EventSettingsSection({
   });
 
   return (
-    <div className="p-6 md:p-8 max-w-[800px] mx-auto w-full space-y-6">
+    <div className="p-6 md:p-8 max-w-[1000px] mx-auto w-full space-y-6">
       <div>
         <h1 className="text-2xl font-serif font-bold">Event Settings</h1>
         <p className="text-muted-foreground mt-1">
@@ -8171,87 +8180,106 @@ function EventSettingsSection({
             <Tag className="w-4 h-4 text-primary" /> Check-In &amp; Labels
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="text-sm font-medium">
-                Print labels at check-in
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                Print a label for each person when they check in.
-              </p>
+        <CardContent>
+          <div className="min-w-0 space-y-7">
+            <div className="min-w-0 space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label className="text-sm font-medium">
+                    Print labels at check-in
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Print a label for each person when they check in.
+                  </p>
+                </div>
+                <Switch
+                  checked={labelSettings.printLabels}
+                  onCheckedChange={(v) =>
+                    setLabelSettings((p) => ({ ...p, printLabels: v }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2 border-l-2 border-border pl-3">
+                <Label className="text-sm text-muted-foreground">
+                  Label type
+                </Label>
+                <Select
+                  value={labelSettings.labelType}
+                  onValueChange={(v) =>
+                    setLabelSettings((p) => ({ ...p, labelType: v }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="simple_name_tag">
+                      Simple Name Tag
+                    </SelectItem>
+                    <SelectItem value="simple_name">
+                      Simple Child Label
+                    </SelectItem>
+                    <SelectItem
+                      value="child_security"
+                      disabled={!isChildCheckin}
+                    >
+                      Child Security Label{" "}
+                      {!isChildCheckin ? "(kids events only)" : ""}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="pt-1 text-xs text-muted-foreground">
+                  {labelSettings.labelType === "simple_name_tag" && (
+                    <p>Prints only the person's name on a 2″×4″ label.</p>
+                  )}
+                  {labelSettings.labelType === "simple_name" && (
+                    <p>
+                      Prints the child's name, guardian, room, and allergies on
+                      a 2″×4″ label.
+                    </p>
+                  )}
+                  {labelSettings.labelType === "child_security" && (
+                    <p>
+                      Prints child name, guardian, allergies, room, and a unique
+                      pickup security code.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {isChildCheckin && (
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">
+                      Require check-out
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Staff must scan the security code at pickup.
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This setting changes the pickup process, not the label
+                      appearance.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={labelSettings.requireCheckout}
+                    onCheckedChange={(v) =>
+                      setLabelSettings((p) => ({ ...p, requireCheckout: v }))
+                    }
+                  />
+                </div>
+              )}
             </div>
-            <Switch
-              checked={labelSettings.printLabels}
-              onCheckedChange={(v) =>
-                setLabelSettings((p) => ({ ...p, printLabels: v }))
-              }
+
+            <div className="border-t pt-6">
+            <LabelSettingsPreview
+              labelType={labelSettings.labelType}
+              printingEnabled={labelSettings.printLabels}
+              organizationName={organization?.name}
             />
+            </div>
           </div>
-
-          {labelSettings.printLabels && (
-            <div className="space-y-2 pl-3 border-l-2 border-border">
-              <Label className="text-sm text-muted-foreground">
-                Label type
-              </Label>
-              <Select
-                value={labelSettings.labelType}
-                onValueChange={(v) =>
-                  setLabelSettings((p) => ({ ...p, labelType: v }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="simple_name_tag">
-                    Simple Name Tag
-                  </SelectItem>
-                  <SelectItem value="simple_name">
-                    Simple Child Label
-                  </SelectItem>
-                  <SelectItem value="child_security" disabled={!isChildCheckin}>
-                    Child security label{" "}
-                    {!isChildCheckin ? "(kids events only)" : ""}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="pt-1 text-xs text-muted-foreground">
-                {labelSettings.labelType === "simple_name_tag" && (
-                  <p>Prints only the person's name on a 2″×4″ label.</p>
-                )}
-                {labelSettings.labelType === "simple_name" && (
-                  <p>
-                    Prints the child's name, guardian, room, and allergies on a
-                    2″×4″ label.
-                  </p>
-                )}
-                {labelSettings.labelType === "child_security" && (
-                  <p>
-                    Prints child name, guardian, allergies, room, and a unique
-                    pickup security code.
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {labelSettings.printLabels && isChildCheckin && (
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-sm font-medium">Require check-out</Label>
-                <p className="text-xs text-muted-foreground">
-                  Staff must scan the security code at pickup.
-                </p>
-              </div>
-              <Switch
-                checked={labelSettings.requireCheckout}
-                onCheckedChange={(v) =>
-                  setLabelSettings((p) => ({ ...p, requireCheckout: v }))
-                }
-              />
-            </div>
-          )}
         </CardContent>
         <CardFooter className="border-t border-border pt-4">
           <Button

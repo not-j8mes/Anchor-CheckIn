@@ -1,7 +1,25 @@
 import { format } from "date-fns";
 import type { LabelData } from "@workspace/api-client-react";
 
-const DEFAULT_ORGANIZATION_NAME = "Anchor Events";
+export function labelDataForType(
+  label: LabelData,
+  labelType?: string,
+): LabelData {
+  if (labelType === "simple_name_tag") {
+    return {
+      ...label,
+      labelCode: "",
+      room: null,
+      allergies: null,
+      specialNeeds: null,
+      guardianName: undefined,
+    };
+  }
+  if (labelType !== "child_security") {
+    return { ...label, labelCode: "" };
+  }
+  return label;
+}
 
 // ---------------------------------------------------------------------------
 // Name-sizing helpers
@@ -49,6 +67,7 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
 
   const fnSize = firstNameFontSize(firstName);
   const lnSize = lastNameFontSize(lastName);
+  const organizationName = (label.organizationName ?? "").trim();
 
   const roomPill = label.room
     ? `<div style="display:inline-flex;align-items:center;gap:1.2mm;font-size:6.5pt;font-weight:700;color:#000000;background:#ffffff;border-radius:9999px;padding:0.7mm 2.5mm;border:1.5px solid #000000;white-space:nowrap;margin-bottom:1.5mm;align-self:flex-start;">${USERS_ICON}&nbsp;${escHtml(label.room)}</div>`
@@ -81,7 +100,7 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
 
   <!-- Header (full width) -->
   <div style="padding:2mm 3.5mm;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #000000;flex-shrink:0;">
-    <span style="font-size:6.5pt;font-weight:800;color:#000000;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;">${escHtml(label.organizationName || DEFAULT_ORGANIZATION_NAME)}</span>
+    <span style="font-size:6.5pt;font-weight:800;color:#000000;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;min-width:0;">${escHtml(organizationName)}</span>
     <span style="font-size:6pt;font-weight:600;color:#000000;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr + counter)}</span>
   </div>
 
@@ -118,6 +137,7 @@ const MAX_NAMES_PER_PARENT_LABEL = 6;
  */
 export function renderParentPickupLabelHtml(labels: LabelData[], pageNum = 1, pageTotal = 1): string {
   const label = labels[0];
+  const organizationName = (label.organizationName ?? "").trim();
   const dateStr = format(new Date(label.checkinDate), "MMM d, h:mm a");
   const pageTag = pageTotal > 1 ? ` · ${pageNum}/${pageTotal}` : "";
 
@@ -139,7 +159,7 @@ export function renderParentPickupLabelHtml(labels: LabelData[], pageNum = 1, pa
 
   <!-- Header -->
   <div style="padding:2mm 3.5mm;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #000000;flex-shrink:0;">
-    <span style="font-size:6.5pt;font-weight:800;color:#000000;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;">${escHtml(label.organizationName || DEFAULT_ORGANIZATION_NAME)}</span>
+    <span style="font-size:6.5pt;font-weight:800;color:#000000;text-transform:uppercase;letter-spacing:0.1em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50mm;min-width:0;">${escHtml(organizationName)}</span>
     <span style="font-size:6pt;font-weight:600;color:#000000;white-space:nowrap;flex-shrink:0;">${escHtml(dateStr + pageTag)}</span>
   </div>
 
@@ -177,6 +197,9 @@ export function printLabels(labels: LabelData[], labelType?: string): void {
   if (labels.length === 0) return;
 
   const isSecurityLabel = labelType === "child_security";
+  const printableLabels = labels.map((label) =>
+    labelDataForType(label, labelType),
+  );
 
   // Remove any stale container from a previous print (afterprint may not have fired).
   const stale = document.getElementById("single-label-print-root");
@@ -189,12 +212,12 @@ export function printLabels(labels: LabelData[], labelType?: string): void {
   document.body.appendChild(container);
 
   const pages: string[] = [];
-  labels.forEach((label, i) => {
-    pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderLabelHtml(label, i, labels.length)}</div>`);
+  printableLabels.forEach((label, i) => {
+    pages.push(`<div style="width:90mm;height:62mm;overflow:hidden;page-break-after:always;break-after:always;">${renderLabelHtml(label, i, printableLabels.length)}</div>`);
   });
   if (isSecurityLabel) {
     const codeGroups = new Map<string, LabelData[]>();
-    labels.forEach((label) => {
+    printableLabels.forEach((label) => {
       if (label.labelCode) {
         if (!codeGroups.has(label.labelCode)) codeGroups.set(label.labelCode, []);
         codeGroups.get(label.labelCode)!.push(label);
