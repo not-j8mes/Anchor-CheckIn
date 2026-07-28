@@ -179,6 +179,39 @@ function getLocalDateDayOfWeek(dateKey: string): number {
   return new Date(dateKey + "T00:00:00").getDay();
 }
 
+function normalizedAllergyValue(value: string | null | undefined) {
+  return value?.trim() ?? "";
+}
+
+function RegistrationAllergyBadge({
+  allergies,
+}: {
+  allergies: string | null | undefined;
+}) {
+  const allergyValue = normalizedAllergyValue(allergies);
+  if (!allergyValue) return null;
+
+  const fullLabel = `Allergy: ${allergyValue}`;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge
+          tabIndex={0}
+          aria-label={fullLabel}
+          className="h-auto min-h-5 max-w-full min-w-0 gap-1 rounded-full border-red-200 bg-red-100 px-2 py-0.5 text-[10px] text-red-800 hover:bg-red-100 whitespace-normal sm:h-5 sm:max-w-[240px] sm:flex-nowrap sm:whitespace-nowrap"
+        >
+          <span className="shrink-0 font-semibold">Allergy:</span>
+          <span className="min-w-0 font-normal sm:truncate">{allergyValue}</span>
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs break-words">
+        {fullLabel}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function statusBadge(status: string) {
   if (status === "active")
     return (
@@ -1726,11 +1759,9 @@ function RegistrationFamilyDetailsDialog({
                             {reg.room}
                           </Badge>
                         )}
-                        {reg.allergies && (
-                          <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
-                            Allergy
-                          </Badge>
-                        )}
+                        <RegistrationAllergyBadge
+                          allergies={reg.allergies}
+                        />
                       </div>
                       <p className="text-sm text-muted-foreground">
                         Registered {format(new Date(reg.createdAt), "MMM d")}
@@ -1834,7 +1865,13 @@ function ChildrenTabContent({
   }, [registrations]);
 
   const alertCount = useMemo(
-    () => registrations.filter((r) => r.allergies || r.specialNeeds).length,
+    () =>
+      registrations.filter(
+        (r) =>
+          normalizedAllergyValue(r.allergies) ||
+          r.medicalNotes ||
+          r.specialNeeds,
+      ).length,
     [registrations],
   );
   const uniqueEmailRecipientCount = useMemo(() => {
@@ -1904,7 +1941,12 @@ function ChildrenTabContent({
     if (roomFilter !== "all")
       result = result.filter((r) => r.room === roomFilter);
     if (alertsOnly)
-      result = result.filter((r) => r.allergies || r.specialNeeds);
+      result = result.filter(
+        (r) =>
+          normalizedAllergyValue(r.allergies) ||
+          r.medicalNotes ||
+          r.specialNeeds,
+      );
     result = [...result].sort((a, b) => {
       if (sort === "name") {
         return `${a.childLastName} ${a.childFirstName}`.localeCompare(
@@ -2217,7 +2259,7 @@ function ChildrenTabContent({
               <div className="space-y-2 bg-muted/20 p-3">
                 {family.children.map((reg) => {
                   const hasAlert = !!(
-                    reg.allergies ||
+                    normalizedAllergyValue(reg.allergies) ||
                     reg.specialNeeds ||
                     reg.medicalNotes
                   );
@@ -2243,11 +2285,9 @@ function ChildrenTabContent({
                                 {reg.room}
                               </Badge>
                             )}
-                            {reg.allergies && (
-                              <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
-                                Allergy
-                              </Badge>
-                            )}
+                            <RegistrationAllergyBadge
+                              allergies={reg.allergies}
+                            />
                             {reg.specialNeeds && (
                               <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">
                                 Medical
@@ -2316,11 +2356,7 @@ function ChildrenTabContent({
                           {reg.room}
                         </Badge>
                       )}
-                      {reg.allergies && (
-                        <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
-                          Allergy
-                        </Badge>
-                      )}
+                      <RegistrationAllergyBadge allergies={reg.allergies} />
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
                       <span>
