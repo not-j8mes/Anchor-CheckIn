@@ -6167,6 +6167,9 @@ function EventDashboardSection({
   isExporting: boolean;
 }) {
   const { toast } = useToast();
+  const [activityTab, setActivityTab] = useState<
+    "registrations" | "checkins"
+  >("registrations");
   const { data: rooms = [] } = useListRooms(eventId, {
     query: {
       enabled: !!eventId,
@@ -6192,14 +6195,14 @@ function EventDashboardSection({
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     )
-    .slice(0, 5);
+    .slice(0, 3);
 
   const recentCheckins = [...(checkedIn ?? [])]
     .sort(
       (a, b) =>
         new Date(b.checkinAt).getTime() - new Date(a.checkinAt).getTime(),
     )
-    .slice(0, 5);
+    .slice(0, 3);
 
   const roomAttendance = useMemo(
     () =>
@@ -6361,20 +6364,28 @@ function EventDashboardSection({
     </Card>
   );
 
-  const statsSection =
-    !card2 && !card3 ? (
-      <div className="grid grid-cols-2 gap-4">
-        {totalRegisteredCard}
-        <EventDateCard event={event} />
-      </div>
-    ) : (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {totalRegisteredCard}
-        {card2}
-        {card3}
-        <EventDateCard event={event} />
-      </div>
-    );
+  const statsSection = (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {totalRegisteredCard}
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">Checked In</p>
+          <p className="mt-1 font-serif text-3xl font-bold text-green-800">
+            {checkedIn.length}
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">Checked Out</p>
+          <p className="mt-1 font-serif text-3xl font-bold text-amber-800">
+            {checkedOut.length}
+          </p>
+        </CardContent>
+      </Card>
+      <EventDateCard event={event} />
+    </div>
+  );
 
   // ── Event header date/schedule summary ──────────────────────────────────────
   const DAY_NAMES_FULL = [
@@ -6608,7 +6619,7 @@ function EventDashboardSection({
               {roomAttendance.rooms.map((room) => (
                 <div
                   key={room.roomId ?? "unassigned"}
-                  className="flex min-h-16 items-center justify-between gap-4 px-4 py-3"
+                  className="flex min-h-12 items-center justify-between gap-4 px-4 py-2"
                   aria-label={`${room.roomName}: ${room.inNowCount} present, ${room.registeredCount} registered`}
                 >
                   <div className="min-w-0">
@@ -6650,201 +6661,186 @@ function EventDashboardSection({
       )}
 
       {/* 5 — Recent Activity */}
-      <div className="space-y-4">
-        {/* Recent Registrations */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold">Recent Registrations</h2>
-            <Link
-              href={`/events/${eventId}/registrations`}
-              className="text-sm text-primary hover:underline"
+      <section>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-semibold">Recent Activity</h2>
+            <div
+              className="inline-flex rounded-lg border bg-muted/40 p-0.5"
+              role="tablist"
+              aria-label="Recent activity type"
             >
-              View all
-            </Link>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activityTab === "registrations"}
+                onClick={() => setActivityTab("registrations")}
+                className={cn(
+                  "min-h-10 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  activityTab === "registrations"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Registrations
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activityTab === "checkins"}
+                onClick={() => setActivityTab("checkins")}
+                className={cn(
+                  "min-h-10 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  activityTab === "checkins"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Check-Ins
+              </button>
+            </div>
           </div>
-          <Card className="overflow-hidden">
-            {recentRegistrations.length > 0 ? (
-              <CardContent className="p-0 divide-y divide-border">
+          <Link
+            href={
+              activityTab === "registrations"
+                ? `/events/${eventId}/registrations`
+                : `/events/${eventId}/checkin`
+            }
+            className="text-sm text-primary hover:underline"
+          >
+            View all
+          </Link>
+        </div>
+        <Card className="overflow-hidden">
+          {activityTab === "registrations" ? (
+            recentRegistrations.length > 0 ? (
+              <CardContent className="divide-y divide-border p-0">
                 {recentRegistrations.map((reg) => (
                   <div
                     key={reg.id}
-                    className="px-4 py-3.5 flex items-center gap-3"
+                    className="flex items-center gap-3 px-4 py-3"
                   >
-                    <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-serif font-bold text-primary text-sm shrink-0">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-serif text-sm font-bold text-primary">
                       {reg.childFirstName[0]}
                       {reg.childLastName[0]}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">
                         {reg.childFirstName} {reg.childLastName}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="truncate text-xs text-muted-foreground">
                         {reg.guardianName}
                         {reg.guardianPhone ? ` · ${reg.guardianPhone}` : ""}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {reg.room && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] hidden sm:flex"
-                        >
-                          {reg.room}
-                        </Badge>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(reg.createdAt), "MMM d")}
-                      </p>
-                    </div>
+                    <p className="shrink-0 text-xs text-muted-foreground">
+                      {format(new Date(reg.createdAt), "MMM d")}
+                    </p>
                   </div>
                 ))}
               </CardContent>
             ) : (
-              <CardContent className="py-8 text-center space-y-2">
-                <Users className="w-7 h-7 mx-auto text-muted-foreground/40" />
-                <p className="text-sm font-medium text-muted-foreground">
+              <CardContent className="flex min-h-20 items-center justify-center py-4 text-center">
+                <p className="text-sm text-muted-foreground">
                   No registrations yet.
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Share the public form to start collecting registrations.
-                </p>
-                {registrationUrl && (
-                  <a
-                    href={registrationUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 gap-1.5"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" /> Open Public Form
-                    </Button>
-                  </a>
-                )}
               </CardContent>
-            )}
-          </Card>
-        </div>
-
-        {/* Recently Checked In — only when check-in is enabled */}
-        {trackAttendance && (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold">Recently Checked In</h2>
-              <Link
-                href={`/events/${eventId}/checkin`}
-                className="text-sm text-primary hover:underline"
-              >
-                View all
-              </Link>
-            </div>
-            <Card className="overflow-hidden">
-              {recentCheckins.length > 0 ? (
-                <CardContent className="p-0 divide-y divide-border">
-                  {recentCheckins.map((c) => (
-                    <div
-                      key={c.id}
-                      className="px-4 py-3.5 flex items-center gap-3"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center font-serif font-bold text-green-800 text-sm shrink-0">
-                        {c.childFirstName[0]}
-                        {c.childLastName[0]}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm">
-                          {c.childFirstName} {c.childLastName}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {c.guardianName}
-                          {c.room ? ` · ${c.room}` : ""}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {c.room && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] hidden sm:flex"
-                          >
-                            {c.room}
-                          </Badge>
-                        )}
-                        <p className="text-xs text-green-700 font-medium">
-                          {format(new Date(c.checkinAt), "h:mm a")}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              ) : (
-                <CardContent className="py-8 text-center space-y-2">
-                  <LogIn className="w-7 h-7 mx-auto text-muted-foreground/40" />
-                  <p className="text-sm font-medium text-muted-foreground">
-                    No check-ins yet.
+            )
+          ) : recentCheckins.length > 0 ? (
+            <CardContent className="divide-y divide-border p-0">
+              {recentCheckins.map((checkin) => (
+                <div
+                  key={checkin.id}
+                  className="flex items-center gap-3 px-4 py-3"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 font-serif text-sm font-bold text-green-800">
+                    {checkin.childFirstName[0]}
+                    {checkin.childLastName[0]}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">
+                      {checkin.childFirstName} {checkin.childLastName}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {checkin.guardianName}
+                      {checkin.room ? ` · ${checkin.room}` : ""}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-xs font-medium text-green-700">
+                    {format(new Date(checkin.checkinAt), "h:mm a")}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    Check-ins will appear here once people are checked in.
-                  </p>
-                </CardContent>
-              )}
-            </Card>
-          </div>
-        )}
-      </div>
+                </div>
+              ))}
+            </CardContent>
+          ) : (
+            <CardContent className="flex min-h-20 items-center justify-center py-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                No check-ins recorded for this session.
+              </p>
+            </CardContent>
+          )}
+        </Card>
+      </section>
 
       {/* 6 — Quick Actions */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-serif font-bold">Quick Actions</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <section>
+        <h2 className="mb-3 text-base font-semibold">Quick Actions</h2>
+        <div className="flex flex-wrap gap-2">
           {registrationUrl && (
             <a
               href={registrationUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center"
             >
-              <ExternalLink className="w-5 h-5 text-primary" />
-              Open Public Form
+              <Button variant="outline" className="min-h-10 gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Open Public Form
+              </Button>
             </a>
           )}
-          {registrationUrl && (
-            <button
-              type="button"
-              onClick={copyEmbedCode}
-              className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center"
-            >
-              <Copy className="w-5 h-5 text-primary" />
-              Copy Embed Code
-            </button>
-          )}
           <Link href={`/events/${eventId}/form`}>
-            <div className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center cursor-pointer">
-              <FileEdit className="w-5 h-5 text-primary" />
+            <Button variant="outline" className="min-h-10 gap-2">
+              <FileEdit className="h-4 w-4" />
               Edit Form
-            </div>
+            </Button>
           </Link>
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={onExportCsv}
             disabled={isExporting}
-            className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center disabled:opacity-50"
+            className="min-h-10 gap-2"
           >
             {isExporting ? (
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Download className="w-5 h-5 text-primary" />
+              <Download className="h-4 w-4" />
             )}
             Export CSV
-          </button>
-          <Link href={`/events/${eventId}/settings`}>
-            <div className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border bg-card hover:border-primary hover:bg-primary/5 transition-all text-sm font-medium text-center cursor-pointer">
-              <Settings className="w-5 h-5 text-primary" />
-              Event Settings
-            </div>
-          </Link>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="min-h-10 gap-2">
+                <MoreHorizontal className="h-4 w-4" />
+                More actions
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {registrationUrl && (
+                <DropdownMenuItem onSelect={copyEmbedCode}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy Embed Code
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem asChild>
+                <Link href={`/events/${eventId}/settings`}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Event Settings
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
