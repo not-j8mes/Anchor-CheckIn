@@ -151,7 +151,12 @@ export function renderParentPickupLabelHtml(labels: LabelData[], pageNum = 1, pa
 
   const nameFontSize = labels.length <= 2 ? "9pt" : labels.length <= 4 ? "8pt" : "7pt";
   const childNamesList = labels
-    .map((l) => `<div style="font-size:${nameFontSize};font-weight:700;color:#000000;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(l.childName)}</div>`)
+    .map((label) => {
+      const childAndRoom = label.room
+        ? `${label.childName} · ${label.room}`
+        : label.childName;
+      return `<div style="font-size:${nameFontSize};font-weight:700;color:#000000;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(childAndRoom)}</div>`;
+    })
     .join("");
 
   return `

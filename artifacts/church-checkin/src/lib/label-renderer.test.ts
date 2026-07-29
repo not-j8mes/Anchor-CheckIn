@@ -47,8 +47,8 @@ test("parent pickup labels retain organization, children, and pickup code", () =
   const sibling = { ...sampleLabel, childName: "Henry Thomas" };
   const html = renderParentPickupLabelHtml([sampleLabel, sibling]);
   assert.match(html, /Oakwood Bible Chapel/);
-  assert.match(html, /Charlotte Thomas/);
-  assert.match(html, /Henry Thomas/);
+  assert.match(html, /Charlotte Thomas · Nursery/);
+  assert.match(html, /Henry Thomas · Nursery/);
   for (const character of sampleLabel.labelCode) {
     assert.match(html, new RegExp(`>${character}<`));
   }
