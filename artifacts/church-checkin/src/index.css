@@ -136,6 +136,114 @@
   --sidebar-accent-foreground: 45 30% 95%;
 }
 
+/* Browser-local accessibility mode. Semantic tokens cover the app broadly;
+   named check-in classes reinforce states that previously depended on pale fills. */
+:root[data-contrast="high"] {
+  --background: 45 35% 97%;
+  --foreground: 222 55% 11%;
+  --border: 218 34% 38%;
+  --card-border: 218 34% 38%;
+  --popover-border: 218 34% 38%;
+  --muted: 213 35% 88%;
+  --muted-foreground: 220 35% 28%;
+  --accent: 42 95% 82%;
+  --accent-foreground: 222 55% 14%;
+  --input: 218 34% 38%;
+  --ring: 214 100% 32%;
+  --destructive: 0 78% 38%;
+  --sidebar-border: 45 80% 65%;
+}
+
+:root.dark[data-contrast="high"] {
+  --foreground: 45 40% 98%;
+  --border: 214 42% 68%;
+  --card-border: 214 42% 68%;
+  --popover-border: 214 42% 68%;
+  --muted-foreground: 214 30% 84%;
+  --input: 214 42% 68%;
+  --ring: 42 100% 62%;
+}
+
+@layer base {
+  :root[data-contrast="high"] :where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  :root[data-contrast="high"] :where(button, input, select, textarea, [role="switch"]):disabled,
+  :root[data-contrast="high"] :where([aria-disabled="true"]) {
+    opacity: 0.72;
+    color: hsl(var(--muted-foreground));
+    border-color: hsl(var(--border));
+  }
+}
+
+:root[data-contrast="high"] .checkin-family-group {
+  border: 2px solid #263957;
+  box-shadow: none;
+}
+
+:root[data-contrast="high"] .checkin-family-header {
+  background: #dbeafe;
+  border-bottom: 2px solid #263957;
+}
+
+:root[data-contrast="high"] .checkin-child-row {
+  border-width: 2px;
+}
+
+:root[data-contrast="high"] .checkin-child-row--selected {
+  background: #ffedb5;
+  border-color: #b45309;
+  box-shadow: inset 4px 0 0 #d97706;
+}
+
+:root[data-contrast="high"] .checkin-child-row--unselected {
+  background: #ffffff;
+  border-color: #64748b;
+}
+
+:root[data-contrast="high"] .checkin-session-banner {
+  border-width: 2px;
+  border-color: #1d4ed8;
+  background: #dbeafe;
+  color: #172554;
+}
+
+:root[data-contrast="high"] .checkin-filter {
+  border-width: 2px;
+}
+
+:root[data-contrast="high"] .checkin-filter--selected {
+  background: #f59e0b;
+  border-color: #92400e;
+  color: #172554;
+}
+
+:root[data-contrast="high"] .checkin-filter--unselected {
+  background: #ffffff;
+  border-color: #475569;
+  color: #172554;
+}
+
+:root[data-contrast="high"] .checkin-room-badge {
+  background: #ffedb5;
+  border-color: #92400e;
+  color: #78350f;
+}
+
+:root[data-contrast="high"] .checkin-allergy-badge {
+  background: #fee2e2;
+  border-color: #b91c1c;
+  color: #7f1d1d;
+}
+
+:root[data-contrast="high"] .checkin-medical-badge {
+  background: #dbeafe;
+  border-color: #1d4ed8;
+  color: #172554;
+}
+
 @layer base {
   * {
     @apply border-border;

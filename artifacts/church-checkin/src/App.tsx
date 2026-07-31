@@ -132,9 +132,7 @@ function ProtectedEventSetupWizard() {
 function ProtectedSettingsPage() {
   return (
     <AuthGate>
-      <PermissionGate permission="org_settings">
-        <SettingsPage />
-      </PermissionGate>
+      <SettingsPage />
     </AuthGate>
   );
 }

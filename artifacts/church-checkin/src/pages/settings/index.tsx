@@ -41,10 +41,11 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, ChevronDown, Database, KeyRound, LockKeyhole, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Upload, UserPlus, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, Contrast, Database, KeyRound, LockKeyhole, Moon, Sun, Trash2, Tag, Plus, Pencil, Check, X, Upload, UserPlus, Users } from "lucide-react";
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
 import { TrimmedLogo } from "@/components/branding/TrimmedLogo";
 import { useDarkMode } from "@/hooks/use-dark-mode";
+import { useHighContrast } from "@/hooks/use-high-contrast";
 import { useAuth } from "@/lib/auth";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -556,8 +557,32 @@ function EventCategoriesCard() {
 // ─── Settings page ────────────────────────────────────────────────────────────
 
 export default function Settings() {
-  const { data: org, isLoading } = useGetOrganization();
   const { user, organization } = useAuth();
+  const canManageOrganization = Boolean(
+    organization &&
+      (organization.role === "owner" ||
+        organization.permissions.includes("org_settings")),
+  );
+  const canManagePeople = Boolean(
+    canManageOrganization &&
+      (organization?.role === "owner" || organization?.role === "admin"),
+  );
+  const canManageEventTools = Boolean(
+    canManageOrganization &&
+      organization &&
+      (organization.role === "owner" ||
+        organization.permissions.includes("event_settings")),
+  );
+  const canManageAdvanced = Boolean(
+    canManageEventTools &&
+      (organization?.role === "owner" || organization?.role === "admin"),
+  );
+  const { data: org, isLoading } = useGetOrganization({
+    query: {
+      enabled: canManageOrganization,
+      queryKey: getGetOrganizationQueryKey(),
+    },
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -571,11 +596,16 @@ export default function Settings() {
   const [savedFormData, setSavedFormData] = useState<BrandingFormData>(formData);
 
   const { isDark, setIsDark } = useDarkMode();
+  const { isHighContrast, setIsHighContrast } = useHighContrast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const brandLogo = formData.logoUrl || org?.logoUrl || DEFAULT_APP_LOGO;
-  const brandName = formData.name || org?.name || DEFAULT_ORGANIZATION_NAME;
+  const brandName =
+    formData.name ||
+    org?.name ||
+    organization?.name ||
+    DEFAULT_ORGANIZATION_NAME;
   const hasBrandingChanges =
     formData.name !== savedFormData.name ||
     formData.logoUrl !== savedFormData.logoUrl ||
@@ -685,7 +715,7 @@ export default function Settings() {
     resetAllData.mutate();
   };
 
-  if (isLoading) {
+  if (canManageOrganization && isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-10">
@@ -729,11 +759,17 @@ export default function Settings() {
 
     <div className="max-w-3xl mx-auto px-6 py-10">
       <div>
-        <h1 className="text-3xl font-serif font-bold text-foreground">Organization Settings</h1>
-        <p className="text-muted-foreground mt-1">Manage your organization, events, people, and app preferences.</p>
+        <h1 className="text-3xl font-serif font-bold text-foreground">Settings</h1>
+        <p className="text-muted-foreground mt-1">
+          {canManageOrganization
+            ? "Manage your organization and personal preferences."
+            : "Manage your personal preferences."}
+        </p>
       </div>
 
       <main className="mt-8 space-y-10">
+      {canManageOrganization && (
+      <>
       <section id="organization" className="scroll-mt-24 space-y-3">
         <div>
           <h2 className="text-xl font-semibold text-foreground">Organization</h2>
@@ -861,6 +897,7 @@ export default function Settings() {
       </form>
       </section>
 
+      {canManageEventTools && (
       <section id="events" className="scroll-mt-24 space-y-3">
         <div>
           <h2 className="text-xl font-semibold text-foreground">Events</h2>
@@ -868,15 +905,21 @@ export default function Settings() {
         </div>
         <EventCategoriesCard />
       </section>
+      )}
 
-      {user && (organization?.role === "owner" || organization?.role === "admin") && (
+      {user && canManagePeople && (
         <section id="people" className="scroll-mt-24 space-y-3">
           <div>
             <h2 className="text-xl font-semibold text-foreground">People & Access</h2>
             <p className="text-sm text-muted-foreground">Control who can sign in and help run check-in.</p>
           </div>
-          <OrganizationMembersCard currentUserId={user.id} currentRole={organization.role} />
+          <OrganizationMembersCard
+            currentUserId={user.id}
+            currentRole={organization!.role as "owner" | "admin"}
+          />
         </section>
+      )}
+      </>
       )}
 
       <section id="appearance" className="scroll-mt-24 space-y-3">
@@ -885,7 +928,7 @@ export default function Settings() {
           <p className="text-sm text-muted-foreground">Personal display preferences for this device.</p>
         </div>
         <Card className="border-card-border shadow-sm">
-          <CardContent className="pt-6">
+          <CardContent className="divide-y divide-border pt-6">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 {isDark ? <Moon className="w-5 h-5 text-muted-foreground" /> : <Sun className="w-5 h-5 text-muted-foreground" />}
@@ -896,11 +939,30 @@ export default function Settings() {
               </div>
               <Switch checked={isDark} onCheckedChange={setIsDark} aria-label="Toggle dark mode" />
             </div>
+            <div className="flex items-center justify-between gap-4 pt-5 mt-5">
+              <div className="flex items-center gap-3">
+                <Contrast className="w-5 h-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-sm">High contrast mode</p>
+                  <p id="high-contrast-description" className="text-xs text-muted-foreground">
+                    Strengthens borders, text, and status colours on washed-out displays.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={isHighContrast}
+                onCheckedChange={setIsHighContrast}
+                aria-label="High contrast mode"
+                aria-describedby="high-contrast-description"
+              />
+            </div>
           </CardContent>
         </Card>
       </section>
 
-      {/* Advanced section */}
+      {canManageAdvanced && (
+      <>
+      {/* Advanced organization section */}
       <section id="advanced" className="scroll-mt-24 space-y-3">
         <div>
           <h2 className="text-xl font-semibold text-foreground">Advanced</h2>
@@ -1035,6 +1097,8 @@ export default function Settings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </>
+      )}
       </main>
     </div>
     </div>

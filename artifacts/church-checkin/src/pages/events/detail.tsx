@@ -4450,9 +4450,9 @@ function FamilyGroupDeskCard({
   const showBatchCheckout = checkedIn.length > 1 && requireCheckout;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#263957] shadow-sm dark:border-slate-500">
+    <div className="checkin-family-group overflow-hidden rounded-xl border border-[#263957] shadow-sm dark:border-slate-500">
       {/* Family header */}
-      <div className="px-3 pt-2 pb-2 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-200 dark:border-blue-900/40">
+      <div className="checkin-family-header px-3 pt-2 pb-2 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-200 dark:border-blue-900/40">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
             <Users className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
@@ -4573,7 +4573,10 @@ function FamilyGroupDeskCard({
             <Card
               key={reg.id}
               className={cn(
-                "transition-all",
+                "checkin-child-row transition-all",
+                isSelected || isSelectedForCheckout
+                  ? "checkin-child-row--selected"
+                  : "checkin-child-row--unselected",
                 isClickable ? "cursor-pointer" : "",
                 cardCls,
               )}
@@ -4597,17 +4600,17 @@ function FamilyGroupDeskCard({
                       {reg.childFirstName} {reg.childLastName}
                     </span>
                     {reg.room && (
-                      <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">
+                      <Badge className="checkin-room-badge text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">
                         {reg.room}
                       </Badge>
                     )}
                     {reg.allergies && (
-                      <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
+                      <Badge className="checkin-allergy-badge text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
                         Allergy
                       </Badge>
                     )}
                     {reg.specialNeeds && (
-                      <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">
+                      <Badge className="checkin-medical-badge text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">
                         Medical
                       </Badge>
                     )}
@@ -5490,7 +5493,7 @@ function CheckInDeskContent({
       </div>
       {selectedSessionDate && selectedSessionDate !== today && (
         <div
-          className={`flex items-start gap-2.5 px-4 py-3 rounded-lg border text-sm ${
+          className={`checkin-session-banner flex items-start gap-2.5 px-4 py-3 rounded-lg border text-sm ${
             selectedSessionDate < today
               ? "border-amber-300 bg-amber-50 text-amber-900"
               : "border-blue-300 bg-blue-50 text-blue-900"
@@ -5516,10 +5519,10 @@ function CheckInDeskContent({
               key={f}
               type="button"
               onClick={() => setFilter(f)}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+              className={`checkin-filter inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
                 active
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
+                  ? "checkin-filter--selected bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "checkin-filter--unselected bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
               }`}
             >
               {DESK_FILTER_LABELS[f]}
@@ -5721,17 +5724,17 @@ function CheckInDeskContent({
                         {reg.childFirstName} {reg.childLastName}
                       </span>
                       {reg.room && (
-                        <Badge className="text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">
+                        <Badge className="checkin-room-badge text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">
                           {reg.room}
                         </Badge>
                       )}
                       {reg.allergies && (
-                        <Badge className="text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
+                        <Badge className="checkin-allergy-badge text-[10px] h-5 bg-red-100 text-red-800 border-red-200 hover:bg-red-100 rounded-full">
                           Allergy
                         </Badge>
                       )}
                       {reg.specialNeeds && (
-                        <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">
+                        <Badge className="checkin-medical-badge text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">
                           Medical
                         </Badge>
                       )}

@@ -823,11 +823,11 @@ export default function EventSelectionScreen() {
                 </Link>
               </Button>
             )}
-            {(organization?.role === "owner" || organization?.permissions.includes("org_settings")) && (
+            {user && (
               <Button asChild variant="ghost" size="sm" className="px-2 sm:px-3">
                 <Link href="/settings">
                   <Settings className="w-4 h-4" />
-                  <span className="sr-only sm:not-sr-only sm:ml-1.5">Org Settings</span>
+                  <span className="sr-only sm:not-sr-only sm:ml-1.5">Settings</span>
                 </Link>
               </Button>
             )}
