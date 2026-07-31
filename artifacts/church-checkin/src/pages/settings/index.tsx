@@ -928,8 +928,8 @@ export default function Settings() {
           <p className="text-sm text-muted-foreground">Personal display preferences for this device.</p>
         </div>
         <Card className="border-card-border shadow-sm">
-          <CardContent className="divide-y divide-border pt-6">
-            <div className="flex items-center justify-between gap-4">
+          <CardContent className="divide-y divide-border p-0">
+            <div className="flex items-center justify-between gap-4 px-6 py-5">
               <div className="flex items-center gap-3">
                 {isDark ? <Moon className="w-5 h-5 text-muted-foreground" /> : <Sun className="w-5 h-5 text-muted-foreground" />}
                 <div>
@@ -939,7 +939,7 @@ export default function Settings() {
               </div>
               <Switch checked={isDark} onCheckedChange={setIsDark} aria-label="Toggle dark mode" />
             </div>
-            <div className="flex items-center justify-between gap-4 pt-5 mt-5">
+            <div className="flex items-center justify-between gap-4 px-6 py-5">
               <div className="flex items-center gap-3">
                 <Contrast className="w-5 h-5 text-muted-foreground" />
                 <div>

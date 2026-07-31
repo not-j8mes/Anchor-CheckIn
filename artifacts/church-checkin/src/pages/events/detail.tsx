@@ -4566,8 +4566,8 @@ function FamilyGroupDeskCard({
               : status === "checked_out"
                 ? "border-amber-200 bg-amber-50/30 dark:border-amber-800 dark:bg-amber-950/20"
                 : isSelected
-                  ? "border-amber-300/80 bg-amber-50/50"
-                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50";
+                  ? "border-[var(--selected-child-border)] bg-[var(--selected-child-background)]"
+                  : "border-[var(--default-child-border)] bg-white hover:border-slate-300 hover:bg-slate-50/50";
 
           return (
             <Card

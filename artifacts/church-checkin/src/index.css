@@ -94,6 +94,17 @@
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
   --app-font-serif: 'Fraunces', serif;
   --radius: 0.75rem;
+  --selected-child-background: color-mix(
+    in oklab,
+    var(--color-amber-50) 50%,
+    transparent
+  );
+  --selected-child-border: color-mix(
+    in oklab,
+    var(--color-amber-300) 80%,
+    transparent
+  );
+  --default-child-border: var(--color-slate-200);
 }
 
 .dark {
@@ -152,6 +163,8 @@
   --ring: 214 100% 32%;
   --destructive: 0 78% 38%;
   --sidebar-border: 45 80% 65%;
+  --selected-child-border: var(--color-amber-400);
+  --default-child-border: var(--color-slate-300);
 }
 
 :root.dark[data-contrast="high"] {
@@ -186,21 +199,6 @@
 :root[data-contrast="high"] .checkin-family-header {
   background: #dbeafe;
   border-bottom: 2px solid #263957;
-}
-
-:root[data-contrast="high"] .checkin-child-row {
-  border-width: 2px;
-}
-
-:root[data-contrast="high"] .checkin-child-row--selected {
-  background: #ffedb5;
-  border-color: #b45309;
-  box-shadow: inset 4px 0 0 #d97706;
-}
-
-:root[data-contrast="high"] .checkin-child-row--unselected {
-  background: #ffffff;
-  border-color: #64748b;
 }
 
 :root[data-contrast="high"] .checkin-session-banner {
