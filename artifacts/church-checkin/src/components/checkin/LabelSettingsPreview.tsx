@@ -11,7 +11,7 @@ import {
 } from "@/lib/label-renderer";
 import { cn } from "@/lib/utils";
 
-const SAMPLE_LABEL: LabelData = {
+export const SAMPLE_LABEL: LabelData = {
   childName: "Charlotte Thomas",
   guardianName: "Elizabeth Thomas",
   labelCode: "A7K4",

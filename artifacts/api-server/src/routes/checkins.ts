@@ -13,22 +13,11 @@ import {
   participantGuardiansTable,
 } from "@workspace/db";
 import { CreateCheckinBody, CheckoutChildParams } from "@workspace/api-zod";
-import { randomBytes } from "crypto";
 import { isPgUniqueViolation } from "../lib/httpGuards";
 import { requireAuthContext } from "../lib/auth";
+import { generateLabelCode } from "../lib/pickupCodes";
 
 const router = Router();
-
-function generateLabelCode(): string {
-  // Excludes easily confused characters: 0/O, 1/I
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = randomBytes(4);
-  let code = "";
-  for (const byte of bytes) {
-    code += chars[byte % chars.length];
-  }
-  return code;
-}
 
 /**
  * When "Keep family pickup code the same" is enabled, return the existing family code

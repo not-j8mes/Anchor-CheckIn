@@ -132,7 +132,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { LabelPrintDialog } from "@/components/checkin/LabelPrintDialog";
-import { LabelSettingsPreview } from "@/components/checkin/LabelSettingsPreview";
+import {
+  LabelSettingsPreview,
+  SAMPLE_LABEL,
+} from "@/components/checkin/LabelSettingsPreview";
 import { printLabels as printLabelDirectly } from "@/lib/label-renderer";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -5500,6 +5503,29 @@ function CheckInDeskContent({
                       End Session / Check Out Remaining
                     </DropdownMenuItem>
                   </>
+                )}
+                {printLabels && (
+                  <DropdownMenuItem
+                    className="gap-2 cursor-pointer"
+                    onClick={() =>
+                      printLabelDirectly(
+                        [
+                          {
+                            ...SAMPLE_LABEL,
+                            checkinDate: new Date().toISOString(),
+                            organizationName: getLabelHeaderName(
+                              organization?.name,
+                              eventName,
+                            ),
+                          },
+                        ],
+                        labelType,
+                      )
+                    }
+                  >
+                    <Printer className="w-4 h-4" />
+                    Print Test Label
+                  </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
