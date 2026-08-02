@@ -4239,6 +4239,8 @@ function CheckinDeskSettingsDialog({
   familyCodeEnabled,
   onFamilyCodeEnabledChange,
   showFamilyCodeSetting,
+  searchOnly,
+  onSearchOnlyChange,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -4247,6 +4249,8 @@ function CheckinDeskSettingsDialog({
   familyCodeEnabled: boolean;
   onFamilyCodeEnabledChange: (v: boolean) => void;
   showFamilyCodeSetting: boolean;
+  searchOnly: boolean;
+  onSearchOnlyChange: (v: boolean) => void;
 }) {
   const options: {
     value: DeskDisplayMode;
@@ -4277,6 +4281,32 @@ function CheckinDeskSettingsDialog({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-6 py-2">
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-4">
+            <div className="min-w-0 flex-1 space-y-1">
+              <Label
+                htmlFor="search-only-toggle"
+                className="cursor-pointer text-sm font-medium"
+              >
+                Search-only mode
+              </Label>
+              <p
+                id="search-only-description"
+                className="text-xs text-muted-foreground"
+              >
+                Hide the registrant list until staff search for someone.
+              </p>
+            </div>
+            <Switch
+              id="search-only-toggle"
+              checked={searchOnly}
+              onCheckedChange={onSearchOnlyChange}
+              aria-describedby="search-only-description"
+              className="mt-0.5 shrink-0"
+            />
+          </div>
+
+          <div className="border-t border-border" />
+
           {/* Display mode */}
           <div className="space-y-3">
             <p className="text-sm font-semibold text-foreground">
@@ -4938,7 +4968,12 @@ function CheckInDeskContent({
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [displayMode, setDisplayMode] = useState<DeskDisplayMode>("standard");
+  const [searchOnly, setSearchOnly] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(`checkin:searchOnly:${eventId}`) === "on";
+  });
   const [familyCodeEnabled, setFamilyCodeEnabled] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [batchLoadingGroupId, setBatchLoadingGroupId] = useState<string | null>(
     null,
   );
@@ -4975,6 +5010,16 @@ function CheckInDeskContent({
     }
   }, [eventId, showFamilyCodeSetting]);
 
+  useEffect(() => {
+    setSearchOnly(
+      localStorage.getItem(`checkin:searchOnly:${eventId}`) === "on",
+    );
+  }, [eventId]);
+
+  useEffect(() => {
+    if (searchOnly && !settingsOpen) searchInputRef.current?.focus();
+  }, [searchOnly, settingsOpen]);
+
   const handleDisplayModeChange = (mode: DeskDisplayMode) => {
     setDisplayMode(mode);
     localStorage.setItem(`checkin:displayMode:${eventId}`, mode);
@@ -4983,6 +5028,11 @@ function CheckInDeskContent({
   const handleFamilyCodeEnabledChange = (v: boolean) => {
     setFamilyCodeEnabled(v);
     localStorage.setItem(`checkin:familyCode:${eventId}`, v ? "on" : "off");
+  };
+
+  const handleSearchOnlyChange = (v: boolean) => {
+    setSearchOnly(v);
+    localStorage.setItem(`checkin:searchOnly:${eventId}`, v ? "on" : "off");
   };
 
   const invalidate = () =>
@@ -5289,7 +5339,7 @@ function CheckInDeskContent({
         ? participants
         : participants.filter((p) => p.status === filter);
     if (!search.trim()) return result;
-    const q = search.toLowerCase();
+    const q = search.trim().toLowerCase();
     return result.filter(
       ({ reg, checkin }) =>
         `${reg.childFirstName} ${reg.childLastName}`
@@ -5327,6 +5377,7 @@ function CheckInDeskContent({
   }, [filtered, search, isChildEvent, filter, participants]);
 
   const isLoading = regsLoading || checkinsLoading;
+  const hasSearchQuery = search.trim().length > 0;
 
   const today = getLocalDateKey();
   const selectedSession = sessions?.find(
@@ -5575,6 +5626,7 @@ function CheckInDeskContent({
           <div className="relative w-full flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
             <Input
+              ref={searchInputRef}
               className="pl-11 h-12 text-base"
               placeholder={
                 isChildEvent
@@ -5583,6 +5635,7 @@ function CheckInDeskContent({
               }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              aria-describedby={searchOnly ? "search-only-guidance" : undefined}
             />
           </div>
           {isChildEvent && (
@@ -5600,9 +5653,44 @@ function CheckInDeskContent({
       </div>
 
       {/* Participant cards */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {searchOnly && !hasSearchQuery
+          ? "Registrant list hidden. Search to display results."
+          : hasSearchQuery && !isLoading
+            ? `${filtered.length} matching ${filtered.length === 1 ? "registrant" : "registrants"}.`
+            : ""}
+      </div>
+      {searchOnly && !hasSearchQuery ? (
+        <div
+          id="search-only-guidance"
+          role="status"
+          className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm"
+        >
+          <p className="font-medium text-foreground">
+            Search for a child or family to begin.
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Search by child, guardian, phone, room, or pickup code.
+          </p>
+        </div>
+      ) : isLoading ? (
+        <div
+          role="status"
+          aria-label="Searching registrants"
+          className={`flex items-center justify-center ${searchOnly ? "py-6" : "py-16"}`}
+        >
+          <Loader2 className="w-6 h-6 animate-spin text-primary" aria-hidden="true" />
+        </div>
+      ) : searchOnly && filtered.length === 0 ? (
+        <div role="status" className="rounded-lg border border-border px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-muted-foreground">
+              No registrants match your search.
+            </p>
+            <Button variant="ghost" size="sm" onClick={() => setSearch("")}>
+              Clear search
+            </Button>
+          </div>
         </div>
       ) : filtered.length === 0 ? (
         <Card>
@@ -6157,6 +6245,8 @@ function CheckInDeskContent({
         familyCodeEnabled={familyCodeEnabled}
         onFamilyCodeEnabledChange={handleFamilyCodeEnabledChange}
         showFamilyCodeSetting={showFamilyCodeSetting}
+        searchOnly={searchOnly}
+        onSearchOnlyChange={handleSearchOnlyChange}
       />
     </div>
   );
