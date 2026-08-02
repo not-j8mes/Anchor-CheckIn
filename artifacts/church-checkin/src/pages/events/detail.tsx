@@ -4588,12 +4588,6 @@ function FamilyGroupDeskCard({
           const isClickable =
             isNotIn || (status === "checked_in" && showBatchCheckout);
           const childName = `${reg.childFirstName} ${reg.childLastName}`;
-          const avatarCls =
-            status === "checked_in"
-              ? "bg-green-100 text-green-800"
-              : status === "checked_out"
-                ? "bg-amber-100 text-amber-800"
-                : "bg-primary/10 text-primary";
           const cardCls =
             status === "checked_in"
               ? isSelectedForCheckout
@@ -4622,21 +4616,14 @@ function FamilyGroupDeskCard({
                   toggleCheckoutChild(reg.id);
               }}
             >
-              <CardContent className="px-3 py-2.5 flex items-center gap-3">
-                <div
-                  className={`w-9 h-9 rounded-full flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 ${avatarCls}`}
-                >
-                  {reg.childFirstName[0]}
-                  {reg.childLastName[0]}
-                </div>
-
+              <CardContent className="flex items-center gap-3 px-3 py-2">
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <div className="flex items-center flex-wrap gap-2">
                     <span className="font-semibold text-base leading-tight">
                       {reg.childFirstName} {reg.childLastName}
                     </span>
                     {reg.room && (
-                      <Badge className="checkin-room-badge text-[10px] h-5 bg-[#FFF9EF] text-[#A85B00] border-[#E5BE57] hover:bg-[#FFF9EF] rounded-full font-semibold">
+                      <Badge className="checkin-room-badge h-5 rounded-full border-blue-200 bg-blue-50 text-[10px] font-semibold text-[#263957] hover:bg-blue-50 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-100">
                         {reg.room}
                       </Badge>
                     )}
@@ -4652,11 +4639,6 @@ function FamilyGroupDeskCard({
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-3 text-xs">
-                    {status === "not_checked_in" && (
-                      <span className="text-[11px] text-muted-foreground/50">
-                        Registered {format(new Date(reg.createdAt), "MMM d")}
-                      </span>
-                    )}
                     {status === "checked_in" && checkin && (
                       <div className="space-y-1.5">
                         <span className="text-green-700 font-medium flex items-center gap-1.5">

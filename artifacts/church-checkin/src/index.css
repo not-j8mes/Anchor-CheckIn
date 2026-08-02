@@ -225,9 +225,9 @@
 }
 
 :root[data-contrast="high"] .checkin-room-badge {
-  background: #ffedb5;
-  border-color: #92400e;
-  color: #78350f;
+  background: #dbeafe;
+  border-color: #1e40af;
+  color: #172554;
 }
 
 :root[data-contrast="high"] .checkin-allergy-badge {
