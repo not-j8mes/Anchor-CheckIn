@@ -5340,11 +5340,11 @@ function CheckInDeskContent({
     : "Select date";
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Page header: title row + subtitle/session row */}
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {/* Row 1: title + utility controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-2xl font-serif font-bold">Check-In Desk</h1>
             {selectedSessionDate === today ? (
@@ -5457,8 +5457,8 @@ function CheckInDeskContent({
         {/* Row 2: subtitle */}
         <p className="text-muted-foreground text-sm">
           {isChildEvent
-            ? "Search and check children in or out for this event."
-            : "Search and check participants in or out for this event."}
+            ? "Search and check children in or out."
+            : "Search and check participants in or out."}
         </p>
         {/* Row 3: session selector — only when there is more than one valid session */}
         {sessions && sessions.length > 1 && onSessionChange && (
@@ -5493,64 +5493,86 @@ function CheckInDeskContent({
       </div>
       {selectedSessionDate && selectedSessionDate !== today && (
         <div
-          className={`checkin-session-banner flex items-start gap-2.5 px-4 py-3 rounded-lg border text-sm ${
+          className={`checkin-session-banner flex min-h-11 items-center gap-2 px-3.5 py-2.5 rounded-lg border text-sm ${
             selectedSessionDate < today
               ? "border-amber-300 bg-amber-50 text-amber-900"
               : "border-blue-300 bg-blue-50 text-blue-900"
           }`}
         >
-          <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <Info className="w-4 h-4 flex-shrink-0" />
           <span>
             {selectedSessionDate < today
-              ? `Viewing past session: ${format(new Date(selectedSessionDate + "T00:00:00"), "MMM d, yyyy")}. Changes will edit attendance history for that date.`
-              : `Viewing upcoming session: ${format(new Date(selectedSessionDate + "T00:00:00"), "MMM d, yyyy")}. Check-ins will be recorded for this date.`}
+              ? `Past session · ${format(new Date(selectedSessionDate + "T00:00:00"), "MMM d, yyyy")} · Changes edit attendance history for this date`
+              : `Upcoming session · ${format(new Date(selectedSessionDate + "T00:00:00"), "MMM d, yyyy")} · Check-ins recorded for this date`}
           </span>
         </div>
       )}
 
-      {/* Filter pills */}
-      <div className="flex flex-wrap gap-2">
-        {(
-          ["all", "not_checked_in", "checked_in", "checked_out"] as DeskFilter[]
-        ).map((f) => {
-          const active = filter === f;
-          return (
-            <button
-              key={f}
-              type="button"
-              onClick={() => setFilter(f)}
-              className={`checkin-filter inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-                active
-                  ? "checkin-filter--selected bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "checkin-filter--unselected bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
-              }`}
-            >
-              {DESK_FILTER_LABELS[f]}
-              <span
-                className={`text-xs rounded-full px-1.5 py-0.5 font-bold min-w-[1.4rem] text-center ${
-                  active ? "bg-white/20 text-white" : "bg-muted"
-                }`}
-              >
-                {counts[f]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
       {/* Registrants section */}
       <div className="space-y-3">
-        <div>
+        <div className="flex flex-wrap items-center gap-x-2">
           <h2 className="text-base font-semibold">Registrants</h2>
-          <p className="text-sm text-muted-foreground">
-            {counts.all} registered
-            {displayMode === "family_grouping" ? " · Family grouping on" : ""}
-          </p>
+          <div className="flex items-center text-sm text-muted-foreground">
+            <span>{counts.all} registered</span>
+            {displayMode === "family_grouping" && (
+              <>
+                <span aria-hidden="true">&nbsp;·&nbsp;</span>
+                <span>Family grouping on</span>
+                {isChildEvent && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="ml-1 inline-flex h-7 w-7 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        aria-label="How family grouping works"
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      Click a child card to include or exclude it from family
+                      check-in. Use the pencil icon to edit details.
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Attendance filters */}
+        <div className="flex flex-wrap gap-2">
+          {(
+            ["all", "not_checked_in", "checked_in", "checked_out"] as DeskFilter[]
+          ).map((f) => {
+            const active = filter === f;
+            return (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className={`checkin-filter inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors ${
+                  active
+                    ? "checkin-filter--selected bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "checkin-filter--unselected bg-background text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
+                }`}
+              >
+                {DESK_FILTER_LABELS[f]}
+                <span
+                  className={`text-xs rounded-full px-1.5 py-0.5 font-bold min-w-[1.4rem] text-center ${
+                    active ? "bg-white/20 text-white" : "bg-muted"
+                  }`}
+                >
+                  {counts[f]}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Search + Add Registrant */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
             <Input
               className="pl-11 h-12 text-base"
@@ -5565,7 +5587,7 @@ function CheckInDeskContent({
           </div>
           {isChildEvent && (
             <Button
-              className="shrink-0 gap-2 h-12 px-5 text-base font-semibold"
+              className="h-12 w-full shrink-0 gap-2 px-5 text-base font-semibold sm:w-auto"
               onClick={() => {
                 setExistingFamily(null);
                 setAddRegOpen(true);
@@ -5575,13 +5597,6 @@ function CheckInDeskContent({
             </Button>
           )}
         </div>
-
-        {displayMode === "family_grouping" && isChildEvent && (
-          <p className="text-xs text-muted-foreground">
-            Click a child card to include/exclude from family check-in. Use the
-            pencil icon to edit details.
-          </p>
-        )}
       </div>
 
       {/* Participant cards */}
