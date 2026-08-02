@@ -150,6 +150,7 @@ import { cn } from "@/lib/utils";
 import { RoomsTabContent } from "./detail/RoomsTabContent";
 import { StaffTabContent } from "./detail/StaffTabContent";
 import { getEventRegistrationsExport } from "./detail/registrationExport";
+import { RegistrationExportDialog } from "./detail/RegistrationExportDialog";
 import { buildRegistrationEmbedCode } from "@/lib/embedCode";
 import { summarizeRoomAttendance } from "@/lib/roomAttendance";
 
@@ -216,7 +217,9 @@ function RegistrationAllergyBadge({
           className="h-auto min-h-5 max-w-full min-w-0 gap-1 rounded-full border-red-200 bg-red-100 px-2 py-0.5 text-[10px] text-red-800 hover:bg-red-100 whitespace-normal sm:h-5 sm:max-w-[240px] sm:flex-nowrap sm:whitespace-nowrap"
         >
           <span className="shrink-0 font-semibold">Allergy:</span>
-          <span className="min-w-0 font-normal sm:truncate">{allergyValue}</span>
+          <span className="min-w-0 font-normal sm:truncate">
+            {allergyValue}
+          </span>
         </Badge>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs break-words">
@@ -490,8 +493,9 @@ type ExistingFamilyRegistration = {
 function splitDisplayName(name: string | null | undefined) {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
   return {
-    firstName: parts.length > 1 ? parts.slice(0, -1).join(" ") : parts[0] ?? "",
-    lastName: parts.length > 1 ? parts.at(-1) ?? "" : "",
+    firstName:
+      parts.length > 1 ? parts.slice(0, -1).join(" ") : (parts[0] ?? ""),
+    lastName: parts.length > 1 ? (parts.at(-1) ?? "") : "",
   };
 }
 
@@ -575,8 +579,7 @@ function ManualRegistrationDialog({
       guardian_last_name: guardianName.lastName,
       guardian_email: source.guardianEmail ?? "",
       guardian_phone: source.guardianPhone ?? "",
-      secondary_guardian_first_name:
-        source.secondaryGuardianFirstName ?? "",
+      secondary_guardian_first_name: source.secondaryGuardianFirstName ?? "",
       secondary_guardian_last_name: source.secondaryGuardianLastName ?? "",
       secondary_guardian_phone: source.secondaryGuardianPhone ?? "",
       secondary_guardian_email: source.secondaryGuardianEmail ?? "",
@@ -584,8 +587,7 @@ function ManualRegistrationDialog({
         source.secondaryGuardianRelationship ?? "",
       emergency_contact_name: source.emergencyContactName ?? "",
       emergency_contact_phone: source.emergencyContactPhone ?? "",
-      emergency_contact_relationship:
-        source.emergencyContactRelationship ?? "",
+      emergency_contact_relationship: source.emergencyContactRelationship ?? "",
     };
 
     const sharedAnswers = (section: "guardian_info" | "emergency_contact") =>
@@ -798,9 +800,7 @@ function ManualRegistrationDialog({
                     [fieldId]: value,
                   }))
                 }
-                onAddChild={() =>
-                  setChildrenAnswers((prev) => [...prev, {}])
-                }
+                onAddChild={() => setChildrenAnswers((prev) => [...prev, {}])}
                 onRemoveChild={(index) =>
                   setChildrenAnswers((prev) =>
                     prev.filter((_, i) => i !== index),
@@ -896,7 +896,9 @@ function ContactDetails({
 
   return (
     <div className="min-w-0 space-y-2">
-      {label && <p className="text-xs font-semibold text-foreground">{label}</p>}
+      {label && (
+        <p className="text-xs font-semibold text-foreground">{label}</p>
+      )}
       {!hasDetails ? (
         <p className="text-sm text-muted-foreground">Not provided.</p>
       ) : (
@@ -1061,14 +1063,14 @@ function RegistrationDetailSheet({
     .join(" ");
   const hasSecondaryGuardian = Boolean(
     secondaryGuardianName ||
-      profile.secondaryGuardianPhone ||
-      profile.secondaryGuardianEmail ||
-      profile.secondaryGuardianRelationship,
+    profile.secondaryGuardianPhone ||
+    profile.secondaryGuardianEmail ||
+    profile.secondaryGuardianRelationship,
   );
   const hasEmergencyContact = Boolean(
     profile.emergencyContactName ||
-      profile.emergencyContactPhone ||
-      profile.emergencyContactRelationship,
+    profile.emergencyContactPhone ||
+    profile.emergencyContactRelationship,
   );
   const hasSafetyInformation = Boolean(
     profile.allergies || profile.medicalNotes || profile.specialNeeds,
@@ -1131,7 +1133,10 @@ function RegistrationDetailSheet({
           {/* Body */}
           <div className="flex-1 space-y-7 overflow-y-auto overflow-x-hidden px-5 py-5">
             {detailLoading ? (
-              <div aria-label="Loading registrant details" className="space-y-7">
+              <div
+                aria-label="Loading registrant details"
+                className="space-y-7"
+              >
                 {[3, 3, 2, 3].map((rows, sectionIndex) => (
                   <div key={sectionIndex} className="space-y-3">
                     <div className="h-3 w-36 animate-pulse rounded bg-muted" />
@@ -1222,9 +1227,7 @@ function RegistrationDetailSheet({
                       <dd>
                         {profile.childDateOfBirth
                           ? format(
-                              new Date(
-                                profile.childDateOfBirth + "T00:00:00",
-                              ),
+                              new Date(profile.childDateOfBirth + "T00:00:00"),
                               "MMM d, yyyy",
                             )
                           : "Not provided"}
@@ -1773,9 +1776,7 @@ function RegistrationFamilyDetailsDialog({
                             {reg.room}
                           </Badge>
                         )}
-                        <RegistrationAllergyBadge
-                          allergies={reg.allergies}
-                        />
+                        <RegistrationAllergyBadge allergies={reg.allergies} />
                       </div>
                       <p className="text-sm text-muted-foreground">
                         Registered {format(new Date(reg.createdAt), "MMM d")}
@@ -1830,15 +1831,11 @@ function ChildrenTabContent({
   formId,
   embedSlug,
   isChildCheckin = true,
-  onExportCsv,
-  isExporting = false,
 }: {
   eventId: number;
   formId?: number | null;
   embedSlug?: string | null;
   isChildCheckin?: boolean;
-  onExportCsv?: () => void;
-  isExporting?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [roomFilter, setRoomFilter] = useState("all");
@@ -1852,6 +1849,7 @@ function ChildrenTabContent({
     useState<RegistrationFamilyGroup | null>(null);
   const [addRegOpen, setAddRegOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [emailSubject, setEmailSubject] = useState(
     DEFAULT_EVENT_UPDATE_EMAIL_SUBJECT,
   );
@@ -1870,6 +1868,9 @@ function ChildrenTabContent({
       },
     },
   );
+  const { data: configuredRooms = [] } = useListRooms(eventId, {
+    query: { enabled: !!eventId, queryKey: getListRoomsQueryKey(eventId) },
+  });
 
   const rooms = useMemo(() => {
     const set = new Set(
@@ -1908,7 +1909,8 @@ function ChildrenTabContent({
           result.failedCount > 0 ? ` ${result.failedCount} failed.` : "";
         toast({
           title: `Sent ${result.sentCount} email${result.sentCount === 1 ? "" : "s"}`,
-          description: `${result.recipientCount} unique recipient${result.recipientCount === 1 ? "" : "s"}.${skippedNotice}${failedNotice}`.trim(),
+          description:
+            `${result.recipientCount} unique recipient${result.recipientCount === 1 ? "" : "s"}.${skippedNotice}${failedNotice}`.trim(),
           variant: result.failedCount > 0 ? "destructive" : undefined,
         });
       },
@@ -2059,22 +2061,15 @@ function ChildrenTabContent({
             <span className="hidden sm:inline">Email Registrants</span>
             <span className="sm:hidden">Email</span>
           </Button>
-          {onExportCsv && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onExportCsv}
-              disabled={isExporting}
-              className="text-muted-foreground hover:text-foreground gap-1.5"
-            >
-              {isExporting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">Export CSV</span>
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setExportDialogOpen(true)}
+            className="text-muted-foreground hover:text-foreground gap-1.5"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Export CSV</span>
+          </Button>
         </div>
       </div>
 
@@ -2435,6 +2430,14 @@ function ChildrenTabContent({
             queryKey: getListChildrenQueryKey(),
           });
         }}
+      />
+      <RegistrationExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        eventId={eventId}
+        registrations={registrations}
+        filteredRegistrations={filtered}
+        configuredRooms={configuredRooms}
       />
 
       {editingReg && (
@@ -5205,13 +5208,9 @@ function CheckInDeskContent({
             return {
               ...completedLabel,
               labelCode:
-                labelType !== "child_security"
-                  ? ""
-                  : completedLabel.labelCode,
+                labelType !== "child_security" ? "" : completedLabel.labelCode,
               room:
-                labelType === "simple_name_tag"
-                  ? null
-                  : completedLabel.room,
+                labelType === "simple_name_tag" ? null : completedLabel.room,
             };
           }),
           labelType,
@@ -5620,7 +5619,12 @@ function CheckInDeskContent({
         {/* Attendance filters */}
         <div className="flex flex-wrap gap-2">
           {(
-            ["all", "not_checked_in", "checked_in", "checked_out"] as DeskFilter[]
+            [
+              "all",
+              "not_checked_in",
+              "checked_in",
+              "checked_out",
+            ] as DeskFilter[]
           ).map((f) => {
             const active = filter === f;
             return (
@@ -5705,10 +5709,16 @@ function CheckInDeskContent({
           aria-label="Searching registrants"
           className={`flex items-center justify-center ${searchOnly ? "py-6" : "py-16"}`}
         >
-          <Loader2 className="w-6 h-6 animate-spin text-primary" aria-hidden="true" />
+          <Loader2
+            className="w-6 h-6 animate-spin text-primary"
+            aria-hidden="true"
+          />
         </div>
       ) : searchOnly && filtered.length === 0 ? (
-        <div role="status" className="rounded-lg border border-border px-4 py-3 text-sm">
+        <div
+          role="status"
+          className="rounded-lg border border-border px-4 py-3 text-sm"
+        >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-muted-foreground">
               No registrants match your search.
@@ -6403,9 +6413,9 @@ function EventDashboardSection({
   isExporting: boolean;
 }) {
   const { toast } = useToast();
-  const [activityTab, setActivityTab] = useState<
-    "registrations" | "checkins"
-  >("registrations");
+  const [activityTab, setActivityTab] = useState<"registrations" | "checkins">(
+    "registrations",
+  );
   const { data: rooms = [] } = useListRooms(eventId, {
     query: {
       enabled: !!eventId,
@@ -7023,11 +7033,7 @@ function EventDashboardSection({
         <h2 className="mb-3 text-base font-semibold">Quick Actions</h2>
         <div className="flex flex-wrap gap-2">
           {registrationUrl && (
-            <a
-              href={registrationUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href={registrationUrl} target="_blank" rel="noopener noreferrer">
               <Button variant="outline" className="min-h-10 gap-2">
                 <ExternalLink className="h-4 w-4" />
                 Open Public Form
@@ -7579,7 +7585,10 @@ function RegistrationFormSection({
         <TabsContent value="settings" className="mt-5">
           <div className="space-y-5 max-w-3xl">
             <div className="flex items-center justify-end min-h-5">
-              <span className="text-xs text-muted-foreground" aria-live="polite">
+              <span
+                className="text-xs text-muted-foreground"
+                aria-live="polite"
+              >
                 {saveStatus === "saving"
                   ? "Saving..."
                   : saveStatus === "saved"
@@ -7615,10 +7624,10 @@ function RegistrationFormSection({
                   minHeightClassName="min-h-[112px]"
                   value={formSettings.description}
                   onChange={(value) =>
-                      setFormSettings((p) => ({
-                        ...p,
-                        description: value,
-                      }))
+                    setFormSettings((p) => ({
+                      ...p,
+                      description: value,
+                    }))
                   }
                 />
                 <FormattedTextEditor
@@ -7627,10 +7636,10 @@ function RegistrationFormSection({
                   minHeightClassName="min-h-[112px]"
                   value={formSettings.registrationCompleteMessage}
                   onChange={(value) =>
-                      setFormSettings((p) => ({
-                        ...p,
-                        registrationCompleteMessage: value,
-                      }))
+                    setFormSettings((p) => ({
+                      ...p,
+                      registrationCompleteMessage: value,
+                    }))
                   }
                 />
               </CardContent>
@@ -8465,12 +8474,12 @@ function EventSettingsSection({
             </div>
 
             <div className="border-t pt-6">
-            <LabelSettingsPreview
-              labelType={labelSettings.labelType}
-              printingEnabled={labelSettings.printLabels}
-              organizationName={organization?.name}
-              eventName={event.name}
-            />
+              <LabelSettingsPreview
+                labelType={labelSettings.labelType}
+                printingEnabled={labelSettings.printLabels}
+                organizationName={organization?.name}
+                eventName={event.name}
+              />
             </div>
           </div>
         </CardContent>
@@ -8902,16 +8911,10 @@ export default function EventWorkspace() {
           (checkin) => checkin.sessionId === resolvedSessionId,
         )
       : [];
-  const latestDashboardCheckinByRegistration = new Map<
-    number,
-    EventCheckin
-  >();
+  const latestDashboardCheckinByRegistration = new Map<number, EventCheckin>();
   for (const checkin of dashboardSessionCheckins) {
     if (!latestDashboardCheckinByRegistration.has(checkin.registrationId)) {
-      latestDashboardCheckinByRegistration.set(
-        checkin.registrationId,
-        checkin,
-      );
+      latestDashboardCheckinByRegistration.set(checkin.registrationId, checkin);
     }
   }
   const dashboardCheckedIn = [
@@ -8966,8 +8969,6 @@ export default function EventWorkspace() {
           formId={event.formId}
           embedSlug={event.formEmbedSlug}
           isChildCheckin={isChildCheckin}
-          onExportCsv={handleExportCsv}
-          isExporting={isExporting}
         />
       </div>
     );
