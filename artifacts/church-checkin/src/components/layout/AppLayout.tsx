@@ -25,7 +25,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: org } = useGetOrganization();
   const { user, logout } = useAuth();
-  const { setOpenMobile } = useSidebar();
+  const { setOpenMobile, state: sidebarState } = useSidebar();
   const brandLogo = org?.logoUrl || DEFAULT_APP_LOGO;
   const brandName = org?.name || DEFAULT_ORGANIZATION_NAME;
 
@@ -43,10 +43,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen w-full bg-background">
       <Sidebar>
         <SidebarHeader className="p-4 flex flex-row items-center gap-2 text-sidebar-primary">
-          <img src={brandLogo} alt={`${brandName} logo`} className="w-8 h-8 object-contain" />
-          <span className="font-serif font-bold text-lg text-sidebar-foreground">
+          <img src={brandLogo} alt={`${brandName} logo`} className="w-8 h-8 shrink-0 object-contain" />
+          <span className="min-w-0 flex-1 truncate font-serif font-bold text-lg text-sidebar-foreground">
             {brandName}
           </span>
+          <SidebarTrigger
+            className="hidden h-8 w-8 shrink-0 md:inline-flex"
+            title="Collapse sidebar (Ctrl+B)"
+            aria-label="Collapse sidebar"
+          />
         </SidebarHeader>
         <SidebarContent className="px-2 mt-4">
           <SidebarMenu>
@@ -121,6 +126,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </SidebarFooter>
       </Sidebar>
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {sidebarState === "collapsed" && (
+          <SidebarTrigger
+            className="fixed left-3 top-3 z-30 hidden h-9 w-9 border border-border bg-background shadow-sm md:inline-flex"
+            title="Open sidebar (Ctrl+B)"
+            aria-label="Open sidebar"
+          />
+        )}
         {/* Mobile-only top bar with hamburger to open sidebar */}
         <div className="flex md:hidden sticky top-0 z-10 items-center gap-3 px-4 h-14 border-b border-border bg-background/95 backdrop-blur shrink-0">
           <SidebarTrigger className="h-8 w-8" />

@@ -81,7 +81,7 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
   const { id } = useParams<{ id: string }>();
   const eventId = Number(id);
   const [location] = useLocation();
-  const { setOpenMobile } = useSidebar();
+  const { setOpenMobile, state: sidebarState } = useSidebar();
   const { user, organization, logout } = useAuth();
 
   const { data: event } = useGetEvent(eventId, {
@@ -151,16 +151,23 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
       <Sidebar>
         <SidebarHeader className="p-3 border-b border-sidebar-border">
           {/* Back to events */}
-          <Link href="/" onClick={close}>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground h-8 px-2"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Back to Events
-            </Button>
-          </Link>
+          <div className="flex items-center gap-1">
+            <Link href="/" onClick={close} className="min-w-0 flex-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground h-8 px-2"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back to Events
+              </Button>
+            </Link>
+            <SidebarTrigger
+              className="hidden h-8 w-8 shrink-0 md:inline-flex"
+              title="Collapse sidebar (Ctrl+B)"
+              aria-label="Collapse sidebar"
+            />
+          </div>
 
           {/* Event identity */}
           {event ? (
@@ -227,6 +234,13 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
       </Sidebar>
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {sidebarState === "collapsed" && (
+          <SidebarTrigger
+            className="fixed left-3 top-3 z-30 hidden h-9 w-9 border border-border bg-background shadow-sm md:inline-flex"
+            title="Open sidebar (Ctrl+B)"
+            aria-label="Open sidebar"
+          />
+        )}
         {/* Mobile-only top bar with hamburger to open sidebar */}
         <div className="flex md:hidden sticky top-0 z-10 items-center gap-3 px-4 h-14 border-b border-border bg-background/95 backdrop-blur shrink-0">
           <SidebarTrigger className="h-8 w-8" />

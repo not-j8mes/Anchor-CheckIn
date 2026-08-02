@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { LabelData } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Printer } from "lucide-react";
 import {
   labelDataForType,
+  printLabels,
   renderLabelHtml,
   renderParentPickupLabelHtml,
 } from "@/lib/label-renderer";
@@ -151,6 +154,19 @@ export function LabelSettingsPreview({
       <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
         Printed size and font rendering may vary slightly by browser and
         printer.
+      </p>
+
+      <Button
+        type="button"
+        variant="outline"
+        className="mt-4 w-full gap-2"
+        onClick={() => printLabels([previewLabel], labelType)}
+      >
+        <Printer className="h-4 w-4" />
+        Print Test Label
+      </Button>
+      <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
+        Opens your browser’s print dialog using the sample shown above.
       </p>
     </aside>
   );
