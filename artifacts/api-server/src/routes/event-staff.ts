@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import {
   db,
   eventsTable,
@@ -74,10 +74,11 @@ router.get("/events/:eventId/staff", async (req, res) => {
         email: eventStaffMembersTable.email,
         phone: eventStaffMembersTable.phone,
         createdAt: eventStaffMembersTable.createdAt,
+        name: sql<string>`trim(concat_ws(' ', ${eventStaffMembersTable.firstName}, ${eventStaffMembersTable.lastName}))`,
         roleName: eventStaffRolesTable.name,
       })
       .from(eventStaffMembersTable)
-      .innerJoin(
+      .leftJoin(
         eventStaffRolesTable,
         eq(eventStaffRolesTable.id, eventStaffMembersTable.roleId),
       )
@@ -215,31 +216,31 @@ router.post(
   requireOrganizationPermission("staff"),
   async (req, res) => {
     const eventId = parseId(req.params.eventId);
-    const roleId = parseId(req.body?.roleId);
-    const firstName =
-      typeof req.body?.firstName === "string" ? req.body.firstName.trim() : "";
-    const lastName =
-      typeof req.body?.lastName === "string" ? req.body.lastName.trim() : "";
+    const roleId = req.body?.roleId == null ? null : parseId(req.body.roleId);
+    const name =
+      typeof req.body?.name === "string" ? req.body.name.trim() : "";
     const auth = requireAuthContext(req);
-    if (!eventId || !roleId || !firstName || !lastName) {
-      res.status(400).json({ error: "Name and role are required" });
+    if (!eventId || !name || (req.body?.roleId != null && !roleId)) {
+      res.status(400).json({ error: "A valid name is required" });
       return;
     }
     try {
-      const [role] = await db
-        .select({ id: eventStaffRolesTable.id })
-        .from(eventStaffRolesTable)
-        .where(
-          and(
-            eq(eventStaffRolesTable.id, roleId),
-            eq(eventStaffRolesTable.eventId, eventId),
-            eq(eventStaffRolesTable.organizationId, auth.organizationId),
-          ),
-        )
-        .limit(1);
-      if (!role) {
-        res.status(400).json({ error: "Invalid staff role" });
-        return;
+      if (roleId) {
+        const [role] = await db
+          .select({ id: eventStaffRolesTable.id })
+          .from(eventStaffRolesTable)
+          .where(
+            and(
+              eq(eventStaffRolesTable.id, roleId),
+              eq(eventStaffRolesTable.eventId, eventId),
+              eq(eventStaffRolesTable.organizationId, auth.organizationId),
+            ),
+          )
+          .limit(1);
+        if (!role) {
+          res.status(400).json({ error: "Invalid staff role" });
+          return;
+        }
       }
       const [member] = await db
         .insert(eventStaffMembersTable)
@@ -247,8 +248,8 @@ router.post(
           eventId,
           organizationId: auth.organizationId,
           roleId,
-          firstName,
-          lastName,
+          firstName: name,
+          lastName: "",
           email:
             typeof req.body?.email === "string" && req.body.email.trim()
               ? req.body.email.trim()
@@ -273,46 +274,49 @@ router.put(
   async (req, res) => {
     const eventId = parseId(req.params.eventId);
     const memberId = parseId(req.params.memberId);
-    const roleId = parseId(req.body?.roleId);
-    const firstName =
-      typeof req.body?.firstName === "string" ? req.body.firstName.trim() : "";
-    const lastName =
-      typeof req.body?.lastName === "string" ? req.body.lastName.trim() : "";
+    const roleId = req.body?.roleId == null ? null : parseId(req.body.roleId);
+    const name =
+      typeof req.body?.name === "string" ? req.body.name.trim() : "";
     const auth = requireAuthContext(req);
-    if (!eventId || !memberId || !roleId || !firstName || !lastName) {
-      res.status(400).json({ error: "Name and role are required" });
+    if (
+      !eventId ||
+      !memberId ||
+      !name ||
+      (req.body?.roleId != null && !roleId)
+    ) {
+      res.status(400).json({ error: "A valid name is required" });
       return;
     }
     try {
-      const [role] = await db
-        .select({ id: eventStaffRolesTable.id })
-        .from(eventStaffRolesTable)
-        .where(
-          and(
-            eq(eventStaffRolesTable.id, roleId),
-            eq(eventStaffRolesTable.eventId, eventId),
-            eq(eventStaffRolesTable.organizationId, auth.organizationId),
-          ),
-        )
-        .limit(1);
-      if (!role) {
-        res.status(400).json({ error: "Invalid staff role" });
-        return;
+      if (roleId) {
+        const [role] = await db
+          .select({ id: eventStaffRolesTable.id })
+          .from(eventStaffRolesTable)
+          .where(
+            and(
+              eq(eventStaffRolesTable.id, roleId),
+              eq(eventStaffRolesTable.eventId, eventId),
+              eq(eventStaffRolesTable.organizationId, auth.organizationId),
+            ),
+          )
+          .limit(1);
+        if (!role) {
+          res.status(400).json({ error: "Invalid staff role" });
+          return;
+        }
       }
       const [member] = await db
         .update(eventStaffMembersTable)
         .set({
           roleId,
-          firstName,
-          lastName,
-          email:
-            typeof req.body?.email === "string" && req.body.email.trim()
-              ? req.body.email.trim()
-              : null,
-          phone:
-            typeof req.body?.phone === "string" && req.body.phone.trim()
-              ? req.body.phone.trim()
-              : null,
+          firstName: name,
+          lastName: "",
+          ...(typeof req.body?.email === "string"
+            ? { email: req.body.email.trim() || null }
+            : {}),
+          ...(typeof req.body?.phone === "string"
+            ? { phone: req.body.phone.trim() || null }
+            : {}),
         })
         .where(
           and(

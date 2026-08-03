@@ -62,12 +62,13 @@ interface StaffRole {
 
 interface StaffMember {
   id: number;
-  roleId: number;
+  roleId: number | null;
+  name: string;
   firstName: string;
   lastName: string;
   email: string | null;
   phone: string | null;
-  roleName: string;
+  roleName: string | null;
 }
 
 interface StaffData {
@@ -107,6 +108,12 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+export function staffInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return `${parts[0]?.[0] ?? ""}${parts.length > 1 ? (parts.at(-1)?.[0] ?? "") : ""}`.toUpperCase();
+}
+
 function printStaffLabels(
   members: StaffMember[],
   eventName: string,
@@ -128,12 +135,10 @@ function printStaffLabels(
 <div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;width:90mm;height:62mm;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;background:#fff;border:1px solid #000;border-radius:3px;color:#000;overflow:hidden;display:flex;flex-direction:column;">
   <div style="padding:2.5mm 4mm;border-bottom:1px solid #000;display:flex;justify-content:space-between;align-items:center;">
     <span style="font-size:7pt;font-weight:800;text-transform:uppercase;letter-spacing:.1em;">${settings.showOrganization ? escapeHtml(organizationName) : ""}</span>
-    <span style="font-size:7pt;font-weight:800;text-transform:uppercase;letter-spacing:.12em;">STAFF</span>
   </div>
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3mm 5mm;text-align:center;">
-    <div style="font-size:28pt;font-weight:900;line-height:1.05;max-width:80mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(member.firstName)}</div>
-    ${settings.showLastName ? `<div style="font-size:16pt;font-weight:700;line-height:1.2;max-width:80mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(member.lastName)}</div>` : ""}
-    ${settings.showRole ? `<div style="margin-top:3mm;border:2px solid #000;border-radius:999px;padding:1.5mm 5mm;font-size:11pt;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">${escapeHtml(member.roleName)}</div>` : ""}
+    <div style="font-size:28pt;font-weight:900;line-height:1.05;max-width:80mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(member.name)}</div>
+    ${settings.showRole && member.roleName ? `<div style="margin-top:3mm;border:2px solid #000;border-radius:999px;padding:1.5mm 5mm;font-size:11pt;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">${escapeHtml(member.roleName)}</div>` : ""}
   </div>
   ${settings.showEventName ? `<div style="padding:2mm 4mm;border-top:1px solid #000;font-size:7pt;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(eventName)}</div>` : ""}
 </div></div>`,
@@ -159,7 +164,7 @@ export function StaffTabContent({
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<number | "all">("all");
+  const [roleFilter, setRoleFilter] = useState<number | "all" | "none">("all");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [memberToDelete, setMemberToDelete] = useState<StaffMember | null>(null);
   const [roleToDelete, setRoleToDelete] = useState<StaffRole | null>(null);
@@ -170,11 +175,8 @@ export function StaffTabContent({
     showOrganization: true,
   });
   const [roleName, setRoleName] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [roleId, setRoleId] = useState("");
+  const [name, setName] = useState("");
+  const [roleId, setRoleId] = useState("none");
 
   const { data, isLoading } = useQuery({
     queryKey,
@@ -214,20 +216,14 @@ export function StaffTabContent({
       staffRequest(`/api/events/${eventId}/staff/members`, {
         method: "POST",
         body: JSON.stringify({
-          firstName,
-          lastName,
-          email,
-          phone,
-          roleId: Number(roleId),
+          name,
+          roleId: roleId === "none" ? null : Number(roleId),
         }),
       }),
     onSuccess: () => {
       refresh();
-      setFirstName("");
-      setLastName("");
-      setEmail("");
-      setPhone("");
-      setRoleId("");
+      setName("");
+      setRoleId("none");
       setMemberDialogOpen(false);
       toast({ title: "Staff member added" });
     },
@@ -238,11 +234,8 @@ export function StaffTabContent({
       staffRequest(`/api/events/${eventId}/staff/members/${editingMember?.id}`, {
         method: "PUT",
         body: JSON.stringify({
-          firstName,
-          lastName,
-          email,
-          phone,
-          roleId: Number(roleId),
+          name,
+          roleId: roleId === "none" ? null : Number(roleId),
         }),
       }),
     onSuccess: () => {
@@ -295,10 +288,14 @@ export function StaffTabContent({
   const organizationName = organization?.name ?? "Anchor Events";
   const normalizedSearch = search.trim().toLowerCase();
   const filteredMembers = members.filter((member) => {
-    const matchesRole = roleFilter === "all" || member.roleId === roleFilter;
+    const matchesRole =
+      roleFilter === "all" ||
+      (roleFilter === "none"
+        ? member.roleId === null
+        : member.roleId === roleFilter);
     const matchesSearch =
       !normalizedSearch ||
-      `${member.firstName} ${member.lastName} ${member.email ?? ""} ${member.phone ?? ""} ${member.roleName}`
+      `${member.name} ${member.email ?? ""} ${member.phone ?? ""} ${member.roleName ?? ""}`
         .toLowerCase()
         .includes(normalizedSearch);
     return matchesRole && matchesSearch;
@@ -313,20 +310,14 @@ export function StaffTabContent({
   };
   const openAddMember = () => {
     setEditingMember(null);
-    setFirstName("");
-    setLastName("");
-    setEmail("");
-    setPhone("");
-    setRoleId("");
+    setName("");
+    setRoleId("none");
     setMemberDialogOpen(true);
   };
   const openEditMember = (member: StaffMember) => {
     setEditingMember(member);
-    setFirstName(member.firstName);
-    setLastName(member.lastName);
-    setEmail(member.email ?? "");
-    setPhone(member.phone ?? "");
-    setRoleId(String(member.roleId));
+    setName(member.name);
+    setRoleId(member.roleId == null ? "none" : String(member.roleId));
     setMemberDialogOpen(true);
   };
 
@@ -383,7 +374,6 @@ export function StaffTabContent({
         </div>
         <Button
           className="h-12 shrink-0 gap-2 px-5 text-base font-semibold"
-          disabled={!roles.length}
           onClick={openAddMember}
         >
           <Plus className="h-5 w-5" />
@@ -397,7 +387,9 @@ export function StaffTabContent({
         <Select
           value={String(roleFilter)}
           onValueChange={(value) =>
-            setRoleFilter(value === "all" ? "all" : Number(value))
+            setRoleFilter(
+              value === "all" || value === "none" ? value : Number(value),
+            )
           }
         >
           <SelectTrigger className="h-9 w-auto min-w-48 text-sm">
@@ -405,6 +397,9 @@ export function StaffTabContent({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Staff ({members.length})</SelectItem>
+            <SelectItem value="none">
+              No role ({members.filter((member) => member.roleId === null).length})
+            </SelectItem>
             {roles.map((role) => {
               const count = members.filter(
                 (member) => member.roleId === role.id,
@@ -458,7 +453,6 @@ export function StaffTabContent({
             <Button
               size="sm"
               className="mt-4"
-              disabled={!roles.length}
               onClick={openAddMember}
             >
               <Plus className="mr-1.5 h-4 w-4" /> Add Staff Member
@@ -501,7 +495,7 @@ export function StaffTabContent({
               >
                 <Checkbox
                   checked={selectedIds.has(member.id)}
-                  aria-label={`Select ${member.firstName} ${member.lastName}`}
+                  aria-label={`Select ${member.name}`}
                   onCheckedChange={(checked) => {
                     const next = new Set(selectedIds);
                     checked ? next.add(member.id) : next.delete(member.id);
@@ -510,18 +504,17 @@ export function StaffTabContent({
                 />
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-serif text-sm font-bold text-primary">
-                    {member.firstName[0]}
-                    {member.lastName[0]}
+                    {staffInitials(member.name)}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-semibold">
-                      {member.firstName} {member.lastName}
+                      {member.name}
                     </p>
-                    <div className="mt-1 sm:hidden">
+                    {member.roleName && <div className="mt-1 sm:hidden">
                       <Badge className="h-5 rounded-full border-[#E5BE57] bg-[#FFF9EF] text-[10px] font-semibold text-[#A85B00] hover:bg-[#FFF9EF]">
                         {member.roleName}
                       </Badge>
-                    </div>
+                    </div>}
                     {(member.email || member.phone) && (
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         {member.email || member.phone}
@@ -530,9 +523,13 @@ export function StaffTabContent({
                   </div>
                 </div>
                 <div className="hidden sm:block">
-                  <Badge className="h-5 rounded-full border-[#E5BE57] bg-[#FFF9EF] text-[10px] font-semibold text-[#A85B00] hover:bg-[#FFF9EF]">
-                    {member.roleName}
-                  </Badge>
+                  {member.roleName ? (
+                    <Badge className="h-5 rounded-full border-[#E5BE57] bg-[#FFF9EF] text-[10px] font-semibold text-[#A85B00] hover:bg-[#FFF9EF]">
+                      {member.roleName}
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No role</span>
+                  )}
                 </div>
                 <div className="flex justify-end gap-1">
                   <Button
@@ -655,7 +652,6 @@ export function StaffTabContent({
           <div className="grid gap-5 py-2 sm:grid-cols-[1fr_210px]">
             <div className="space-y-4">
               {([
-                ["showLastName", "Show last name"],
                 ["showRole", "Show staff role"],
                 ["showEventName", "Show event name"],
                 ["showOrganization", "Show organization"],
@@ -677,11 +673,9 @@ export function StaffTabContent({
               <div className="aspect-[90/62] overflow-hidden rounded border border-foreground bg-white text-black shadow-sm">
                 <div className="flex h-[22%] items-center justify-between border-b border-black px-2 text-[7px] font-bold uppercase">
                   <span>{draftSettings.showOrganization ? organizationName : ""}</span>
-                  <span>Staff</span>
                 </div>
                 <div className="flex h-[61%] flex-col items-center justify-center px-2 text-center">
-                  <div className="max-w-full truncate text-xl font-black">Jordan</div>
-                  {draftSettings.showLastName && <div className="text-sm font-bold">Taylor</div>}
+                  <div className="max-w-full truncate text-xl font-black">Jordan Taylor</div>
                   {draftSettings.showRole && (
                     <div className="mt-1.5 rounded-full border-2 border-black px-3 py-0.5 text-[8px] font-black uppercase">
                       Team Lead
@@ -723,41 +717,28 @@ export function StaffTabContent({
             </DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="staff-first-name">First name</Label>
-              <Input id="staff-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="staff-last-name">Last name</Label>
-              <Input id="staff-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            <div className="col-span-2 space-y-2">
+              <Label htmlFor="staff-name">Name</Label>
+              <Input id="staff-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
             </div>
             <div className="col-span-2 space-y-2">
-              <Label>Role</Label>
+              <Label>Role (optional)</Label>
               <Select value={roleId} onValueChange={setRoleId}>
                 <SelectTrigger><SelectValue placeholder="Choose a role" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">No role</SelectItem>
                   {roles.map((role) => (
                     <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="staff-email">Email (optional)</Label>
-              <Input id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="staff-phone">Phone (optional)</Label>
-              <Input id="staff-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMemberDialogOpen(false)}>Cancel</Button>
             <Button
               disabled={
-                !firstName.trim() ||
-                !lastName.trim() ||
-                !roleId ||
+                !name.trim() ||
                 createMember.isPending ||
                 updateMember.isPending
               }
@@ -783,7 +764,7 @@ export function StaffTabContent({
             <AlertDialogTitle>Remove staff member?</AlertDialogTitle>
             <AlertDialogDescription>
               {memberToDelete
-                ? `${memberToDelete.firstName} ${memberToDelete.lastName} will be removed from this event.`
+                ? `${memberToDelete.name} will be removed from this event.`
                 : "This staff member will be removed from the event."}
             </AlertDialogDescription>
           </AlertDialogHeader>
