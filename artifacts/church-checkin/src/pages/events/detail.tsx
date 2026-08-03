@@ -5724,7 +5724,7 @@ function CheckInDeskContent({
           </CardContent>
         </Card>
       ) : displayMode === "family_grouping" && isChildEvent ? (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {groupForDesk(filteredForGrouping as DeskParticipant[]).map(
             (group) => {
               const groupKey =
