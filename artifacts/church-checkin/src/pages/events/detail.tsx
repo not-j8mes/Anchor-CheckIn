@@ -151,6 +151,7 @@ import { cn } from "@/lib/utils";
 import { RoomsTabContent } from "./detail/RoomsTabContent";
 import { StaffTabContent } from "./detail/StaffTabContent";
 import { getEventRegistrationsExport } from "./detail/registrationExport";
+import { sortDeskFamiliesByFirstChildLastName } from "@/lib/desk-family-sort";
 import { RegistrationExportDialog } from "./detail/RegistrationExportDialog";
 import { buildRegistrationEmbedCode } from "@/lib/embedCode";
 import { summarizeRoomAttendance } from "@/lib/roomAttendance";
@@ -4971,7 +4972,7 @@ function groupForDesk(filtered: DeskParticipant[]): Array<{
     });
   }
 
-  return result;
+  return sortDeskFamiliesByFirstChildLastName(result);
 }
 
 // ─── Check-In Desk ────────────────────────────────────────────────────────────
