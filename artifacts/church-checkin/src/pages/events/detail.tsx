@@ -115,6 +115,7 @@ import {
   Printer,
   StickyNote,
   Settings,
+  SlidersHorizontal,
   Tag,
   ChevronRight,
   User,
@@ -4247,6 +4248,11 @@ function CheckinDeskSettingsDialog({
   showFamilyCodeSetting,
   searchOnly,
   onSearchOnlyChange,
+  showSessionActions,
+  onStartSession,
+  onEndSession,
+  showPrintTestLabel,
+  onPrintTestLabel,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -4257,6 +4263,11 @@ function CheckinDeskSettingsDialog({
   showFamilyCodeSetting: boolean;
   searchOnly: boolean;
   onSearchOnlyChange: (v: boolean) => void;
+  showSessionActions: boolean;
+  onStartSession: () => void;
+  onEndSession: () => void;
+  showPrintTestLabel: boolean;
+  onPrintTestLabel: () => void;
 }) {
   const options: {
     value: DeskDisplayMode;
@@ -4279,14 +4290,20 @@ function CheckinDeskSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-primary" />
-            Check-In Settings
+            Desk Controls
           </DialogTitle>
+          <DialogDescription>
+            Manage Check-In Desk display preferences, session actions, and tools.
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-6 py-2">
+        <div className="space-y-6 overflow-y-auto py-2 pr-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Display
+          </p>
           <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-4">
             <div className="min-w-0 flex-1 space-y-1">
               <Label
@@ -4390,6 +4407,57 @@ function CheckinDeskSettingsDialog({
                     className="shrink-0 mt-0.5"
                   />
                 </div>
+              </div>
+            </>
+          )}
+
+          {showSessionActions && (
+            <>
+              <div className="border-t border-border" />
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Session Actions
+                </p>
+                <div className="grid gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="justify-start gap-2"
+                    onClick={onStartSession}
+                  >
+                    <Calendar className="h-4 w-4" />
+                    Start new session / Reset for today
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="justify-start gap-2 border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                    onClick={onEndSession}
+                  >
+                    <PowerOff className="h-4 w-4" />
+                    End Session / Check Out Remaining
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {showPrintTestLabel && (
+            <>
+              <div className="border-t border-border" />
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Tools
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start gap-2"
+                  onClick={onPrintTestLabel}
+                >
+                  <Printer className="h-4 w-4" />
+                  Print Test Label
+                </Button>
               </div>
             </>
           )}
@@ -5432,84 +5500,39 @@ function CheckInDeskContent({
                 aria-label="Print labels on check-in"
               />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`gap-1.5 ${displayMode === "family_grouping" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setSettingsOpen(true)}
-              title="Check-In Settings"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">Settings</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onExportCsv}
-              disabled={isExporting}
-              className="text-muted-foreground hover:text-foreground gap-1.5"
-            >
-              {isExporting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">Export CSV</span>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground px-2"
+                  size="icon"
+                  className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                  onClick={() => setSettingsOpen(true)}
+                  aria-label="Desk Controls"
                 >
-                  <MoreHorizontal className="w-4 h-4" />
+                  <SlidersHorizontal className="w-4 h-4" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {isChildEvent && (
-                  <>
-                    <DropdownMenuItem
-                      className="gap-2 cursor-pointer"
-                      onClick={handleStartTodaySession}
-                    >
-                      <Calendar className="w-4 h-4" />
-                      Start new session / Reset for today
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive gap-2 cursor-pointer"
-                      onClick={() => setEndSessionOpen(true)}
-                    >
-                      <PowerOff className="w-4 h-4" />
-                      End Session / Check Out Remaining
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {printLabels && (
-                  <DropdownMenuItem
-                    className="gap-2 cursor-pointer"
-                    onClick={() =>
-                      printLabelDirectly(
-                        [
-                          {
-                            ...SAMPLE_LABEL,
-                            checkinDate: new Date().toISOString(),
-                            organizationName: getLabelHeaderName(
-                              organization?.name,
-                              eventName,
-                            ),
-                          },
-                        ],
-                        labelType,
-                      )
-                    }
-                  >
-                    <Printer className="w-4 h-4" />
-                    Print Test Label
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </TooltipTrigger>
+              <TooltipContent>Desk Controls</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onExportCsv}
+                  disabled={isExporting}
+                  className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                  aria-label="Export CSV"
+                >
+                  {isExporting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export CSV</TooltipContent>
+            </Tooltip>
           </div>
         </div>
         {/* Row 2: subtitle */}
@@ -6265,6 +6288,32 @@ function CheckInDeskContent({
         showFamilyCodeSetting={showFamilyCodeSetting}
         searchOnly={searchOnly}
         onSearchOnlyChange={handleSearchOnlyChange}
+        showSessionActions={isChildEvent}
+        onStartSession={() => {
+          setSettingsOpen(false);
+          void handleStartTodaySession();
+        }}
+        onEndSession={() => {
+          setSettingsOpen(false);
+          setEndSessionOpen(true);
+        }}
+        showPrintTestLabel={printLabels}
+        onPrintTestLabel={() => {
+          setSettingsOpen(false);
+          printLabelDirectly(
+            [
+              {
+                ...SAMPLE_LABEL,
+                checkinDate: new Date().toISOString(),
+                organizationName: getLabelHeaderName(
+                  organization?.name,
+                  eventName,
+                ),
+              },
+            ],
+            labelType,
+          );
+        }}
       />
     </div>
   );
