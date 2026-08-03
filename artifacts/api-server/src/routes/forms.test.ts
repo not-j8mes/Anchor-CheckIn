@@ -457,6 +457,109 @@ describe("GET /api/forms/by-slug/:embedSlug — public org field safety", () => 
     }
   });
 
+  it("adds a child to an existing family without duplicating shared contacts", async () => {
+    const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const [organization] = await db
+      .insert(organizationsTable)
+      .values({ name: `Family Test ${suffix}` })
+      .returning({ id: organizationsTable.id });
+    const [form] = await db
+      .insert(formsTable)
+      .values({
+        organizationId: organization.id,
+        title: "Family child-only form",
+        embedSlug: `family-child-${suffix}`,
+        isActive: true,
+        isPublic: true,
+      })
+      .returning({ id: formsTable.id });
+    const [event] = await db
+      .insert(eventsTable)
+      .values({
+        organizationId: organization.id,
+        name: "Family Test Event",
+        formId: form.id,
+        registrationType: "child_checkin",
+      })
+      .returning({ id: eventsTable.id });
+    const fields = await db
+      .insert(formFieldsTable)
+      .values([
+        { organizationId: organization.id, formId: form.id, fieldKind: "system", systemKey: "child_first_name", label: "Child First Name", fieldType: "text", required: true, sortOrder: 0 },
+        { organizationId: organization.id, formId: form.id, fieldKind: "system", systemKey: "child_last_name", label: "Child Last Name", fieldType: "text", required: true, sortOrder: 1 },
+        { organizationId: organization.id, formId: form.id, fieldKind: "custom", sectionKey: "child_info", label: "Favourite game", fieldType: "text", required: true, sortOrder: 2 },
+        { organizationId: organization.id, formId: form.id, fieldKind: "system", systemKey: "guardian_first_name", label: "Guardian First Name", fieldType: "text", required: true, sortOrder: 3 },
+        { organizationId: organization.id, formId: form.id, fieldKind: "system", systemKey: "guardian_last_name", label: "Guardian Last Name", fieldType: "text", required: true, sortOrder: 4 },
+        { organizationId: organization.id, formId: form.id, fieldKind: "system", systemKey: "guardian_phone", label: "Guardian Phone", fieldType: "phone", required: true, sortOrder: 5 },
+        { organizationId: organization.id, formId: form.id, fieldKind: "system", systemKey: "emergency_contact_name", label: "Emergency Contact", fieldType: "text", required: true, sortOrder: 6 },
+        { organizationId: organization.id, formId: form.id, fieldKind: "custom", sectionKey: "additional_questions", label: "Family language", fieldType: "text", required: true, sortOrder: 7 },
+      ])
+      .returning();
+    const byKey = new Map(fields.map((field) => [field.systemKey ?? field.label, field.id]));
+
+    try {
+      const first = await postJson(`/api/forms/${form.id}/register`, {
+        fields: [
+          { fieldId: byKey.get("child_first_name"), value: "Avery" },
+          { fieldId: byKey.get("child_last_name"), value: "Taylor" },
+          { fieldId: byKey.get("Favourite game"), value: "Tag" },
+          { fieldId: byKey.get("guardian_first_name"), value: "Nicole" },
+          { fieldId: byKey.get("guardian_last_name"), value: "Taylor" },
+          { fieldId: byKey.get("guardian_phone"), value: "555-207-0107" },
+          { fieldId: byKey.get("emergency_contact_name"), value: "Pat Taylor" },
+          { fieldId: byKey.get("Family language"), value: "English" },
+        ],
+      });
+      assert.equal(first.status, 201);
+      const firstRegistration = first.body as {
+        id: number;
+        registrationGroupId: number;
+      };
+
+      const second = await postJson(`/api/forms/${form.id}/register`, {
+        registrationGroupId: firstRegistration.registrationGroupId,
+        fields: [
+          { fieldId: byKey.get("child_first_name"), value: "Riley" },
+          { fieldId: byKey.get("child_last_name"), value: "Taylor" },
+          { fieldId: byKey.get("Favourite game"), value: "Soccer" },
+        ],
+      });
+      assert.equal(second.status, 201);
+
+      const result = await pool.query<{
+        registrations: string;
+        guardians: string;
+        emergencyContacts: string;
+        distinctPrimaryGuardians: string;
+        familyAnswer: string;
+        childAnswer: string;
+      }>(
+        `SELECT
+          (SELECT count(*) FROM registrations WHERE registration_group_id = $1) AS registrations,
+          (SELECT count(*) FROM guardians WHERE organization_id = $2) AS guardians,
+          (SELECT count(*) FROM emergency_contacts WHERE organization_id = $2) AS "emergencyContacts",
+          (SELECT count(DISTINCT guardian_id) FROM registrations WHERE registration_group_id = $1) AS "distinctPrimaryGuardians",
+          (SELECT answer_value FROM registration_custom_answers WHERE registration_id = $3 AND question_label = 'Family language') AS "familyAnswer",
+          (SELECT answer_value FROM registration_custom_answers WHERE registration_id = $3 AND question_label = 'Favourite game') AS "childAnswer"`,
+        [
+          firstRegistration.registrationGroupId,
+          organization.id,
+          (second.body as { id: number }).id,
+        ],
+      );
+      assert.deepEqual(result.rows[0], {
+        registrations: "2",
+        guardians: "1",
+        emergencyContacts: "1",
+        distinctPrimaryGuardians: "1",
+        familyAnswer: "English",
+        childAnswer: "Soccer",
+      });
+    } finally {
+      await db.delete(organizationsTable).where(eq(organizationsTable.id, organization.id));
+    }
+  });
+
   it("saves a registration when the confirmation email sends", async () => {
     const fixture = await createRegistrationEmailFixture();
     const sent: unknown[] = [];

@@ -491,15 +491,6 @@ type ExistingFamilyRegistration = {
   sourceRegistration: Registration;
 };
 
-function splitDisplayName(name: string | null | undefined) {
-  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  return {
-    firstName:
-      parts.length > 1 ? parts.slice(0, -1).join(" ") : (parts[0] ?? ""),
-    lastName: parts.length > 1 ? (parts.at(-1) ?? "") : "",
-  };
-}
-
 function ManualRegistrationDialog({
   formId,
   embedSlug,
@@ -507,6 +498,11 @@ function ManualRegistrationDialog({
   eventId,
   allowCheckIn = false,
   selectedSessionId,
+  reuseFamilyCode = false,
+  labelType = "child_security",
+  printLabelsEnabled = false,
+  organizationName,
+  eventName,
   existingFamily,
   open,
   onOpenChange,
@@ -517,6 +513,11 @@ function ManualRegistrationDialog({
   eventId: number;
   allowCheckIn?: boolean;
   selectedSessionId?: number | null;
+  reuseFamilyCode?: boolean;
+  labelType?: string;
+  printLabelsEnabled?: boolean;
+  organizationName?: string | null;
+  eventName?: string;
   existingFamily?: ExistingFamilyRegistration | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -553,7 +554,6 @@ function ManualRegistrationDialog({
   const [submissionAction, setSubmissionAction] = useState<
     "save" | "check-in" | null
   >(null);
-  const appliedFamilyPrefillRef = useRef<string | null>(null);
   const isSubmitting = submissionAction !== null;
 
   const submitReg = useSubmitRegistration();
@@ -564,49 +564,7 @@ function ManualRegistrationDialog({
     setChildrenAnswers([{}]);
     setEmergencyAnswers({});
     setAdditionalAnswers({});
-    appliedFamilyPrefillRef.current = null;
   };
-
-  useEffect(() => {
-    if (!open || !existingFamily || formFields.length === 0) return;
-
-    const prefillKey = `${existingFamily.registrationGroupId}:${form?.id ?? formId ?? ""}`;
-    if (appliedFamilyPrefillRef.current === prefillKey) return;
-
-    const source = existingFamily.sourceRegistration;
-    const guardianName = splitDisplayName(source.guardianName);
-    const valuesBySystemKey: Record<string, string> = {
-      guardian_first_name: guardianName.firstName,
-      guardian_last_name: guardianName.lastName,
-      guardian_email: source.guardianEmail ?? "",
-      guardian_phone: source.guardianPhone ?? "",
-      secondary_guardian_first_name: source.secondaryGuardianFirstName ?? "",
-      secondary_guardian_last_name: source.secondaryGuardianLastName ?? "",
-      secondary_guardian_phone: source.secondaryGuardianPhone ?? "",
-      secondary_guardian_email: source.secondaryGuardianEmail ?? "",
-      secondary_guardian_relationship:
-        source.secondaryGuardianRelationship ?? "",
-      emergency_contact_name: source.emergencyContactName ?? "",
-      emergency_contact_phone: source.emergencyContactPhone ?? "",
-      emergency_contact_relationship: source.emergencyContactRelationship ?? "",
-    };
-
-    const sharedAnswers = (section: "guardian_info" | "emergency_contact") =>
-      Object.fromEntries(
-        formFields
-          .filter((field) => getFieldSection(field) === section)
-          .map((field) => [
-            field.id,
-            field.systemKey ? (valuesBySystemKey[field.systemKey] ?? "") : "",
-          ]),
-      );
-
-    setGuardianAnswers(sharedAnswers("guardian_info"));
-    setEmergencyAnswers(sharedAnswers("emergency_contact"));
-    setChildrenAnswers([{}]);
-    setAdditionalAnswers({});
-    appliedFamilyPrefillRef.current = prefillKey;
-  }, [existingFamily, form?.id, formFields, formId, open]);
 
   const roomAssignmentFieldId = formFields.find(
     (f) => f.systemKey === "room_assignment",
@@ -634,25 +592,29 @@ function ManualRegistrationDialog({
       const createdRegistrations: Registration[] = [];
       for (const childAnswerMap of childrenAnswers) {
         const fields: { fieldId: number; value: string }[] = [];
-        for (const f of formFields.filter(
-          (f) => getFieldSection(f) === "guardian_info",
-        )) {
-          fields.push({ fieldId: f.id, value: guardianAnswers[f.id] ?? "" });
+        if (!existingFamily) {
+          for (const f of formFields.filter(
+            (f) => getFieldSection(f) === "guardian_info",
+          )) {
+            fields.push({ fieldId: f.id, value: guardianAnswers[f.id] ?? "" });
+          }
         }
         for (const f of formFields.filter(
           (f) => getFieldSection(f) === "child_info",
         )) {
           fields.push({ fieldId: f.id, value: childAnswerMap[f.id] ?? "" });
         }
-        for (const f of formFields.filter(
-          (f) => getFieldSection(f) === "emergency_contact",
-        )) {
-          fields.push({ fieldId: f.id, value: emergencyAnswers[f.id] ?? "" });
-        }
-        for (const f of formFields.filter((f) =>
-          ["additional_questions", "waivers"].includes(getFieldSection(f)),
-        )) {
-          fields.push({ fieldId: f.id, value: additionalAnswers[f.id] ?? "" });
+        if (!existingFamily) {
+          for (const f of formFields.filter(
+            (f) => getFieldSection(f) === "emergency_contact",
+          )) {
+            fields.push({ fieldId: f.id, value: emergencyAnswers[f.id] ?? "" });
+          }
+          for (const f of formFields.filter((f) =>
+            ["additional_questions", "waivers"].includes(getFieldSection(f)),
+          )) {
+            fields.push({ fieldId: f.id, value: additionalAnswers[f.id] ?? "" });
+          }
         }
         const selectedRoom = roomAssignmentFieldId
           ? (childAnswerMap[roomAssignmentFieldId] ?? "")
@@ -670,16 +632,32 @@ function ManualRegistrationDialog({
         createdRegistrations.push(registration);
       }
       registrationsCreated = true;
+      const labelsToPrint: LabelData[] = [];
       if (shouldCheckIn) {
         for (const registration of createdRegistrations) {
-          await createCheckin.mutateAsync({
+          const result = await createCheckin.mutateAsync({
             data: {
               registrationId: registration.id,
               room: registration.room ?? undefined,
               sessionId: selectedSessionId!,
+              reuseFamilyCode: reuseFamilyCode || undefined,
             },
           });
+          if (result.labelData) {
+            labelsToPrint.push({
+              ...result.labelData,
+              organizationName: getLabelHeaderName(
+                organizationName,
+                eventName,
+              ),
+              guardianName:
+                registration.guardianName || result.labelData.guardianName,
+            });
+          }
         }
+      }
+      if (printLabelsEnabled && labelsToPrint.length > 0) {
+        printLabelDirectly(labelsToPrint, labelType);
       }
       queryClient.invalidateQueries({
         queryKey: getListRegistrationsQueryKey(resolvedFormId),
@@ -744,6 +722,22 @@ function ManualRegistrationDialog({
               ? `Add Child to ${existingFamily.familyName}`
               : `Add ${isChildCheckin ? "Child" : "Registrant"}`}
           </DialogTitle>
+          {existingFamily && (
+            <div
+              className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm"
+              aria-label={`Adding a child to ${existingFamily.familyName}`}
+            >
+              <p className="font-semibold text-foreground">
+                {existingFamily.familyName}
+              </p>
+              <p className="mt-0.5 text-muted-foreground">
+                Guardian: {existingFamily.sourceRegistration.guardianName}
+                {existingFamily.sourceRegistration.guardianPhone
+                  ? ` · ${existingFamily.sourceRegistration.guardianPhone}`
+                  : ""}
+              </p>
+            </div>
+          )}
         </DialogHeader>
 
         {!embedSlug ? (
@@ -764,6 +758,9 @@ function ManualRegistrationDialog({
                 formFields={formFields}
                 rooms={rooms}
                 isChildCheckin={isChildCheckin}
+                allowMultipleChildren={!existingFamily}
+                allowSecondGuardian={!existingFamily}
+                visibleSections={existingFamily ? ["child_info"] : undefined}
                 addAnotherPersonLabel={
                   allowCheckIn && isChildCheckin
                     ? "Add Another Child to This Family"
@@ -5044,6 +5041,7 @@ function CheckInDeskContent({
   const [familyCodeEnabled, setFamilyCodeEnabled] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const deskControlsTriggerRef = useRef<HTMLButtonElement>(null);
+  const addChildTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [batchLoadingGroupId, setBatchLoadingGroupId] = useState<string | null>(
     null,
   );
@@ -5781,6 +5779,10 @@ function CheckInDeskContent({
                   labelType={labelType}
                   requireCheckout={requireCheckout}
                   onAddChild={() => {
+                    addChildTriggerRef.current =
+                      document.activeElement instanceof HTMLButtonElement
+                        ? document.activeElement
+                        : null;
                     const sourceRegistration = group.items[0]!.reg;
                     const registrationGroupId =
                       group.groupId ??
@@ -6268,11 +6270,19 @@ function CheckInDeskContent({
         eventId={eventId}
         allowCheckIn
         selectedSessionId={selectedSessionId}
+        reuseFamilyCode={familyCodeEnabled}
+        labelType={labelType}
+        printLabelsEnabled={printLabels}
+        organizationName={organization?.name}
+        eventName={eventName}
         existingFamily={existingFamily}
         open={addRegOpen}
         onOpenChange={(nextOpen) => {
           setAddRegOpen(nextOpen);
-          if (!nextOpen) setExistingFamily(null);
+          if (!nextOpen) {
+            setExistingFamily(null);
+            requestAnimationFrame(() => addChildTriggerRef.current?.focus());
+          }
         }}
       />
 

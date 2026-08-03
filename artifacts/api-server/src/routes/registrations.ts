@@ -233,6 +233,15 @@ const SYSTEM_KEY_MAP: Record<string, { table: FieldTable; column: string }> = {
   accessibility_needs: { table: "participants", column: "special_needs" },
 };
 
+export function isChildScopedRegistrationField(
+  field: Pick<FormField, "fieldKind" | "systemKey" | "sectionKey">,
+): boolean {
+  if (field.sectionKey === "child_info") return true;
+  if (field.fieldKind !== "system" || !field.systemKey) return false;
+  if (field.systemKey === "room_assignment") return true;
+  return SYSTEM_KEY_MAP[field.systemKey]?.table === "participants";
+}
+
 // ─── Form version helpers ─────────────────────────────────────────────────────
 
 /**
@@ -391,6 +400,99 @@ router.post(
       const fieldById = new Map(formFields.map((f) => [f.id, f]));
       const valueByFieldId = new Map<number, string>();
 
+      let existingFamilySource: typeof registrationsTable.$inferSelect | null =
+        null;
+      let existingFamilyGuardianLinks: Array<{
+        guardianId: number;
+        relationship: string | null;
+        isPrimary: boolean;
+        canPickUp: boolean;
+      }> = [];
+      let inheritedFamilyAnswers: Array<{
+        formFieldId: number | null;
+        questionLabel: string;
+        answerValue: string;
+      }> = [];
+      let existingFamilyEmergencyContact: {
+        name: string;
+        phone: string;
+        relationship: string | null;
+      } | null = null;
+
+      if (incomingGroupId !== null) {
+        if (!eventId || !organizationId) {
+          throw new InvalidRegistrationGroupError();
+        }
+        const [source] = await db
+          .select()
+          .from(registrationsTable)
+          .where(
+            and(
+              eq(registrationsTable.registrationGroupId, incomingGroupId),
+              eq(registrationsTable.formId, formId),
+              eq(registrationsTable.eventId, eventId),
+              eq(registrationsTable.organizationId, organizationId),
+            ),
+          )
+          .orderBy(asc(registrationsTable.id))
+          .limit(1);
+        if (!source) throw new InvalidRegistrationGroupError();
+        existingFamilySource = source;
+
+        if (source.participantId) {
+          [existingFamilyGuardianLinks, [existingFamilyEmergencyContact]] =
+            await Promise.all([
+              db
+                .select({
+                  guardianId: participantGuardiansTable.guardianId,
+                  relationship: participantGuardiansTable.relationship,
+                  isPrimary: participantGuardiansTable.isPrimary,
+                  canPickUp: participantGuardiansTable.canPickUp,
+                })
+                .from(participantGuardiansTable)
+                .where(
+                  eq(
+                    participantGuardiansTable.participantId,
+                    source.participantId,
+                  ),
+                ),
+              db
+                .select({
+                  name: emergencyContactsTable.name,
+                  phone: emergencyContactsTable.phone,
+                  relationship: emergencyContactsTable.relationship,
+                })
+                .from(emergencyContactsTable)
+                .where(
+                  eq(emergencyContactsTable.participantId, source.participantId),
+                )
+                .limit(1),
+            ]);
+        }
+
+        const childFieldIds = new Set(
+          formFields
+            .filter(isChildScopedRegistrationField)
+            .map((field) => field.id),
+        );
+        inheritedFamilyAnswers = (
+          await db
+            .select({
+              formFieldId: registrationCustomAnswersTable.formFieldId,
+              questionLabel: registrationCustomAnswersTable.questionLabel,
+              answerValue: registrationCustomAnswersTable.answerValue,
+            })
+            .from(registrationCustomAnswersTable)
+            .where(
+              eq(registrationCustomAnswersTable.registrationId, source.id),
+            )
+        ).filter(
+          (answer) =>
+            answer.formFieldId === null ||
+            !childFieldIds.has(answer.formFieldId),
+        );
+      }
+
       for (const { fieldId, value } of submittedFields) {
         const formField = fieldById.get(fieldId);
         if (!formField) {
@@ -420,6 +522,10 @@ router.post(
       );
 
       const missingRequiredFields = formFields
+        .filter(
+          (field) =>
+            !existingFamilySource || isChildScopedRegistrationField(field),
+        )
         .filter((field) => field.required || field.fieldType === "waiver")
         .filter(
           (field) =>
@@ -457,6 +563,11 @@ router.post(
 
         const formField = fieldById.get(fieldId);
         if (!formField) continue;
+        if (
+          existingFamilySource &&
+          !isChildScopedRegistrationField(formField)
+        )
+          continue;
         if (!allowSecondGuardian && isSecondaryGuardianField(formField))
           continue;
 
@@ -522,40 +633,70 @@ router.post(
           })
           .returning();
 
-        // ── Create guardian ───────────────────────────────────────────────────────
-        const [guardian] = await tx
-          .insert(guardiansTable)
-          .values({
-            organizationId,
-            firstName: guardianCols["first_name"] ?? "",
-            lastName: guardianCols["last_name"] ?? "",
-            email: guardianCols["email"] ?? null,
-            phone: guardianCols["phone"] ?? null,
-          })
-          .returning();
+        // Reuse the family's guardian records when adding another child.
+        const guardian = existingFamilySource?.guardianId
+          ? { id: existingFamilySource.guardianId }
+          : (
+              await tx
+                .insert(guardiansTable)
+                .values({
+                  organizationId,
+                  firstName: guardianCols["first_name"] ?? "",
+                  lastName: guardianCols["last_name"] ?? "",
+                  email: guardianCols["email"] ?? null,
+                  phone: guardianCols["phone"] ?? null,
+                })
+                .returning()
+            )[0];
 
         // ── Link participant ↔ guardian ───────────────────────────────────────────
-        await tx.insert(participantGuardiansTable).values({
-          organizationId,
-          participantId: participant.id,
-          guardianId: guardian.id,
-          isPrimary: true,
-          canPickUp: true,
-        });
+        if (existingFamilySource) {
+          const links = [...existingFamilyGuardianLinks];
+          if (
+            guardian &&
+            !links.some((link) => link.guardianId === guardian.id)
+          ) {
+            links.unshift({
+              guardianId: guardian.id,
+              relationship: null,
+              isPrimary: true,
+              canPickUp: true,
+            });
+          }
+          if (links.length > 0) {
+            await tx.insert(participantGuardiansTable).values(
+              links.map((link) => ({
+                organizationId,
+                participantId: participant.id,
+                ...link,
+              })),
+            );
+          }
+        } else if (guardian) {
+          await tx.insert(participantGuardiansTable).values({
+            organizationId,
+            participantId: participant.id,
+            guardianId: guardian.id,
+            isPrimary: true,
+            canPickUp: true,
+          });
 
-        await syncSecondaryGuardianForParticipant(tx, {
-          organizationId,
-          participantId: participant.id,
-          firstName: registrationCols["secondary_guardian_first_name"] ?? null,
-          lastName: registrationCols["secondary_guardian_last_name"] ?? null,
-          phone: registrationCols["secondary_guardian_phone"] ?? null,
-          email: registrationCols["secondary_guardian_email"] ?? null,
-          relationship:
-            registrationCols["secondary_guardian_relationship"] ?? null,
-        });
+          await syncSecondaryGuardianForParticipant(tx, {
+            organizationId,
+            participantId: participant.id,
+            firstName:
+              registrationCols["secondary_guardian_first_name"] ?? null,
+            lastName:
+              registrationCols["secondary_guardian_last_name"] ?? null,
+            phone: registrationCols["secondary_guardian_phone"] ?? null,
+            email: registrationCols["secondary_guardian_email"] ?? null,
+            relationship:
+              registrationCols["secondary_guardian_relationship"] ?? null,
+          });
+        }
 
         // ── Create emergency contact (if name provided) ───────────────────────────
-        if (emergencyCols["name"]) {
+        if (!existingFamilySource && emergencyCols["name"]) {
           await tx.insert(emergencyContactsTable).values({
             organizationId,
             participantId: participant.id,
@@ -566,12 +707,11 @@ router.post(
         }
 
         // ── Build legacy column values for the registrations table ───────────────
-        const legacyGuardianName = [
-          guardianCols["first_name"],
-          guardianCols["last_name"],
-        ]
-          .filter(Boolean)
-          .join(" ");
+        const legacyGuardianName =
+          existingFamilySource?.guardianName ??
+          [guardianCols["first_name"], guardianCols["last_name"]]
+            .filter(Boolean)
+            .join(" ");
 
         // ── Resolve registration group ────────────────────────────────────────────
         // Priority 1: caller supplied a group ID (walk-in multi-child flow)
@@ -643,7 +783,7 @@ router.post(
             eventId,
             formVersionId,
             participantId: participant.id,
-            guardianId: guardian.id,
+            guardianId: guardian?.id ?? null,
             registrationGroupId,
             submittedAt: new Date(),
             // Legacy flat columns — populated from structured data for backward compat
@@ -651,28 +791,57 @@ router.post(
             childLastName: participantCols["last_name"] ?? "",
             childDateOfBirth: participantCols["date_of_birth"] ?? null,
             guardianName: legacyGuardianName || "",
-            guardianPhone: guardianCols["phone"] ?? "",
-            guardianEmail: guardianCols["email"] ?? null,
+            guardianPhone:
+              existingFamilySource?.guardianPhone ??
+              guardianCols["phone"] ??
+              "",
+            guardianEmail:
+              existingFamilySource?.guardianEmail ??
+              guardianCols["email"] ??
+              null,
             secondaryGuardianFirstName:
-              registrationCols["secondary_guardian_first_name"] ?? null,
+              existingFamilySource?.secondaryGuardianFirstName ??
+              registrationCols["secondary_guardian_first_name"] ??
+              null,
             secondaryGuardianLastName:
-              registrationCols["secondary_guardian_last_name"] ?? null,
+              existingFamilySource?.secondaryGuardianLastName ??
+              registrationCols["secondary_guardian_last_name"] ??
+              null,
             secondaryGuardianPhone:
-              registrationCols["secondary_guardian_phone"] ?? null,
+              existingFamilySource?.secondaryGuardianPhone ??
+              registrationCols["secondary_guardian_phone"] ??
+              null,
             secondaryGuardianEmail:
-              registrationCols["secondary_guardian_email"] ?? null,
+              existingFamilySource?.secondaryGuardianEmail ??
+              registrationCols["secondary_guardian_email"] ??
+              null,
             secondaryGuardianRelationship:
-              registrationCols["secondary_guardian_relationship"] ?? null,
+              existingFamilySource?.secondaryGuardianRelationship ??
+              registrationCols["secondary_guardian_relationship"] ??
+              null,
             allergies: participantCols["allergies"] ?? null,
             specialNeeds: participantCols["special_needs"] ?? null,
+            emergencyContactName:
+              existingFamilyEmergencyContact?.name ??
+              existingFamilySource?.emergencyContactName ??
+              null,
+            emergencyContactPhone:
+              existingFamilyEmergencyContact?.phone ??
+              existingFamilySource?.emergencyContactPhone ??
+              null,
+            emergencyContactRelationship:
+              existingFamilyEmergencyContact?.relationship ??
+              existingFamilySource?.emergencyContactRelationship ??
+              null,
             room: roomFromFields ?? submittedRoom,
           })
           .returning();
 
         // ── Save custom answers ───────────────────────────────────────────────────
-        if (customAnswers.length > 0) {
+        const answersToSave = [...customAnswers, ...inheritedFamilyAnswers];
+        if (answersToSave.length > 0) {
           await tx.insert(registrationCustomAnswersTable).values(
-            customAnswers.map((a) => ({
+            answersToSave.map((a) => ({
               registrationId: registration.id,
               organizationId,
               formFieldId: a.formFieldId,

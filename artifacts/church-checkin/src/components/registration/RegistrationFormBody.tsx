@@ -38,6 +38,16 @@ export function isSecondaryGuardianField(field: FormField): boolean {
   return field.sectionKey === SECONDARY_GUARDIAN_SECTION_KEY || (field.systemKey?.startsWith("secondary_guardian_") ?? false);
 }
 
+export function filterFieldsByVisibleSections(
+  formFields: FormField[],
+  visibleSections?: FieldSection[],
+): FormField[] {
+  if (!visibleSections) return formFields;
+  return formFields.filter((field) =>
+    visibleSections.includes(getFieldSection(field)),
+  );
+}
+
 // ─── Field renderer ───────────────────────────────────────────────────────────
 
 const MONTH_OPTIONS = [
@@ -456,6 +466,7 @@ export interface RegistrationFormBodyProps {
   rooms: Room[];
   isChildCheckin: boolean;
   allowAdditionalPeople?: boolean;
+  allowMultipleChildren?: boolean;
   allowSecondGuardian?: boolean;
   addAnotherPersonLabel?: string;
   guardianAnswers: Record<number, string>;
@@ -477,6 +488,7 @@ export function RegistrationFormBody({
   rooms,
   isChildCheckin,
   allowAdditionalPeople = false,
+  allowMultipleChildren = true,
   allowSecondGuardian = true,
   addAnotherPersonLabel,
   guardianAnswers,
@@ -492,16 +504,20 @@ export function RegistrationFormBody({
   visibleSections,
   embedded = false,
 }: RegistrationFormBodyProps) {
-  const guardianFields = formFields.filter((f) => getFieldSection(f) === "guardian_info");
+  const visibleFormFields = filterFieldsByVisibleSections(
+    formFields,
+    visibleSections,
+  );
+  const guardianFields = visibleFormFields.filter((f) => getFieldSection(f) === "guardian_info");
   const primaryGuardianFields = guardianFields.filter((field) => !isSecondaryGuardianField(field));
   const secondaryGuardianFields = guardianFields.filter(isSecondaryGuardianField);
   const [showSecondaryGuardian, setShowSecondaryGuardian] = useState(() =>
     allowSecondGuardian && secondaryGuardianFields.some((field) => !!guardianAnswers[field.id]),
   );
-  const childFields = formFields.filter((f) => getFieldSection(f) === "child_info");
-  const emergencyFields = formFields.filter((f) => getFieldSection(f) === "emergency_contact");
-  const additionalFields = formFields.filter((f) => getFieldSection(f) === "additional_questions");
-  const waiverFields = formFields.filter((f) => getFieldSection(f) === "waivers");
+  const childFields = visibleFormFields.filter((f) => getFieldSection(f) === "child_info");
+  const emergencyFields = visibleFormFields.filter((f) => getFieldSection(f) === "emergency_contact");
+  const additionalFields = visibleFormFields.filter((f) => getFieldSection(f) === "additional_questions");
+  const waiverFields = visibleFormFields.filter((f) => getFieldSection(f) === "waivers");
   const isSectionVisible = (section: FieldSection) =>
     !visibleSections || visibleSections.includes(section);
   const nestedShellClassName = embedded
@@ -644,7 +660,8 @@ export function RegistrationFormBody({
               );
             })}
 
-            {(isChildCheckin || allowAdditionalPeople) && (
+            {((isChildCheckin && allowMultipleChildren) ||
+              allowAdditionalPeople) && (
               <Button
                 type="button"
                 variant="outline"
