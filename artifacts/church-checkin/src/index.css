@@ -282,14 +282,13 @@
 }
 
 @media print {
-  /* Hide the React app so it contributes zero height to the printed document.
-     With #root gone, the only content is #single-label-print-root (62mm) = 1 page. */
-  body > #root {
+  /* Print roots live directly under body. Explicit print mode excludes the
+     React app and every portal sibling (dialogs, overlays, toasts, tooltips). */
+  body[data-print-mode] > * {
     display: none !important;
   }
 
-  /* #single-label-print-root is appended directly to body outside #root by printLabels() */
-  body > #single-label-print-root {
+  body[data-print-mode] > [data-print-root="true"] {
     display: block !important;
     margin: 0 !important;
     padding: 0 !important;

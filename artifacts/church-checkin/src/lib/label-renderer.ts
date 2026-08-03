@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import type { LabelData } from "@workspace/api-client-react";
+import { isPrintActive, printIsolatedRoot } from "./print-isolation";
 
 export function labelDataForType(
   label: LabelData,
@@ -238,20 +239,28 @@ export function renderPrintPagesHtml(
 /**
  * Prints labels from the current app window.
  *
- * Injects a #single-label-print-root div directly onto document.body (outside
- * the React #root). Print CSS hides #root entirely, so the only document content
- * is the label pages — exactly one page per label (two pages per child for
- * security check-out labels: child label + parent pickup label).
+ * Injects a body-level print root and activates isolated print mode. Print CSS
+ * excludes every sibling, including the React app and portal-based overlays, so
+ * the only document content is the label pages.
  */
-export function printLabels(labels: LabelData[], labelType?: string): void {
-  if (labels.length === 0) return;
+export function printLabels(
+  labels: LabelData[],
+  labelType?: string,
+  options?: {
+    mode?: string;
+    rootId?: string;
+    onAfterPrint?: () => void;
+  },
+): boolean {
+  if (labels.length === 0 || isPrintActive()) return false;
 
   // Remove any stale container from a previous print (afterprint may not have fired).
   const stale = document.getElementById("single-label-print-root");
   if (stale) stale.remove();
+  document.getElementById("test-label-print-root")?.remove();
 
   const container = document.createElement("div");
-  container.id = "single-label-print-root";
+  container.id = options?.rootId ?? "single-label-print-root";
   // Keep normal inherited typography so print engines do not collapse text in
   // the header and guardian footer. Each page already has an exact fixed size.
   container.style.cssText =
@@ -260,10 +269,11 @@ export function printLabels(labels: LabelData[], labelType?: string): void {
 
   container.innerHTML = renderPrintPagesHtml(labels, labelType).join("");
 
-  // Let the browser finish layout before opening the print dialog.
-  setTimeout(() => window.print(), 0);
-
-  window.addEventListener("afterprint", () => { container.remove(); }, { once: true });
+  return printIsolatedRoot({
+    mode: options?.mode ?? "labels",
+    root: container,
+    onAfterPrint: options?.onAfterPrint,
+  });
 }
 
 function escHtml(str: string): string {

@@ -52,6 +52,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { isPrintActive, printIsolatedRoot } from "@/lib/print-isolation";
 import { useAuth } from "@/lib/auth";
 
 interface StaffRole {
@@ -112,7 +113,7 @@ function printStaffLabels(
   organizationName: string,
   settings: StaffLabelSettings,
 ) {
-  if (!members.length) return;
+  if (!members.length || isPrintActive()) return;
   document.getElementById("staff-label-print-root")?.remove();
   const root = document.createElement("div");
   root.id = "staff-label-print-root";
@@ -139,8 +140,7 @@ function printStaffLabels(
     )
     .join("");
   document.body.appendChild(root);
-  setTimeout(() => window.print(), 0);
-  window.addEventListener("afterprint", () => root.remove(), { once: true });
+  printIsolatedRoot({ mode: "staff-labels", root });
 }
 
 export function StaffTabContent({

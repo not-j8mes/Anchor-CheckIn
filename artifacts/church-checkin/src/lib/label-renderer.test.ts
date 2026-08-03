@@ -67,6 +67,17 @@ test("family security printing produces one child page per child and one shared 
   assert.match(pages[2]!, /Henry Thomas/);
 });
 
+test("test-label pages contain labels only, never Desk Controls or application chrome", () => {
+  const pages = renderPrintPagesHtml([sampleLabel], "child_security");
+  const output = pages.join("");
+  assert.equal(pages.length, 2);
+  assert.match(output, /Charlotte Thomas/);
+  assert.match(output, /PARENT PICKUP LABEL/);
+  assert.match(output, /Oakwood Bible Chapel/);
+  assert.match(output, /Parent\/Guardian:/);
+  assert.doesNotMatch(output, /Desk Controls|Check-In Desk|Search-only mode|Sidebar/);
+});
+
 test("long organization names are constrained before the timestamp", () => {
   const html = renderLabelHtml(
     {

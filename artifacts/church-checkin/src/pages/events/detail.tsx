@@ -4253,6 +4253,7 @@ function CheckinDeskSettingsDialog({
   onEndSession,
   showPrintTestLabel,
   onPrintTestLabel,
+  isPreparingTestLabel,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -4268,6 +4269,7 @@ function CheckinDeskSettingsDialog({
   onEndSession: () => void;
   showPrintTestLabel: boolean;
   onPrintTestLabel: () => void;
+  isPreparingTestLabel: boolean;
 }) {
   const options: {
     value: DeskDisplayMode;
@@ -4454,9 +4456,17 @@ function CheckinDeskSettingsDialog({
                   variant="outline"
                   className="w-full justify-start gap-2"
                   onClick={onPrintTestLabel}
+                  disabled={isPreparingTestLabel}
+                  aria-busy={isPreparingTestLabel}
                 >
-                  <Printer className="h-4 w-4" />
-                  Print Test Label
+                  {isPreparingTestLabel ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Printer className="h-4 w-4" />
+                  )}
+                  {isPreparingTestLabel
+                    ? "Preparing Test Label…"
+                    : "Print Test Label"}
                 </Button>
               </div>
             </>
@@ -5023,6 +5033,7 @@ function CheckInDeskContent({
     null,
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isPreparingTestLabel, setIsPreparingTestLabel] = useState(false);
   const [displayMode, setDisplayMode] = useState<DeskDisplayMode>("standard");
   const [searchOnly, setSearchOnly] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -5030,6 +5041,7 @@ function CheckInDeskContent({
   });
   const [familyCodeEnabled, setFamilyCodeEnabled] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const deskControlsTriggerRef = useRef<HTMLButtonElement>(null);
   const [batchLoadingGroupId, setBatchLoadingGroupId] = useState<string | null>(
     null,
   );
@@ -5503,6 +5515,7 @@ function CheckInDeskContent({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
+                  ref={deskControlsTriggerRef}
                   variant="ghost"
                   size="icon"
                   className="h-9 w-9 text-muted-foreground hover:text-foreground"
@@ -6298,9 +6311,12 @@ function CheckInDeskContent({
           setEndSessionOpen(true);
         }}
         showPrintTestLabel={printLabels}
+        isPreparingTestLabel={isPreparingTestLabel}
         onPrintTestLabel={() => {
+          if (isPreparingTestLabel) return;
+          setIsPreparingTestLabel(true);
           setSettingsOpen(false);
-          printLabelDirectly(
+          const started = printLabelDirectly(
             [
               {
                 ...SAMPLE_LABEL,
@@ -6312,7 +6328,16 @@ function CheckInDeskContent({
               },
             ],
             labelType,
+            {
+              mode: "test-label",
+              rootId: "test-label-print-root",
+              onAfterPrint: () => {
+                setIsPreparingTestLabel(false);
+                deskControlsTriggerRef.current?.focus();
+              },
+            },
           );
+          if (!started) setIsPreparingTestLabel(false);
         }}
       />
     </div>
