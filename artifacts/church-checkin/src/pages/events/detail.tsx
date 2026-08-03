@@ -2279,11 +2279,7 @@ function ChildrenTabContent({
                       className="cursor-pointer transition-all hover:bg-muted/40 hover:shadow-sm group"
                       onClick={() => setSelectedReg(reg)}
                     >
-                      <CardContent className="px-4 py-3.5 flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5">
-                          {reg.childFirstName[0]}
-                          {reg.childLastName[0]}
-                        </div>
+                      <CardContent className="flex items-start gap-4 px-4 py-3">
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="flex items-center flex-wrap gap-2">
                             <span className="font-semibold text-base leading-tight">
@@ -2305,8 +2301,11 @@ function ChildrenTabContent({
                           </div>
                           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                             <span>
-                              Registered{" "}
-                              {format(new Date(reg.createdAt), "MMM d")}
+                              <span className="font-medium text-foreground/80">
+                                {isChildCheckin ? "Parent/Guardian:" : "Contact:"}
+                              </span>{" "}
+                              {family.guardianName}
+                              {family.guardianPhone && <> · {family.guardianPhone}</>}
                             </span>
                             {hasAlert && (
                               <span className="inline-flex items-center gap-1 text-red-700">
@@ -2316,9 +2315,14 @@ function ChildrenTabContent({
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0 pt-2">
-                          <Pencil className="w-3.5 h-3.5" />
-                          <ChevronRight className="w-4 h-4" />
+                        <div className="flex flex-shrink-0 flex-col items-end gap-1">
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(reg.createdAt), "MMM d")}
+                          </span>
+                          <div className="flex items-center gap-1 text-muted-foreground transition-colors group-hover:text-foreground">
+                            <Pencil className="w-3.5 h-3.5" />
+                            <ChevronRight className="w-4 h-4" />
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -2350,11 +2354,7 @@ function ChildrenTabContent({
                 className="cursor-pointer transition-all hover:bg-muted/40 hover:shadow-sm group"
                 onClick={() => setSelectedReg(reg)}
               >
-                <CardContent className="px-4 py-4 flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-serif font-bold text-sm flex-shrink-0 mt-0.5">
-                    {reg.childFirstName[0]}
-                    {reg.childLastName[0]}
-                  </div>
+                <CardContent className="flex items-start gap-4 px-4 py-3.5">
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center flex-wrap gap-2">
                       <span className="font-semibold text-base leading-tight">
