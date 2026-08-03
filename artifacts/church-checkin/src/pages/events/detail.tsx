@@ -7970,7 +7970,9 @@ function ReportsSection({
             {attendanceSessions.length !== 1 ? "s" : ""} ·{" "}
             {checkins?.length ?? 0} total check-ins
           </p>
-          {attendanceSessions.map(({ date, items }) => (
+          {[...attendanceSessions]
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .map(({ date, items }) => (
             <Card key={date}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -8026,7 +8028,7 @@ function ReportsSection({
                 </div>
               </CardContent>
             </Card>
-          ))}
+            ))}
         </div>
       )}
     </div>
