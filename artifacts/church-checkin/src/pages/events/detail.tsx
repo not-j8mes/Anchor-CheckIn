@@ -4227,6 +4227,8 @@ function EndSessionDialog({
 
 type DeskFilter = "all" | "not_checked_in" | "checked_in" | "checked_out";
 
+const CHECKIN_DESK_POLL_INTERVAL_MS = 3_000;
+
 const DESK_FILTER_LABELS: Record<DeskFilter, string> = {
   all: "All Registered",
   not_checked_in: "Not Checked In",
@@ -8726,12 +8728,16 @@ export default function EventWorkspace() {
     query: { enabled: !!eventId, queryKey: getGetEventQueryKey(eventId) },
   });
   const regFormId = event?.formId ?? 0;
+  const checkinDeskPollingInterval =
+    section === "checkin" ? CHECKIN_DESK_POLL_INTERVAL_MS : false;
   const { data: registrations, isLoading: regsLoading } = useListRegistrations(
     regFormId,
     {
       query: {
         enabled: !!event?.formId,
         queryKey: getListRegistrationsQueryKey(regFormId),
+        refetchInterval: checkinDeskPollingInterval,
+        refetchIntervalInBackground: true,
       },
     },
   );
@@ -8741,6 +8747,8 @@ export default function EventWorkspace() {
       query: {
         enabled: !!eventId,
         queryKey: getListEventCheckinsQueryKey(eventId),
+        refetchInterval: checkinDeskPollingInterval,
+        refetchIntervalInBackground: true,
       },
     },
   );
@@ -8748,6 +8756,8 @@ export default function EventWorkspace() {
     query: {
       enabled: !!eventId,
       queryKey: getListEventSessionsQueryKey(eventId),
+      refetchInterval: checkinDeskPollingInterval,
+      refetchIntervalInBackground: true,
     },
   });
 
