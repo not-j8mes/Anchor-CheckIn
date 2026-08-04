@@ -86,6 +86,8 @@ interface StaffLabelSettings {
   showOrganization: boolean;
 }
 
+type StaffSort = "firstName" | "lastName";
+
 async function staffRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     credentials: "same-origin",
@@ -110,12 +112,6 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function staffInitials(firstName: string, lastName?: string): string {
-  const firstInitial = firstName.trim()[0] ?? "";
-  const lastInitial = lastName?.trim()[0] ?? "";
-  return `${firstInitial}${lastInitial}`.toUpperCase() || "?";
-}
-
 export function staffLabelName(
   member: Pick<StaffMember, "salutation" | "firstName" | "lastName">,
   settings: Pick<StaffLabelSettings, "showSalutation" | "lastNameFormat">,
@@ -130,6 +126,23 @@ export function staffLabelName(
   return [settings.showSalutation ? member.salutation : "", member.firstName, displayedLastName]
     .filter(Boolean)
     .join(" ");
+}
+
+export function sortStaffMembers<T extends Pick<StaffMember, "firstName" | "lastName">>(
+  members: T[],
+  sortBy: StaffSort,
+): T[] {
+  const collator = new Intl.Collator(undefined, { sensitivity: "base" });
+  return [...members].sort((left, right) => {
+    const primary =
+      sortBy === "firstName"
+        ? collator.compare(left.firstName, right.firstName)
+        : collator.compare(left.lastName, right.lastName);
+    if (primary !== 0) return primary;
+    return sortBy === "firstName"
+      ? collator.compare(left.lastName, right.lastName)
+      : collator.compare(left.firstName, right.firstName);
+  });
 }
 
 function printStaffLabels(
@@ -182,6 +195,7 @@ export function StaffTabContent({
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<StaffSort>("firstName");
   const [roleFilter, setRoleFilter] = useState<number | "all" | "none">("all");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [memberToDelete, setMemberToDelete] = useState<StaffMember | null>(null);
@@ -315,7 +329,7 @@ export function StaffTabContent({
   };
   const organizationName = organization?.name ?? "Anchor Events";
   const normalizedSearch = search.trim().toLowerCase();
-  const filteredMembers = members.filter((member) => {
+  const filteredMembers = sortStaffMembers(members.filter((member) => {
     const matchesRole =
       roleFilter === "all" ||
       (roleFilter === "none"
@@ -327,8 +341,9 @@ export function StaffTabContent({
         .toLowerCase()
         .includes(normalizedSearch);
     return matchesRole && matchesSearch;
-  });
-  const selectedMembers = members.filter((member) => selectedIds.has(member.id));
+  }), sortBy);
+  const sortedMembers = sortStaffMembers(members, sortBy);
+  const selectedMembers = sortedMembers.filter((member) => selectedIds.has(member.id));
   const allVisibleSelected =
     filteredMembers.length > 0 &&
     filteredMembers.every((member) => selectedIds.has(member.id));
@@ -368,7 +383,7 @@ export function StaffTabContent({
             size="sm"
             disabled={!members.length}
             onClick={() =>
-              printStaffLabels(members, eventName, organizationName, labelSettings)
+              printStaffLabels(sortedMembers, eventName, organizationName, labelSettings)
             }
           >
             <Printer className="mr-1.5 h-4 w-4" /> Print All Labels
@@ -416,6 +431,18 @@ export function StaffTabContent({
 
       {/* Filter row */}
       <div className="flex flex-wrap items-center gap-2">
+        <Select
+          value={sortBy}
+          onValueChange={(value: StaffSort) => setSortBy(value)}
+        >
+          <SelectTrigger className="h-9 w-auto min-w-44 text-sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="firstName">Sort by first name</SelectItem>
+            <SelectItem value="lastName">Sort by last name</SelectItem>
+          </SelectContent>
+        </Select>
         <Select
           value={String(roleFilter)}
           onValueChange={(value) =>
@@ -534,10 +561,7 @@ export function StaffTabContent({
                     setSelectedIds(next);
                   }}
                 />
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-serif text-sm font-bold text-primary">
-                    {staffInitials(member.firstName, member.lastName)}
-                  </div>
+                <div className="flex min-w-0 items-center">
                   <div className="min-w-0">
                     <p className="truncate font-semibold">
                       {member.name}

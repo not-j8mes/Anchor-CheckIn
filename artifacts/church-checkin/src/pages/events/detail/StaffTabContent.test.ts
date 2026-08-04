@@ -1,11 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { staffInitials, staffLabelName } from "./StaffTabContent";
+import { sortStaffMembers, staffLabelName } from "./StaffTabContent";
 
-test("staff initials support a single full-name field", () => {
-  assert.equal(staffInitials("Jordan", "Taylor"), "JT");
-  assert.equal(staffInitials("Prince"), "P");
-  assert.equal(staffInitials("  Ana María ", " López  "), "AL");
+test("staff can be sorted by first or last name", () => {
+  const members = [
+    { firstName: "Zoe", lastName: "Adams" },
+    { firstName: "Anna", lastName: "Young" },
+    { firstName: "Ben", lastName: "Adams" },
+  ];
+  assert.deepEqual(
+    sortStaffMembers(members, "firstName").map((member) => member.firstName),
+    ["Anna", "Ben", "Zoe"],
+  );
+  assert.deepEqual(
+    sortStaffMembers(members, "lastName").map((member) => member.firstName),
+    ["Ben", "Zoe", "Anna"],
+  );
 });
 
 test("staff label name applies salutation and last-name format settings", () => {
