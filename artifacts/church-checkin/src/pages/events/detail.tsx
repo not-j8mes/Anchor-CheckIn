@@ -152,6 +152,12 @@ import { RoomsTabContent } from "./detail/RoomsTabContent";
 import { StaffTabContent } from "./detail/StaffTabContent";
 import { getEventRegistrationsExport } from "./detail/registrationExport";
 import { sortDeskFamiliesByFirstChildLastName } from "@/lib/desk-family-sort";
+import {
+  ALL_REPORT_ROOMS,
+  UNASSIGNED_REPORT_ROOM,
+  filterCheckinsByRoom,
+  reportRoomOptions,
+} from "@/lib/report-room-filter";
 import { RegistrationExportDialog } from "./detail/RegistrationExportDialog";
 import { buildRegistrationEmbedCode } from "@/lib/embedCode";
 import { summarizeRoomAttendance } from "@/lib/roomAttendance";
@@ -7915,13 +7921,65 @@ function ReportsSection({
   trackAttendance: boolean;
   requireCheckout: boolean;
 }) {
+  const [roomFilter, setRoomFilter] = useState(ALL_REPORT_ROOMS);
+  const allCheckins = checkins ?? [];
+  const roomOptions = useMemo(() => reportRoomOptions(allCheckins), [allCheckins]);
+  const hasUnassignedCheckins = allCheckins.some(
+    (checkin) => !checkin.room?.trim(),
+  );
+  const filteredCheckins = useMemo(
+    () => filterCheckinsByRoom(allCheckins, roomFilter),
+    [allCheckins, roomFilter],
+  );
+  const filteredCheckedIn = useMemo(
+    () => filterCheckinsByRoom(checkedIn, roomFilter),
+    [checkedIn, roomFilter],
+  );
+  const filteredCheckedOut = useMemo(
+    () => filterCheckinsByRoom(checkedOut, roomFilter),
+    [checkedOut, roomFilter],
+  );
+  const filteredAttendanceSessions = useMemo(
+    () =>
+      attendanceSessions
+        .map((session) => ({
+          ...session,
+          items: filterCheckinsByRoom(session.items, roomFilter),
+        }))
+        .filter((session) => session.items.length > 0),
+    [attendanceSessions, roomFilter],
+  );
+
   return (
     <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-serif font-bold">Reports</h1>
-        <p className="text-muted-foreground mt-1">
-          View attendance history and check-in summaries.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-serif font-bold">Reports</h1>
+          <p className="text-muted-foreground mt-1">
+            View attendance history and check-in summaries.
+          </p>
+        </div>
+        <div className="w-full space-y-1.5 sm:w-56">
+          <Label htmlFor="reports-room-filter">Room</Label>
+          <Select value={roomFilter} onValueChange={setRoomFilter}>
+            <SelectTrigger id="reports-room-filter">
+              <SelectValue placeholder="Filter by room" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_REPORT_ROOMS}>All rooms</SelectItem>
+              {roomOptions.map((room) => (
+                <SelectItem key={room} value={room}>
+                  {room}
+                </SelectItem>
+              ))}
+              {hasUnassignedCheckins && (
+                <SelectItem value={UNASSIGNED_REPORT_ROOM}>
+                  Unassigned
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Summary stats */}
@@ -7930,7 +7988,7 @@ function ReportsSection({
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Total Check-ins</p>
             <p className="text-3xl font-bold font-serif mt-1">
-              {checkins?.length ?? 0}
+              {filteredCheckins.length}
             </p>
           </CardContent>
         </Card>
@@ -7939,7 +7997,7 @@ function ReportsSection({
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">Currently In</p>
               <p className="text-3xl font-bold font-serif mt-1 text-green-700">
-                {checkedIn.length}
+                {filteredCheckedIn.length}
               </p>
             </CardContent>
           </Card>
@@ -7949,7 +8007,7 @@ function ReportsSection({
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">Checked Out</p>
               <p className="text-3xl font-bold font-serif mt-1 text-amber-700">
-                {checkedOut.length}
+                {filteredCheckedOut.length}
               </p>
             </CardContent>
           </Card>
@@ -7957,7 +8015,7 @@ function ReportsSection({
       </div>
 
       {/* Attendance sessions */}
-      {!attendanceSessions.length ? (
+      {!filteredAttendanceSessions.length ? (
         <div className="space-y-4">
           <Card className="border-dashed">
             <CardContent className="py-12 text-center text-muted-foreground">
@@ -8004,11 +8062,11 @@ function ReportsSection({
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            {attendanceSessions.length} session
-            {attendanceSessions.length !== 1 ? "s" : ""} ·{" "}
-            {checkins?.length ?? 0} total check-ins
+            {filteredAttendanceSessions.length} session
+            {filteredAttendanceSessions.length !== 1 ? "s" : ""} ·{" "}
+            {filteredCheckins.length} total check-ins
           </p>
-          {[...attendanceSessions]
+          {[...filteredAttendanceSessions]
             .sort((a, b) => a.date.localeCompare(b.date))
             .map(({ date, items }) => (
             <Card key={date}>
