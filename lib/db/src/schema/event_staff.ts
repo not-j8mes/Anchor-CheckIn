@@ -40,6 +40,7 @@ export const eventStaffMembersTable = pgTable("event_staff_members", {
     .references(() => eventsTable.id, { onDelete: "cascade" }),
   roleId: integer("role_id")
     .references(() => eventStaffRolesTable.id, { onDelete: "restrict" }),
+  salutation: text("salutation"),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email"),

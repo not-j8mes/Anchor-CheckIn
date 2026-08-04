@@ -120,6 +120,20 @@
       "when": 1785794400000,
       "tag": "0016_optional_staff_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785880800000,
+      "tag": "0017_staff_salutation",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785967200000,
+      "tag": "0018_staff_label_name_format",
+      "breakpoints": true
     }
   ]
 }

@@ -64,6 +64,7 @@ interface StaffMember {
   id: number;
   roleId: number | null;
   name: string;
+  salutation: string | null;
   firstName: string;
   lastName: string;
   email: string | null;
@@ -78,7 +79,8 @@ interface StaffData {
 }
 
 interface StaffLabelSettings {
-  showLastName: boolean;
+  lastNameFormat: "full" | "initial" | "hidden";
+  showSalutation: boolean;
   showRole: boolean;
   showEventName: boolean;
   showOrganization: boolean;
@@ -108,10 +110,26 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function staffInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "?";
-  return `${parts[0]?.[0] ?? ""}${parts.length > 1 ? (parts.at(-1)?.[0] ?? "") : ""}`.toUpperCase();
+export function staffInitials(firstName: string, lastName?: string): string {
+  const firstInitial = firstName.trim()[0] ?? "";
+  const lastInitial = lastName?.trim()[0] ?? "";
+  return `${firstInitial}${lastInitial}`.toUpperCase() || "?";
+}
+
+export function staffLabelName(
+  member: Pick<StaffMember, "salutation" | "firstName" | "lastName">,
+  settings: Pick<StaffLabelSettings, "showSalutation" | "lastNameFormat">,
+): string {
+  const lastName = member.lastName.trim();
+  const displayedLastName =
+    settings.lastNameFormat === "full"
+      ? lastName
+      : settings.lastNameFormat === "initial" && lastName
+        ? `${lastName[0].toUpperCase()}.`
+        : "";
+  return [settings.showSalutation ? member.salutation : "", member.firstName, displayedLastName]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function printStaffLabels(
@@ -137,7 +155,7 @@ function printStaffLabels(
     <span style="font-size:7pt;font-weight:800;text-transform:uppercase;letter-spacing:.1em;">${settings.showOrganization ? escapeHtml(organizationName) : ""}</span>
   </div>
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3mm 5mm;text-align:center;">
-    <div style="font-size:28pt;font-weight:900;line-height:1.05;max-width:80mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(member.name)}</div>
+    <div style="font-size:28pt;font-weight:900;line-height:1.05;max-width:80mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(staffLabelName(member, settings))}</div>
     ${settings.showRole && member.roleName ? `<div style="margin-top:3mm;border:2px solid #000;border-radius:999px;padding:1.5mm 5mm;font-size:11pt;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">${escapeHtml(member.roleName)}</div>` : ""}
   </div>
   ${settings.showEventName ? `<div style="padding:2mm 4mm;border-top:1px solid #000;font-size:7pt;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(eventName)}</div>` : ""}
@@ -169,13 +187,16 @@ export function StaffTabContent({
   const [memberToDelete, setMemberToDelete] = useState<StaffMember | null>(null);
   const [roleToDelete, setRoleToDelete] = useState<StaffRole | null>(null);
   const [draftSettings, setDraftSettings] = useState<StaffLabelSettings>({
-    showLastName: true,
+    lastNameFormat: "full",
+    showSalutation: true,
     showRole: true,
     showEventName: true,
     showOrganization: true,
   });
   const [roleName, setRoleName] = useState("");
-  const [name, setName] = useState("");
+  const [salutation, setSalutation] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [roleId, setRoleId] = useState("none");
 
   const { data, isLoading } = useQuery({
@@ -216,13 +237,17 @@ export function StaffTabContent({
       staffRequest(`/api/events/${eventId}/staff/members`, {
         method: "POST",
         body: JSON.stringify({
-          name,
+          salutation,
+          firstName,
+          lastName,
           roleId: roleId === "none" ? null : Number(roleId),
         }),
       }),
     onSuccess: () => {
       refresh();
-      setName("");
+      setSalutation("");
+      setFirstName("");
+      setLastName("");
       setRoleId("none");
       setMemberDialogOpen(false);
       toast({ title: "Staff member added" });
@@ -234,7 +259,9 @@ export function StaffTabContent({
       staffRequest(`/api/events/${eventId}/staff/members/${editingMember?.id}`, {
         method: "PUT",
         body: JSON.stringify({
-          name,
+          salutation,
+          firstName,
+          lastName,
           roleId: roleId === "none" ? null : Number(roleId),
         }),
       }),
@@ -280,7 +307,8 @@ export function StaffTabContent({
   const roles = data?.roles ?? [];
   const members = data?.members ?? [];
   const labelSettings = data?.labelSettings ?? {
-    showLastName: true,
+    lastNameFormat: "full" as const,
+    showSalutation: true,
     showRole: true,
     showEventName: true,
     showOrganization: true,
@@ -310,13 +338,17 @@ export function StaffTabContent({
   };
   const openAddMember = () => {
     setEditingMember(null);
-    setName("");
+    setSalutation("");
+    setFirstName("");
+    setLastName("");
     setRoleId("none");
     setMemberDialogOpen(true);
   };
   const openEditMember = (member: StaffMember) => {
     setEditingMember(member);
-    setName(member.name);
+    setSalutation(member.salutation ?? "");
+    setFirstName(member.firstName);
+    setLastName(member.lastName);
     setRoleId(member.roleId == null ? "none" : String(member.roleId));
     setMemberDialogOpen(true);
   };
@@ -504,7 +536,7 @@ export function StaffTabContent({
                 />
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-serif text-sm font-bold text-primary">
-                    {staffInitials(member.name)}
+                    {staffInitials(member.firstName, member.lastName)}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-semibold">
@@ -651,6 +683,34 @@ export function StaffTabContent({
           <DialogHeader><DialogTitle>Customize Staff Label</DialogTitle></DialogHeader>
           <div className="grid gap-5 py-2 sm:grid-cols-[1fr_210px]">
             <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <Label htmlFor="showSalutation">Show salutation</Label>
+                <Switch
+                  id="showSalutation"
+                  checked={draftSettings.showSalutation}
+                  onCheckedChange={(checked) =>
+                    setDraftSettings((current) => ({ ...current, showSalutation: checked }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastNameFormat">Last name</Label>
+                <Select
+                  value={draftSettings.lastNameFormat}
+                  onValueChange={(value: StaffLabelSettings["lastNameFormat"]) =>
+                    setDraftSettings((current) => ({ ...current, lastNameFormat: value }))
+                  }
+                >
+                  <SelectTrigger id="lastNameFormat">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full">Show full last name</SelectItem>
+                    <SelectItem value="initial">Show last initial</SelectItem>
+                    <SelectItem value="hidden">Hide last name</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {([
                 ["showRole", "Show staff role"],
                 ["showEventName", "Show event name"],
@@ -675,7 +735,12 @@ export function StaffTabContent({
                   <span>{draftSettings.showOrganization ? organizationName : ""}</span>
                 </div>
                 <div className="flex h-[61%] flex-col items-center justify-center px-2 text-center">
-                  <div className="max-w-full truncate text-xl font-black">Jordan Taylor</div>
+                  <div className="max-w-full truncate text-xl font-black">
+                    {staffLabelName(
+                      { salutation: "Dr", firstName: "Jordan", lastName: "Taylor" },
+                      draftSettings,
+                    )}
+                  </div>
                   {draftSettings.showRole && (
                     <div className="mt-1.5 rounded-full border-2 border-black px-3 py-0.5 text-[8px] font-black uppercase">
                       Team Lead
@@ -718,8 +783,30 @@ export function StaffTabContent({
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 py-2">
             <div className="col-span-2 space-y-2">
-              <Label htmlFor="staff-name">Name</Label>
-              <Input id="staff-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+              <Label htmlFor="staff-salutation">Salutation (optional)</Label>
+              <Input
+                id="staff-salutation"
+                value={salutation}
+                onChange={(event) => setSalutation(event.target.value)}
+                placeholder="e.g. Mr, Ms, Mrs, Dr, Rev"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="staff-first-name">First name</Label>
+              <Input
+                id="staff-first-name"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="staff-last-name">Last name (optional)</Label>
+              <Input
+                id="staff-last-name"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+              />
             </div>
             <div className="col-span-2 space-y-2">
               <Label>Role (optional)</Label>
@@ -738,7 +825,7 @@ export function StaffTabContent({
             <Button variant="outline" onClick={() => setMemberDialogOpen(false)}>Cancel</Button>
             <Button
               disabled={
-                !name.trim() ||
+                !firstName.trim() ||
                 createMember.isPending ||
                 updateMember.isPending
               }

@@ -46,7 +46,8 @@ router.get("/events/:eventId/staff", async (req, res) => {
     }
     const [settings] = await db
       .select({
-        showLastName: eventsTable.staffLabelShowLastName,
+        lastNameFormat: eventsTable.staffLabelLastNameFormat,
+        showSalutation: eventsTable.staffLabelShowSalutation,
         showRole: eventsTable.staffLabelShowRole,
         showEventName: eventsTable.staffLabelShowEventName,
         showOrganization: eventsTable.staffLabelShowOrganization,
@@ -69,12 +70,13 @@ router.get("/events/:eventId/staff", async (req, res) => {
         id: eventStaffMembersTable.id,
         eventId: eventStaffMembersTable.eventId,
         roleId: eventStaffMembersTable.roleId,
+        salutation: eventStaffMembersTable.salutation,
         firstName: eventStaffMembersTable.firstName,
         lastName: eventStaffMembersTable.lastName,
         email: eventStaffMembersTable.email,
         phone: eventStaffMembersTable.phone,
         createdAt: eventStaffMembersTable.createdAt,
-        name: sql<string>`trim(concat_ws(' ', ${eventStaffMembersTable.firstName}, ${eventStaffMembersTable.lastName}))`,
+        name: sql<string>`trim(concat_ws(' ', ${eventStaffMembersTable.salutation}, ${eventStaffMembersTable.firstName}, ${eventStaffMembersTable.lastName}))`,
         roleName: eventStaffRolesTable.name,
       })
       .from(eventStaffMembersTable)
@@ -112,11 +114,17 @@ router.put(
     }
     const booleanValue = (key: string) =>
       typeof req.body?.[key] === "boolean" ? req.body[key] : undefined;
+    const lastNameFormat = ["full", "initial", "hidden"].includes(
+      req.body?.lastNameFormat,
+    )
+      ? req.body.lastNameFormat
+      : undefined;
     try {
       const [updated] = await db
         .update(eventsTable)
         .set({
-          staffLabelShowLastName: booleanValue("showLastName"),
+          staffLabelLastNameFormat: lastNameFormat,
+          staffLabelShowSalutation: booleanValue("showSalutation"),
           staffLabelShowRole: booleanValue("showRole"),
           staffLabelShowEventName: booleanValue("showEventName"),
           staffLabelShowOrganization: booleanValue("showOrganization"),
@@ -128,7 +136,8 @@ router.put(
           ),
         )
         .returning({
-          showLastName: eventsTable.staffLabelShowLastName,
+          lastNameFormat: eventsTable.staffLabelLastNameFormat,
+          showSalutation: eventsTable.staffLabelShowSalutation,
           showRole: eventsTable.staffLabelShowRole,
           showEventName: eventsTable.staffLabelShowEventName,
           showOrganization: eventsTable.staffLabelShowOrganization,
@@ -217,11 +226,21 @@ router.post(
   async (req, res) => {
     const eventId = parseId(req.params.eventId);
     const roleId = req.body?.roleId == null ? null : parseId(req.body.roleId);
-    const name =
-      typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const salutation =
+      typeof req.body?.salutation === "string"
+        ? req.body.salutation.trim()
+        : "";
+    const firstName =
+      typeof req.body?.firstName === "string"
+        ? req.body.firstName.trim()
+        : typeof req.body?.name === "string"
+          ? req.body.name.trim()
+          : "";
+    const lastName =
+      typeof req.body?.lastName === "string" ? req.body.lastName.trim() : "";
     const auth = requireAuthContext(req);
-    if (!eventId || !name || (req.body?.roleId != null && !roleId)) {
-      res.status(400).json({ error: "A valid name is required" });
+    if (!eventId || !firstName || (req.body?.roleId != null && !roleId)) {
+      res.status(400).json({ error: "A valid first name is required" });
       return;
     }
     try {
@@ -248,8 +267,9 @@ router.post(
           eventId,
           organizationId: auth.organizationId,
           roleId,
-          firstName: name,
-          lastName: "",
+          salutation: salutation || null,
+          firstName,
+          lastName,
           email:
             typeof req.body?.email === "string" && req.body.email.trim()
               ? req.body.email.trim()
@@ -275,16 +295,26 @@ router.put(
     const eventId = parseId(req.params.eventId);
     const memberId = parseId(req.params.memberId);
     const roleId = req.body?.roleId == null ? null : parseId(req.body.roleId);
-    const name =
-      typeof req.body?.name === "string" ? req.body.name.trim() : "";
+    const salutation =
+      typeof req.body?.salutation === "string"
+        ? req.body.salutation.trim()
+        : "";
+    const firstName =
+      typeof req.body?.firstName === "string"
+        ? req.body.firstName.trim()
+        : typeof req.body?.name === "string"
+          ? req.body.name.trim()
+          : "";
+    const lastName =
+      typeof req.body?.lastName === "string" ? req.body.lastName.trim() : "";
     const auth = requireAuthContext(req);
     if (
       !eventId ||
       !memberId ||
-      !name ||
+      !firstName ||
       (req.body?.roleId != null && !roleId)
     ) {
-      res.status(400).json({ error: "A valid name is required" });
+      res.status(400).json({ error: "A valid first name is required" });
       return;
     }
     try {
@@ -309,8 +339,9 @@ router.put(
         .update(eventStaffMembersTable)
         .set({
           roleId,
-          firstName: name,
-          lastName: "",
+          salutation: salutation || null,
+          firstName,
+          lastName,
           ...(typeof req.body?.email === "string"
             ? { email: req.body.email.trim() || null }
             : {}),

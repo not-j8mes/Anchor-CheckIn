@@ -28,6 +28,8 @@ export const eventsTable = pgTable("events", {
   printLabels: boolean("print_labels"),
   labelType: text("label_type"), // 'simple_name' | 'child_security'
   staffLabelShowLastName: boolean("staff_label_show_last_name").notNull().default(true),
+  staffLabelLastNameFormat: text("staff_label_last_name_format").notNull().default("full"),
+  staffLabelShowSalutation: boolean("staff_label_show_salutation").notNull().default(true),
   staffLabelShowRole: boolean("staff_label_show_role").notNull().default(true),
   staffLabelShowEventName: boolean("staff_label_show_event_name").notNull().default(true),
   staffLabelShowOrganization: boolean("staff_label_show_organization").notNull().default(true),
