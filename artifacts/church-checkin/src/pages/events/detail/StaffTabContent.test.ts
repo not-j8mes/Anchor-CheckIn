@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sortStaffMembers, staffLabelName } from "./StaffTabContent";
+import {
+  sortStaffMembers,
+  staffLabelFontSize,
+  staffLabelName,
+} from "./StaffTabContent";
 
 test("staff can be sorted by first or last name", () => {
   const members = [
@@ -15,6 +19,14 @@ test("staff can be sorted by first or last name", () => {
   assert.deepEqual(
     sortStaffMembers(members, "lastName").map((member) => member.firstName),
     ["Ben", "Zoe", "Anna"],
+  );
+});
+
+test("staff label names shrink instead of being truncated", () => {
+  assert.equal(staffLabelFontSize("Jordan Taylor"), 28);
+  assert.ok(
+    staffLabelFontSize("Alexandria Montgomery-Wellington") <
+      staffLabelFontSize("Jordan Taylor"),
   );
 });
 

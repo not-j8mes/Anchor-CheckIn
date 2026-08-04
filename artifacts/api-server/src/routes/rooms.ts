@@ -2,6 +2,7 @@ import { Router } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import {
   db,
+  checkinsTable,
   roomsTable,
   registrationsTable,
   eventsTable,
@@ -89,6 +90,14 @@ router.get("/events/:eventId/rooms", async (req, res) => {
           WHERE r.event_id = ${eventId}
             AND r.room = ${roomsTable.name}
         )`,
+        checkedInCount: sql<number>`(
+          SELECT COUNT(DISTINCT c.registration_id)::int
+          FROM ${checkinsTable} c
+          INNER JOIN ${registrationsTable} r ON r.id = c.registration_id
+          WHERE r.event_id = ${eventId}
+            AND c.room = ${roomsTable.name}
+            AND c.checkout_at IS NULL
+        )`,
       })
       .from(roomsTable)
       .where(eq(roomsTable.eventId, eventId))
@@ -153,7 +162,7 @@ router.post(
           ageMax: ageMax ?? null,
         })
         .returning();
-      res.status(201).json({ ...room, participantCount: 0 });
+      res.status(201).json({ ...room, participantCount: 0, checkedInCount: 0 });
     } catch (err) {
       req.log.error({ err }, "Failed to create room");
       res.status(500).json({ error: "Internal server error" });

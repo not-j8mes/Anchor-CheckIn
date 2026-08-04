@@ -1216,6 +1216,7 @@ export const ListRoomsResponseItem = zod.object({
   "ageMin": zod.number().nullish(),
   "ageMax": zod.number().nullish(),
   "participantCount": zod.number().optional(),
+  "checkedInCount": zod.number().optional(),
   "createdAt": zod.string()
 })
 export const ListRoomsResponse = zod.array(ListRoomsResponseItem)
@@ -1249,6 +1250,7 @@ export const CreateRoomResponse = zod.object({
   "ageMin": zod.number().nullish(),
   "ageMax": zod.number().nullish(),
   "participantCount": zod.number().optional(),
+  "checkedInCount": zod.number().optional(),
   "createdAt": zod.string()
 })
 
@@ -1282,6 +1284,7 @@ export const UpdateRoomResponse = zod.object({
   "ageMin": zod.number().nullish(),
   "ageMax": zod.number().nullish(),
   "participantCount": zod.number().optional(),
+  "checkedInCount": zod.number().optional(),
   "createdAt": zod.string()
 })
 

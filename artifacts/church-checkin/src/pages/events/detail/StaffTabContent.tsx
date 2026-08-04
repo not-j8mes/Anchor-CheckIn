@@ -128,6 +128,14 @@ export function staffLabelName(
     .join(" ");
 }
 
+export function staffLabelFontSize(name: string): number {
+  const weightedLength = [...name].reduce(
+    (length, character) => length + (/[MW@#%]/.test(character) ? 1.35 : 1),
+    0,
+  );
+  return Math.max(11, Math.min(28, Math.floor(520 / Math.max(weightedLength, 1))));
+}
+
 export function sortStaffMembers<T extends Pick<StaffMember, "firstName" | "lastName">>(
   members: T[],
   sortBy: StaffSort,
@@ -157,8 +165,9 @@ function printStaffLabels(
   root.id = "staff-label-print-root";
   root.style.cssText = "margin:0;padding:0;line-height:0;font-size:0;";
   root.innerHTML = members
-    .map(
-      (member, index) => `<div style="width:90mm;height:62mm;overflow:hidden;${
+    .map((member, index) => {
+      const labelName = staffLabelName(member, settings);
+      return `<div style="width:90mm;height:62mm;overflow:hidden;${
         index < members.length - 1
           ? "page-break-after:always;break-after:always;"
           : ""
@@ -168,12 +177,12 @@ function printStaffLabels(
     <span style="font-size:7pt;font-weight:800;text-transform:uppercase;letter-spacing:.1em;">${settings.showOrganization ? escapeHtml(organizationName) : ""}</span>
   </div>
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3mm 5mm;text-align:center;">
-    <div style="font-size:28pt;font-weight:900;line-height:1.05;max-width:80mm;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(staffLabelName(member, settings))}</div>
+    <div style="font-size:${staffLabelFontSize(labelName)}pt;font-weight:900;line-height:1.05;max-width:80mm;white-space:nowrap;">${escapeHtml(labelName)}</div>
     ${settings.showRole && member.roleName ? `<div style="margin-top:3mm;border:2px solid #000;border-radius:999px;padding:1.5mm 5mm;font-size:11pt;font-weight:800;text-transform:uppercase;letter-spacing:.06em;">${escapeHtml(member.roleName)}</div>` : ""}
   </div>
   ${settings.showEventName ? `<div style="padding:2mm 4mm;border-top:1px solid #000;font-size:7pt;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(eventName)}</div>` : ""}
-</div></div>`,
-    )
+</div></div>`;
+    })
     .join("");
   document.body.appendChild(root);
   printIsolatedRoot({ mode: "staff-labels", root });
@@ -759,7 +768,20 @@ export function StaffTabContent({
                   <span>{draftSettings.showOrganization ? organizationName : ""}</span>
                 </div>
                 <div className="flex h-[61%] flex-col items-center justify-center px-2 text-center">
-                  <div className="max-w-full truncate text-xl font-black">
+                  <div
+                    className="max-w-full whitespace-nowrap font-black"
+                    style={{
+                      fontSize: `${Math.max(
+                        8,
+                        staffLabelFontSize(
+                          staffLabelName(
+                            { salutation: "Dr", firstName: "Jordan", lastName: "Taylor" },
+                            draftSettings,
+                          ),
+                        ) * 0.7,
+                      )}px`,
+                    }}
+                  >
                     {staffLabelName(
                       { salutation: "Dr", firstName: "Jordan", lastName: "Taylor" },
                       draftSettings,

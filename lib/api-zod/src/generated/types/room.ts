@@ -21,5 +21,6 @@ export interface Room {
   /** @nullable */
   ageMax?: number | null;
   participantCount?: number;
+  checkedInCount?: number;
   createdAt: string;
 }

@@ -177,7 +177,12 @@ export function RoomsTabContent({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: rooms, isLoading } = useListRooms(eventId, {
-    query: { enabled: !!eventId, queryKey: getListRoomsQueryKey(eventId) },
+    query: {
+      enabled: !!eventId,
+      queryKey: getListRoomsQueryKey(eventId),
+      refetchInterval: 3_000,
+      refetchIntervalInBackground: true,
+    },
   });
   const { data: formFields = [] } = useListFormFields(formId ?? 0, {
     query: {
@@ -343,6 +348,10 @@ export function RoomsTabContent({
                         </p>
                       )}
                     </div>
+                    <p className="mt-1 text-xs font-medium text-foreground">
+                      Currently checked in: {room.checkedInCount ?? 0} of{" "}
+                      {room.participantCount ?? 0}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
