@@ -80,6 +80,12 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -161,6 +167,8 @@ import {
 import { RegistrationExportDialog } from "./detail/RegistrationExportDialog";
 import { buildRegistrationEmbedCode } from "@/lib/embedCode";
 import { summarizeRoomAttendance } from "@/lib/roomAttendance";
+import { defaultReportSessionDate } from "@/lib/report-session-selection";
+import { calculateSessionReport } from "@/lib/session-report-metrics";
 
 const BULK_CHECKOUT_REASON_LABELS: Record<string, string> = {
   end_of_event: "End of event",
@@ -496,6 +504,7 @@ type ExistingFamilyRegistration = {
   registrationGroupId: number;
   familyName: string;
   sourceRegistration: Registration;
+  allowCheckIn: boolean;
 };
 
 function ManualRegistrationDialog({
@@ -562,6 +571,8 @@ function ManualRegistrationDialog({
     "save" | "check-in" | null
   >(null);
   const isSubmitting = submissionAction !== null;
+  const canCheckIn =
+    allowCheckIn && (!existingFamily || existingFamily.allowCheckIn);
 
   const submitReg = useSubmitRegistration();
   const createCheckin = useCreateCheckin();
@@ -585,7 +596,7 @@ function ManualRegistrationDialog({
     const submitter = (e.nativeEvent as SubmitEvent)
       .submitter as HTMLButtonElement | null;
     const shouldCheckIn =
-      allowCheckIn && submitter?.value === "add-and-check-in";
+      canCheckIn && submitter?.value === "add-and-check-in";
     if (shouldCheckIn && selectedSessionId == null) {
       toast({
         title: "Select an event session before checking in",
@@ -816,10 +827,10 @@ function ManualRegistrationDialog({
             <DialogFooter className="z-10 shrink-0 gap-2 border-t border-border bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 shadow-[0_-4px_12px_rgba(15,23,42,0.04)] sm:px-6 sm:space-x-0">
               <Button
                 type="button"
-                variant={allowCheckIn ? "ghost" : "outline"}
+                variant={canCheckIn ? "ghost" : "outline"}
                 className={cn(
                   "min-h-11",
-                  allowCheckIn &&
+                  canCheckIn &&
                     "w-full text-muted-foreground hover:text-foreground sm:w-auto",
                 )}
                 onClick={() => {
@@ -829,34 +840,36 @@ function ManualRegistrationDialog({
               >
                 Cancel
               </Button>
-              {allowCheckIn && (
+              {canCheckIn && (
                 <div className="hidden flex-1 sm:block" aria-hidden="true" />
               )}
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                variant={allowCheckIn ? "outline" : "default"}
+                variant={canCheckIn ? "outline" : "default"}
                 className={cn(
                   "min-h-11 gap-2",
-                  allowCheckIn &&
+                  canCheckIn &&
                     "w-full border-foreground/70 bg-background text-foreground hover:bg-muted sm:w-auto",
                 )}
               >
                 {submissionAction === "save" && (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 )}
-                {allowCheckIn && submissionAction !== "save" && (
+                {canCheckIn && submissionAction !== "save" && (
                   <Save className="h-4 w-4" />
                 )}
                 {submissionAction === "save"
                   ? "Saving…"
-                  : allowCheckIn
+                  : existingFamily && !canCheckIn
+                    ? "Save"
+                    : canCheckIn
                     ? "Save Without Check-In"
                     : childrenAnswers.length > 1
                       ? `Add ${childrenAnswers.length} ${isChildCheckin ? "Children" : "Registrants"}`
                       : `Add ${isChildCheckin ? "Child" : "Registrant"}`}
               </Button>
-              {allowCheckIn && (
+              {canCheckIn && (
                 <Button
                   type="submit"
                   name="submitAction"
@@ -5810,6 +5823,15 @@ function CheckInDeskContent({
                       registrationGroupId,
                       familyName: `${group.guardian.split(" ").slice(-1)[0]} Family`,
                       sourceRegistration,
+                      allowCheckIn:
+                        filter === "checked_in" ||
+                        (filter !== "not_checked_in" &&
+                          participants.some(
+                            (item) =>
+                              item.reg.registrationGroupId ===
+                                registrationGroupId &&
+                              item.status === "checked_in",
+                          )),
                     });
                     setAddRegOpen(true);
                   }}
@@ -7908,6 +7930,7 @@ function RegistrationFormSection({
 
 function ReportsSection({
   checkins,
+  registrations,
   checkedIn,
   checkedOut,
   attendanceSessions,
@@ -7915,80 +7938,124 @@ function ReportsSection({
   requireCheckout,
 }: {
   checkins: EventCheckin[] | undefined;
+  registrations: Registration[] | undefined;
   checkedIn: EventCheckin[];
   checkedOut: EventCheckin[];
   attendanceSessions: Array<{ date: string; items: EventCheckin[] }>;
   trackAttendance: boolean;
   requireCheckout: boolean;
 }) {
+  type SelectedReportView =
+    | "attended"
+    | "new-registrations"
+    | "did-not-attend"
+    | "first-time";
+  const [selectedReportView, setSelectedReportView] =
+    useState<SelectedReportView>("attended");
   const [roomFilter, setRoomFilter] = useState(ALL_REPORT_ROOMS);
   const allCheckins = checkins ?? [];
+  const sortedSessions = useMemo(
+    () => [...attendanceSessions].sort((a, b) => a.date.localeCompare(b.date)),
+    [attendanceSessions],
+  );
+  const [selectedSessionDate, setSelectedSessionDate] = useState<string | null>(
+    () =>
+      defaultReportSessionDate(
+        attendanceSessions.map((session) => session.date),
+        getLocalDateKey(),
+      ),
+  );
+  useEffect(() => {
+    if (
+      selectedSessionDate &&
+      sortedSessions.some((session) => session.date === selectedSessionDate)
+    ) {
+      return;
+    }
+    setSelectedSessionDate(
+      defaultReportSessionDate(
+        sortedSessions.map((session) => session.date),
+        getLocalDateKey(),
+      ),
+    );
+  }, [selectedSessionDate, sortedSessions]);
   const roomOptions = useMemo(() => reportRoomOptions(allCheckins), [allCheckins]);
   const hasUnassignedCheckins = allCheckins.some(
     (checkin) => !checkin.room?.trim(),
   );
-  const filteredCheckins = useMemo(
-    () => filterCheckinsByRoom(allCheckins, roomFilter),
-    [allCheckins, roomFilter],
-  );
-  const filteredCheckedIn = useMemo(
-    () => filterCheckinsByRoom(checkedIn, roomFilter),
-    [checkedIn, roomFilter],
-  );
-  const filteredCheckedOut = useMemo(
-    () => filterCheckinsByRoom(checkedOut, roomFilter),
-    [checkedOut, roomFilter],
-  );
-  const filteredAttendanceSessions = useMemo(
+  const showRoomFilter = roomOptions.length > 0 || hasUnassignedCheckins;
+  const sessionReport = useMemo(
     () =>
-      attendanceSessions
-        .map((session) => ({
-          ...session,
-          items: filterCheckinsByRoom(session.items, roomFilter),
-        }))
-        .filter((session) => session.items.length > 0),
-    [attendanceSessions, roomFilter],
+      selectedSessionDate
+        ? calculateSessionReport({
+            selectedDate: selectedSessionDate,
+            sessions: sortedSessions,
+            registrations: registrations ?? [],
+            roomFilter,
+          })
+        : null,
+    [registrations, roomFilter, selectedSessionDate, sortedSessions],
   );
+  const reportDateLabel = selectedSessionDate
+    ? format(new Date(`${selectedSessionDate}T00:00:00`), "EEEE, MMMM d, yyyy")
+    : "this session";
+  const reportViewConfig = {
+    attended: {
+      label: "Attended",
+      count: sessionReport?.attendedRecords.length ?? 0,
+      description: "Unique attendees",
+      summary: `${sessionReport?.attendedRecords.length ?? 0} unique attendees for ${reportDateLabel}`,
+      empty: "No one attended this session.",
+    },
+    "new-registrations": {
+      label: "New Registrations",
+      count: sessionReport?.newRegistrations.length ?? 0,
+      description: "Created on this date",
+      summary: `${sessionReport?.newRegistrations.length ?? 0} registrations created on ${reportDateLabel}`,
+      empty: "No registrations were created on this date.",
+    },
+    "did-not-attend": {
+      label: "Did Not Attend",
+      count: sessionReport?.didNotAttendRegistrations.length ?? 0,
+      description: "Registered but never checked in",
+      summary: `${sessionReport?.didNotAttendRegistrations.length ?? 0} eligible registrants who did not check in`,
+      empty: "Every eligible registrant attended this session.",
+    },
+    "first-time": {
+      label: "First-Time Attendees",
+      count: sessionReport?.firstTimeAttendeeRecords.length ?? 0,
+      description: "First event attendance",
+      summary: `${sessionReport?.firstTimeAttendeeRecords.length ?? 0} people attending this event for the first time`,
+      empty: "No first-time attendees for this session.",
+    },
+  } satisfies Record<SelectedReportView, {
+    label: string;
+    count: number;
+    description: string;
+    summary: string;
+    empty: string;
+  }>;
+  const activeReport = reportViewConfig[selectedReportView];
 
   return (
     <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div>
         <div>
           <h1 className="text-2xl font-serif font-bold">Reports</h1>
           <p className="text-muted-foreground mt-1">
             View attendance history and check-in summaries.
           </p>
         </div>
-        <div className="w-full space-y-1.5 sm:w-56">
-          <Label htmlFor="reports-room-filter">Room</Label>
-          <Select value={roomFilter} onValueChange={setRoomFilter}>
-            <SelectTrigger id="reports-room-filter">
-              <SelectValue placeholder="Filter by room" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_REPORT_ROOMS}>All rooms</SelectItem>
-              {roomOptions.map((room) => (
-                <SelectItem key={room} value={room}>
-                  {room}
-                </SelectItem>
-              ))}
-              {hasUnassignedCheckins && (
-                <SelectItem value={UNASSIGNED_REPORT_ROOM}>
-                  Unassigned
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {/* Summary stats */}
+      <h2 className="text-lg font-semibold">Event Totals</h2>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Total Check-ins</p>
             <p className="text-3xl font-bold font-serif mt-1">
-              {filteredCheckins.length}
+              {allCheckins.length}
             </p>
           </CardContent>
         </Card>
@@ -7997,7 +8064,7 @@ function ReportsSection({
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">Currently In</p>
               <p className="text-3xl font-bold font-serif mt-1 text-green-700">
-                {filteredCheckedIn.length}
+                {checkedIn.length}
               </p>
             </CardContent>
           </Card>
@@ -8007,7 +8074,7 @@ function ReportsSection({
             <CardContent className="p-5">
               <p className="text-sm text-muted-foreground">Checked Out</p>
               <p className="text-3xl font-bold font-serif mt-1 text-amber-700">
-                {filteredCheckedOut.length}
+                {checkedOut.length}
               </p>
             </CardContent>
           </Card>
@@ -8015,7 +8082,7 @@ function ReportsSection({
       </div>
 
       {/* Attendance sessions */}
-      {!filteredAttendanceSessions.length ? (
+      {!sortedSessions.length ? (
         <div className="space-y-4">
           <Card className="border-dashed">
             <CardContent className="py-12 text-center text-muted-foreground">
@@ -8060,72 +8127,240 @@ function ReportsSection({
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            {filteredAttendanceSessions.length} session
-            {filteredAttendanceSessions.length !== 1 ? "s" : ""} ·{" "}
-            {filteredCheckins.length} total check-ins
-          </p>
-          {[...filteredAttendanceSessions]
-            .sort((a, b) => a.date.localeCompare(b.date))
-            .map(({ date, items }) => (
-            <Card key={date}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">
-                    {format(new Date(date + "T00:00:00"), "EEEE, MMMM d, yyyy")}
-                  </CardTitle>
-                  <div className="flex flex-wrap justify-end gap-2 text-xs text-muted-foreground">
-                    <span>Total check-ins: {items.length}</span>
-                    <span>
-                      Currently in:{" "}
-                      {items.filter((item) => !item.checkoutAt).length}
-                    </span>
-                    <span>
-                      Checked out:{" "}
-                      {items.filter((item) => !!item.checkoutAt).length}
-                    </span>
+        <section className="space-y-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Session Attendance</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Totals below apply to the selected session and room.
+              </p>
+            </div>
+            <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
+              <div className="w-full space-y-1.5 sm:w-72">
+                <Label htmlFor="reports-session-date">Session Date</Label>
+                {sortedSessions.length > 1 ? (
+                  <Select
+                    value={selectedSessionDate ?? undefined}
+                    onValueChange={setSelectedSessionDate}
+                  >
+                    <SelectTrigger id="reports-session-date">
+                      <SelectValue placeholder="Select a session date" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sortedSessions.map((session) => (
+                        <SelectItem key={session.date} value={session.date}>
+                          {format(
+                            new Date(`${session.date}T00:00:00`),
+                            "EEEE, MMMM d, yyyy",
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div
+                    id="reports-session-date"
+                    className="flex min-h-10 items-center rounded-md border bg-muted/20 px-3 text-sm"
+                  >
+                    {format(
+                      new Date(`${sortedSessions[0]!.date}T00:00:00`),
+                      "EEEE, MMMM d, yyyy",
+                    )}
                   </div>
+                )}
+              </div>
+              {showRoomFilter && (
+                <div className="w-full space-y-1.5 sm:w-56">
+                  <Label htmlFor="reports-room-filter">Room</Label>
+                  <Select value={roomFilter} onValueChange={setRoomFilter}>
+                    <SelectTrigger id="reports-room-filter">
+                      <SelectValue placeholder="Filter by room" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_REPORT_ROOMS}>All rooms</SelectItem>
+                      {roomOptions.map((room) => (
+                        <SelectItem key={room} value={room}>
+                          {room}
+                        </SelectItem>
+                      ))}
+                      {hasUnassignedCheckins && (
+                        <SelectItem value={UNASSIGNED_REPORT_ROOM}>
+                          Unassigned
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardHeader>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-base font-semibold">Selected Session</h3>
+            <p className="text-sm text-muted-foreground">
+              {selectedSessionDate
+                ? format(new Date(`${selectedSessionDate}T00:00:00`), "EEEE, MMMM d, yyyy")
+                : "No session selected"}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-live="polite">
+            {(Object.entries(reportViewConfig) as Array<
+              [SelectedReportView, (typeof reportViewConfig)[SelectedReportView]]
+            >).map(([view, config]) => {
+              const selected = selectedReportView === view;
+              return (
+                <button
+                  key={view}
+                  type="button"
+                  aria-pressed={selected}
+                  aria-label={`${config.label}, ${config.count}, ${selected ? "selected" : "view details"}`}
+                  onClick={() => setSelectedReportView(view)}
+                  className="h-full min-w-0 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <Card className={cn(
+                    "h-full transition-colors",
+                    selected && "border-primary bg-primary/5",
+                  )}>
+                    <CardContent className="p-4">
+                      <p className="break-words text-xs font-semibold uppercase leading-snug tracking-wide text-muted-foreground">
+                        {config.label}
+                      </p>
+                      <p className="mt-1 font-serif text-3xl font-bold">{config.count}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{config.description}</p>
+                    </CardContent>
+                  </Card>
+                </button>
+              );
+            })}
+          </div>
+
+          <div aria-live="polite" aria-atomic="true">
+            <h3 className="text-base font-semibold">{activeReport.label}</h3>
+            <p className="text-sm text-muted-foreground">{activeReport.summary}</p>
+          </div>
+
+          {activeReport.count === 0 ? (
+            <div className="rounded-lg border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+              {activeReport.empty}
+            </div>
+          ) : (
+            <Card>
               <CardContent className="p-0">
                 <div className="divide-y divide-border">
-                  {[...items]
-                    .sort(
-                      (a, b) =>
-                        new Date(a.checkinAt).getTime() -
-                        new Date(b.checkinAt).getTime(),
-                    )
-                    .map((c) => (
+                  {selectedReportView === "attended" && sessionReport?.attendedRecords.map((record) => (
                       <div
-                        key={c.id}
-                        className="px-5 py-2.5 flex items-center justify-between gap-4"
+                        key={record.registrationId}
+                        className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5"
                       >
-                        <div>
-                          <p className="font-medium text-sm">
-                            {c.childFirstName} {c.childLastName}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {record.firstCheckin.childFirstName} {record.firstCheckin.childLastName}
                           </p>
-                          {c.room && (
-                            <p className="text-xs text-muted-foreground">
-                              {c.room}
-                            </p>
-                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {record.firstCheckin.room?.trim() || "Unassigned"}
+                          </p>
                         </div>
-                        <div className="text-right text-xs text-muted-foreground flex-shrink-0">
-                          <p>In: {format(new Date(c.checkinAt), "h:mm a")}</p>
-                          {c.checkoutAt && (
+                        <div className="shrink-0 text-xs text-muted-foreground sm:text-right">
+                          <p>In: {format(new Date(record.firstCheckin.checkinAt), "h:mm a")}</p>
+                          {record.finalCheckout ? (
                             <p className="text-amber-700">
-                              Out: {format(new Date(c.checkoutAt), "h:mm a")}
+                              Out: {format(new Date(record.finalCheckout), "h:mm a")}
                             </p>
+                          ) : (
+                            <p className="text-green-700">Currently in</p>
                           )}
                         </div>
                       </div>
                     ))}
+                  {selectedReportView === "new-registrations" && sessionReport?.newRegistrations.map((registration) => {
+                    const attended = sessionReport.attendedRecords.some((record) => record.registrationId === registration.id);
+                    return <div key={registration.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5">
+                      <div className="min-w-0"><p className="truncate text-sm font-medium">{registration.childFirstName} {registration.childLastName}</p><p className="text-xs text-muted-foreground">{registration.room?.trim() || "Unassigned"}{registration.guardianName ? ` · Guardian: ${registration.guardianName}` : ""}</p></div>
+                      <div className="shrink-0 text-xs text-muted-foreground sm:text-right"><p>Registered: {format(new Date(registration.createdAt), "h:mm a")}</p><p className={attended ? "text-green-700" : ""}>{attended ? "Attended" : "Did not attend"}</p></div>
+                    </div>;
+                  })}
+                  {selectedReportView === "did-not-attend" && sessionReport?.didNotAttendRegistrations.map((registration) => (
+                    <div key={registration.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5">
+                      <div className="min-w-0"><p className="truncate text-sm font-medium">{registration.childFirstName} {registration.childLastName}</p><p className="text-xs text-muted-foreground">{registration.room?.trim() || "Unassigned"}</p></div>
+                      <div className="shrink-0 text-xs text-muted-foreground sm:text-right"><p>Registered {format(new Date(registration.createdAt), "MMM d")}</p><p>No check-in recorded</p></div>
+                    </div>
+                  ))}
+                  {selectedReportView === "first-time" && sessionReport?.firstTimeAttendeeRecords.map((record) => (
+                    <div key={record.registrationId} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5">
+                      <div className="min-w-0"><p className="truncate text-sm font-medium">{record.firstCheckin.childFirstName} {record.firstCheckin.childLastName}</p><p className="text-xs text-muted-foreground">{record.firstCheckin.room?.trim() || "Unassigned"}</p></div>
+                      <div className="shrink-0 text-xs text-muted-foreground sm:text-right"><p>In: {format(new Date(record.firstCheckin.checkinAt), "h:mm a")}</p><p>First event attendance</p></div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
-            ))}
-        </div>
+          )}
+
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold">Report Details</h3>
+            <Accordion type="multiple" className="rounded-lg border px-4">
+              <AccordionItem value="rooms">
+                <AccordionTrigger>Attendance by Room</AccordionTrigger>
+                <AccordionContent>
+                  {sessionReport?.attendanceByRoom.length ? (
+                    <div className="divide-y">
+                      {sessionReport.attendanceByRoom.map((room) => (
+                        <div key={room.room} className="flex justify-between gap-4 py-2 text-sm">
+                          <span className="font-medium">{room.room}</span>
+                          <span className="text-right text-muted-foreground">
+                            {room.attended} attended · {room.registered} registered · {room.rate}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : <p className="text-sm text-muted-foreground">No registrations for this session.</p>}
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="returning">
+                <AccordionTrigger>Returning vs. First-Time</AccordionTrigger>
+                <AccordionContent className="space-y-2 text-sm">
+                  <div className="flex justify-between"><span>First-time attendees</span><strong>{sessionReport?.firstTimeAttendeeCount ?? 0}</strong></div>
+                  <div className="flex justify-between"><span>Returning attendees</span><strong>{sessionReport?.returningAttendeeCount ?? 0}</strong></div>
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="activity">
+                <AccordionTrigger>Check-In Activity</AccordionTrigger>
+                <AccordionContent>
+                  {sessionReport?.checkInIntervals.length ? (
+                    <div className="divide-y text-sm">
+                      {sessionReport.checkInIntervals.map((interval) => {
+                        const end = new Date(interval.start.getTime() + 15 * 60 * 1000);
+                        return <div key={interval.start.toISOString()} className="flex justify-between py-2"><span>{format(interval.start, "h:mm")}–{format(end, "h:mm a")}</span><strong>{interval.count} check-in{interval.count === 1 ? "" : "s"}</strong></div>;
+                      })}
+                    </div>
+                  ) : <p className="text-sm text-muted-foreground">No check-ins occurred.</p>}
+                </AccordionContent>
+              </AccordionItem>
+              {sortedSessions.length > 1 && (
+                <AccordionItem value="multi-day">
+                  <AccordionTrigger>Multi-Day Attendance</AccordionTrigger>
+                  <AccordionContent className="space-y-2 text-sm">
+                    <div className="flex justify-between"><span>Attended this session</span><strong>{sessionReport?.multiDay.attendedThisSession ?? 0}</strong></div>
+                    <div className="flex justify-between"><span>Attended every session so far</span><strong>{sessionReport?.multiDay.attendedEverySession ?? 0}</strong></div>
+                    <div className="flex justify-between"><span>Missed the previous session</span><strong>{sessionReport?.multiDay.missedPrevious ?? 0}</strong></div>
+                    <div className="flex justify-between"><span>Returned after an absence</span><strong>{sessionReport?.multiDay.returnedAfterAbsence ?? 0}</strong></div>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+              {requireCheckout && (
+                <AccordionItem value="checkout">
+                  <AccordionTrigger>Checkout Summary</AccordionTrigger>
+                  <AccordionContent className="space-y-2 text-sm">
+                    <div className="flex justify-between"><span>Average attendance duration</span><strong>{sessionReport?.checkout.averageDurationMs == null ? "Not available" : `${Math.round(sessionReport.checkout.averageDurationMs / 60000)} min`}</strong></div>
+                    <div className="flex justify-between"><span>Earliest checkout</span><strong>{sessionReport?.checkout.earliestCheckout ? format(new Date(sessionReport.checkout.earliestCheckout), "h:mm a") : "Not available"}</strong></div>
+                    <div className="flex justify-between"><span>Latest checkout</span><strong>{sessionReport?.checkout.latestCheckout ? format(new Date(sessionReport.checkout.latestCheckout), "h:mm a") : "Not available"}</strong></div>
+                    <div className="flex justify-between"><span>Missing checkout records</span><strong>{sessionReport?.checkout.missingCheckoutCount ?? 0}</strong></div>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+            </Accordion>
+          </div>
+        </section>
       )}
     </div>
   );
@@ -9164,6 +9399,7 @@ export default function EventWorkspace() {
     return (
       <ReportsSection
         checkins={checkins}
+        registrations={registrations}
         checkedIn={checkedIn}
         checkedOut={checkedOut}
         attendanceSessions={attendanceSessions}
