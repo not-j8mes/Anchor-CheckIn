@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { LabelData } from "@workspace/api-client-react";
 import {
+  firstNameFontSize,
+  lastNameFontSize,
+  pickupNameFontSize,
   renderLabelHtml,
   renderParentPickupLabelHtml,
   renderPrintPagesHtml,
@@ -16,6 +19,35 @@ const sampleLabel: LabelData = {
   allergies: "Tree nuts",
   organizationName: "  Oakwood Bible Chapel  ",
 };
+
+test("registrant label names continuously scale down for longer text", () => {
+  assert.equal(firstNameFontSize("Ava"), "52pt");
+  assert.ok(parseFloat(firstNameFontSize("Alexandria-Montgomery")) < 21);
+  assert.ok(parseFloat(lastNameFontSize("Montgomery-Wellington-Smythe")) < 10);
+  assert.ok(
+    parseFloat(
+      pickupNameFontSize(
+        "Alexandria Montgomery-Wellington-Smythe · Early Childhood Nursery",
+        2,
+      ),
+    ) < 9,
+  );
+});
+
+test("long registrant names print without ellipsis styling", () => {
+  const html = renderLabelHtml(
+    {
+      ...sampleLabel,
+      childName: "Alexandria-Montgomery Wellington-Smythe",
+      guardianName: undefined,
+      organizationName: "",
+    },
+    0,
+    1,
+  );
+  assert.match(html, /Alexandria-Montgomery/);
+  assert.doesNotMatch(html, /Alexandria-Montgomery<\/div>[^]*text-overflow:ellipsis/);
+});
 
 test("child labels render the trimmed organization and guardian footer", () => {
   const html = renderLabelHtml(sampleLabel, 0, 1);

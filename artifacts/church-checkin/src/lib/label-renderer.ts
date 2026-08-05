@@ -26,19 +26,36 @@ export function labelDataForType(
 // Name-sizing helpers
 // ---------------------------------------------------------------------------
 
+function weightedTextLength(text: string): number {
+  return [...text].reduce(
+    (length, character) => length + (/[MW@#%]/.test(character) ? 1.35 : 1),
+    0,
+  );
+}
+
+function scaledFontSize(
+  text: string,
+  maximumPt: number,
+  widthBudget: number,
+): string {
+  const size = Math.min(
+    maximumPt,
+    widthBudget / Math.max(weightedTextLength(text), 1),
+  );
+  return `${Math.max(4, Math.floor(size * 10) / 10)}pt`;
+}
+
 export function firstNameFontSize(name: string): string {
-  const n = name.length;
-  if (n <= 5)  return "52pt";
-  if (n <= 7)  return "42pt";
-  if (n <= 9)  return "34pt";
-  if (n <= 12) return "27pt";
-  return "21pt";
+  return scaledFontSize(name, 52, 260);
 }
 
 export function lastNameFontSize(name: string): string {
-  if (name.length <= 14) return "16pt";
-  if (name.length <= 20) return "13pt";
-  return "10pt";
+  return scaledFontSize(name, 16, 250);
+}
+
+export function pickupNameFontSize(name: string, nameCount: number): string {
+  const maximumPt = nameCount <= 2 ? 9 : nameCount <= 4 ? 8 : 7;
+  return scaledFontSize(name, maximumPt, 510);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,8 +128,8 @@ export function renderLabelHtml(label: LabelData, index: number, total: number):
     <!-- Left: names + badges -->
     <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:2mm 2mm 2mm 3.5mm;min-width:0;overflow:hidden;">
       ${roomPill}
-      <div style="font-size:${fnSize};font-weight:900;line-height:0.93;color:#000000;letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(firstName)}</div>
-      ${lastName ? `<div style="font-size:${lnSize};font-weight:700;color:#000000;line-height:1.2;margin-top:1mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(lastName)}</div>` : ""}
+      <div style="font-size:${fnSize};font-weight:900;line-height:0.93;color:#000000;letter-spacing:-0.02em;white-space:nowrap;">${escHtml(firstName)}</div>
+      ${lastName ? `<div style="font-size:${lnSize};font-weight:700;color:#000000;line-height:1.2;margin-top:1mm;white-space:nowrap;">${escHtml(lastName)}</div>` : ""}
       ${allergyLine}
     </div>
 
@@ -150,13 +167,12 @@ export function renderParentPickupLabelHtml(labels: LabelData[], pageNum = 1, pa
     )
     .join("");
 
-  const nameFontSize = labels.length <= 2 ? "9pt" : labels.length <= 4 ? "8pt" : "7pt";
   const childNamesList = labels
     .map((label) => {
       const childAndRoom = label.room
         ? `${label.childName} · ${label.room}`
         : label.childName;
-      return `<div style="font-size:${nameFontSize};font-weight:700;color:#000000;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(childAndRoom)}</div>`;
+      return `<div style="font-size:${pickupNameFontSize(childAndRoom, labels.length)};font-weight:700;color:#000000;line-height:1.3;white-space:nowrap;">${escHtml(childAndRoom)}</div>`;
     })
     .join("");
 
