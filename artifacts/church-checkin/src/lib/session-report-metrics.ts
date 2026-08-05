@@ -13,6 +13,63 @@ export interface RoomAttendanceMetric {
   rate: number;
 }
 
+export function calculateEventOverview({
+  sessions,
+  registrations,
+  today,
+}: {
+  sessions: ReportSession[];
+  registrations: Registration[];
+  today: string;
+}) {
+  // A session dated today is considered occurred because configured session
+  // options currently expose a calendar date, not a start datetime.
+  const occurredSessions = sessions.filter((session) => session.date <= today);
+  const attendanceCountByRegistrant = new Map<number, number>();
+  let attendanceVisits = 0;
+  for (const session of occurredSessions) {
+    const sessionAttendeeIds = new Set(
+      session.items.map((item) => item.registrationId),
+    );
+    attendanceVisits += sessionAttendeeIds.size;
+    for (const id of sessionAttendeeIds) {
+      attendanceCountByRegistrant.set(
+        id,
+        (attendanceCountByRegistrant.get(id) ?? 0) + 1,
+      );
+    }
+  }
+  const uniqueAttendees = attendanceCountByRegistrant.size;
+  const repeatAttendees = [...attendanceCountByRegistrant.values()].filter(
+    (count) => count >= 2,
+  ).length;
+  const singleSession = sessions.length === 1 ? sessions[0]! : null;
+  const singleDayRegistered = singleSession
+    ? getEligibleRegistrantsForSession(registrations, singleSession.date).length
+    : 0;
+  const singleDayAttended = singleSession
+    ? new Set(singleSession.items.map((item) => item.registrationId)).size
+    : 0;
+
+  return {
+    occurredSessionCount: occurredSessions.length,
+    attendanceVisits,
+    uniqueAttendees,
+    averagePerSession:
+      occurredSessions.length > 0
+        ? attendanceVisits / occurredSessions.length
+        : null,
+    repeatAttendees,
+    singleDay: {
+      registered: singleDayRegistered,
+      attended: singleDayAttended,
+      attendanceRate: singleDayRegistered
+        ? Math.round((singleDayAttended / singleDayRegistered) * 100)
+        : 0,
+    },
+  };
+}
+
 const roomName = (value?: string | null) => value?.trim() || "Unassigned";
 
 /**

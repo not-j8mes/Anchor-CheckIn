@@ -168,7 +168,10 @@ import { RegistrationExportDialog } from "./detail/RegistrationExportDialog";
 import { buildRegistrationEmbedCode } from "@/lib/embedCode";
 import { summarizeRoomAttendance } from "@/lib/roomAttendance";
 import { defaultReportSessionDate } from "@/lib/report-session-selection";
-import { calculateSessionReport } from "@/lib/session-report-metrics";
+import {
+  calculateEventOverview,
+  calculateSessionReport,
+} from "@/lib/session-report-metrics";
 
 const BULK_CHECKOUT_REASON_LABELS: Record<string, string> = {
   end_of_event: "End of event",
@@ -6841,7 +6844,7 @@ function EventDashboardSection({
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-6">
+    <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-8">
       {/* 1 — Page Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -7931,18 +7934,12 @@ function RegistrationFormSection({
 function ReportsSection({
   checkins,
   registrations,
-  checkedIn,
-  checkedOut,
   attendanceSessions,
-  trackAttendance,
   requireCheckout,
 }: {
   checkins: EventCheckin[] | undefined;
   registrations: Registration[] | undefined;
-  checkedIn: EventCheckin[];
-  checkedOut: EventCheckin[];
   attendanceSessions: Array<{ date: string; items: EventCheckin[] }>;
-  trackAttendance: boolean;
   requireCheckout: boolean;
 }) {
   type SelectedReportView =
@@ -8036,6 +8033,21 @@ function ReportsSection({
     empty: string;
   }>;
   const activeReport = reportViewConfig[selectedReportView];
+  const eventOverview = useMemo(
+    () =>
+      calculateEventOverview({
+        sessions: sortedSessions,
+        registrations: registrations ?? [],
+        today: getLocalDateKey(),
+      }),
+    [registrations, sortedSessions],
+  );
+  const averagePerSession =
+    eventOverview.averagePerSession == null
+      ? "—"
+      : Number.isInteger(eventOverview.averagePerSession)
+        ? String(eventOverview.averagePerSession)
+        : eventOverview.averagePerSession.toFixed(1);
 
   return (
     <div className="p-6 md:p-8 max-w-[1200px] mx-auto w-full space-y-6">
@@ -8048,42 +8060,76 @@ function ReportsSection({
         </div>
       </div>
 
-      {/* Summary stats */}
-      <h2 className="text-lg font-semibold">Event Totals</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Total Check-ins</p>
-            <p className="text-3xl font-bold font-serif mt-1">
-              {allCheckins.length}
-            </p>
-          </CardContent>
-        </Card>
-        {trackAttendance && (
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Currently In</p>
-              <p className="text-3xl font-bold font-serif mt-1 text-green-700">
-                {checkedIn.length}
-              </p>
-            </CardContent>
-          </Card>
+      {/* Event-wide overview; intentionally independent of report controls. */}
+      <section
+        className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6"
+        aria-labelledby="event-overview-heading"
+      >
+        <div className="border-b border-border pb-4">
+          <h2 id="event-overview-heading" className="text-lg font-semibold">
+            Event Overview
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Summary across the full event.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {(sortedSessions.length === 1
+            ? [
+                ["Registered", eventOverview.singleDay.registered, "Eligible for this session"],
+                ["Attended", eventOverview.singleDay.attended, "Unique attendees"],
+                ["Attendance Rate", `${eventOverview.singleDay.attendanceRate}%`, "Attended ÷ registered"],
+              ]
+            : [
+                ["Unique Attendees", eventOverview.uniqueAttendees, "Attended at least once"],
+                ["Average per Session", averagePerSession, eventOverview.occurredSessionCount ? `Across ${eventOverview.occurredSessionCount} session${eventOverview.occurredSessionCount === 1 ? "" : "s"}` : "No sessions have occurred"],
+                ["Repeat Attendees", eventOverview.repeatAttendees, eventOverview.occurredSessionCount < 2 ? "Available after multiple sessions" : `${eventOverview.repeatAttendees} of ${eventOverview.uniqueAttendees} attended multiple sessions`],
+              ]
+          ).map(([label, value, description]) => (
+            <Card key={String(label)} aria-label={`${label}: ${value}. ${description}`}>
+              <CardContent className="p-5">
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="mt-1 font-serif text-3xl font-bold">{value}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        {sortedSessions.length !== 1 && (
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <span>
+              {eventOverview.occurredSessionCount
+                ? `${eventOverview.attendanceVisits} attendance visits across ${eventOverview.occurredSessionCount} session${eventOverview.occurredSessionCount === 1 ? "" : "s"}`
+                : "No sessions have occurred yet"}
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="What is an attendance visit?">
+                  <Info className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                An attendance visit represents one person attending one session. The same person may contribute more than one attendance visit across a multi-day event.
+              </TooltipContent>
+            </Tooltip>
+          </div>
         )}
-        {requireCheckout && (
-          <Card>
-            <CardContent className="p-5">
-              <p className="text-sm text-muted-foreground">Checked Out</p>
-              <p className="text-3xl font-bold font-serif mt-1 text-amber-700">
-                {checkedOut.length}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      </section>
 
       {/* Attendance sessions */}
       {!sortedSessions.length ? (
-        <div className="space-y-4">
+        <section
+          className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6"
+          aria-labelledby="session-attendance-empty-heading"
+        >
+          <div className="border-b border-border pb-4">
+            <h2 id="session-attendance-empty-heading" className="text-lg font-semibold">
+              Session Attendance
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Review attendance for a specific session and room.
+            </p>
+          </div>
           <Card className="border-dashed">
             <CardContent className="py-12 text-center text-muted-foreground">
               <BarChart2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -8125,18 +8171,27 @@ function ReportsSection({
               </Card>
             ))}
           </div>
-        </div>
+        </section>
       ) : (
-        <section className="space-y-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Session Attendance</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Totals below apply to the selected session and room.
-              </p>
-            </div>
-            <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
-              <div className="w-full space-y-1.5 sm:w-72">
+        <section
+          className="space-y-5 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-6"
+          aria-labelledby="session-attendance-heading"
+        >
+          <div className="border-b border-border pb-4">
+            <h2 id="session-attendance-heading" className="text-lg font-semibold">
+              Session Attendance
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Review attendance for a specific session and room.
+            </p>
+          </div>
+          <div
+            className={cn(
+              "grid w-full grid-cols-1 gap-4",
+              showRoomFilter ? "sm:grid-cols-2" : "sm:max-w-md",
+            )}
+          >
+              <div className="w-full space-y-1.5">
                 <Label htmlFor="reports-session-date">Session Date</Label>
                 {sortedSessions.length > 1 ? (
                   <Select
@@ -8170,7 +8225,7 @@ function ReportsSection({
                 )}
               </div>
               {showRoomFilter && (
-                <div className="w-full space-y-1.5 sm:w-56">
+                <div className="w-full space-y-1.5">
                   <Label htmlFor="reports-room-filter">Room</Label>
                   <Select value={roomFilter} onValueChange={setRoomFilter}>
                     <SelectTrigger id="reports-room-filter">
@@ -8192,16 +8247,6 @@ function ReportsSection({
                   </Select>
                 </div>
               )}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-base font-semibold">Selected Session</h3>
-            <p className="text-sm text-muted-foreground">
-              {selectedSessionDate
-                ? format(new Date(`${selectedSessionDate}T00:00:00`), "EEEE, MMMM d, yyyy")
-                : "No session selected"}
-            </p>
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-live="polite">
             {(Object.entries(reportViewConfig) as Array<
@@ -9400,10 +9445,7 @@ export default function EventWorkspace() {
       <ReportsSection
         checkins={checkins}
         registrations={registrations}
-        checkedIn={checkedIn}
-        checkedOut={checkedOut}
         attendanceSessions={attendanceSessions}
-        trackAttendance={trackAttendance}
         requireCheckout={requireCheckout}
       />
     );

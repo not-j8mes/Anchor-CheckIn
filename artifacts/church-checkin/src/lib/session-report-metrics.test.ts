@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { EventCheckin, Registration } from "@workspace/api-client-react";
-import { calculateSessionReport } from "./session-report-metrics";
+import {
+  calculateEventOverview,
+  calculateSessionReport,
+} from "./session-report-metrics";
 
 const registrations = [
   { id: 1, formId: 1, childFirstName: "A", childLastName: "One", room: "Blue", createdAt: "2026-08-01T12:00:00" },
@@ -97,4 +100,35 @@ test("same-day registrations are eligible through the end-of-day cutoff", () => 
   });
   assert.equal(report.eligibleRegistrations.length, 1);
   assert.equal(report.newRegistrationsCount, 1);
+});
+
+test("event overview deduplicates people within sessions and counts repeats across sessions", () => {
+  const overview = calculateEventOverview({
+    sessions: [
+      sessions[0]!,
+      sessions[1]!,
+      { date: "2026-08-05", items: [] },
+      { date: "2026-08-10", items: [checkin(9, 3, "2026-08-10", "Red")] },
+    ],
+    registrations,
+    today: "2026-08-05",
+  });
+  assert.equal(overview.uniqueAttendees, 2);
+  assert.equal(overview.attendanceVisits, 3);
+  assert.equal(overview.occurredSessionCount, 3);
+  assert.equal(overview.averagePerSession, 1);
+  assert.equal(overview.repeatAttendees, 1);
+});
+
+test("event overview handles no occurred sessions and single-day events", () => {
+  const future = calculateEventOverview({
+    sessions: [{ date: "2026-08-10", items: [] }],
+    registrations,
+    today: "2026-08-01",
+  });
+  assert.equal(future.averagePerSession, null);
+  assert.equal(future.repeatAttendees, 0);
+  assert.equal(future.singleDay.registered, 3);
+  assert.equal(future.singleDay.attended, 0);
+  assert.equal(future.singleDay.attendanceRate, 0);
 });
