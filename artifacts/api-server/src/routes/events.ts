@@ -887,11 +887,25 @@ router.post(
       typeof req.body?.subject === "string" ? req.body.subject.trim() : "";
     const message =
       typeof req.body?.message === "string" ? req.body.message.trim() : "";
+    const hasCustomRecipients = Array.isArray(req.body?.recipients);
+    const customRecipients: string[] = hasCustomRecipients
+      ? [...new Set<string>(
+          (req.body.recipients as unknown[])
+            .filter((value: unknown): value is string => typeof value === "string")
+            .map((value: string) => value.trim().toLowerCase())
+            .filter(Boolean),
+        )]
+      : [];
     if (
       !subject ||
       subject.length > 200 ||
       !message ||
-      message.length > 10000
+      message.length > 10000 ||
+      (hasCustomRecipients &&
+        (customRecipients.length === 0 ||
+          customRecipients.some(
+            (email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
+          )))
     ) {
       res.status(400).json({ error: "Invalid input" });
       return;
@@ -924,7 +938,7 @@ router.post(
         res.status(404).json({ error: "Event not found" });
         return;
       }
-      if (!event.formId) {
+      if (!event.formId && !hasCustomRecipients) {
         res.json({
           recipientCount: 0,
           sentCount: 0,
@@ -941,23 +955,6 @@ router.post(
         .where(eq(organizationsTable.id, auth.organizationId))
         .limit(1);
 
-      const registrations = await db
-        .select({
-          id: registrationsTable.id,
-          childFirstName: registrationsTable.childFirstName,
-          childLastName: registrationsTable.childLastName,
-          guardianName: registrationsTable.guardianName,
-          guardianEmail: registrationsTable.guardianEmail,
-        })
-        .from(registrationsTable)
-        .where(
-          and(
-            eq(registrationsTable.formId, event.formId),
-            eq(registrationsTable.organizationId, auth.organizationId),
-          ),
-        )
-        .orderBy(asc(registrationsTable.createdAt));
-
       const recipients = new Map<
         string,
         {
@@ -967,7 +964,33 @@ router.post(
         }
       >();
 
-      for (const registration of registrations) {
+      if (hasCustomRecipients) {
+        for (const email of customRecipients) {
+          recipients.set(email, {
+            email,
+            primaryContactName: null,
+            participantNames: [],
+          });
+        }
+      } else {
+        const registrations = await db
+          .select({
+            id: registrationsTable.id,
+            childFirstName: registrationsTable.childFirstName,
+            childLastName: registrationsTable.childLastName,
+            guardianName: registrationsTable.guardianName,
+            guardianEmail: registrationsTable.guardianEmail,
+          })
+          .from(registrationsTable)
+          .where(
+            and(
+              eq(registrationsTable.formId, event.formId!),
+              eq(registrationsTable.organizationId, auth.organizationId),
+            ),
+          )
+          .orderBy(asc(registrationsTable.createdAt));
+
+        for (const registration of registrations) {
         const email = registration.guardianEmail?.trim();
         if (!email || !email.includes("@")) continue;
 
@@ -994,7 +1017,8 @@ router.post(
         ) {
           existing.participantNames.push(participantName);
         }
-        recipients.set(key, existing);
+          recipients.set(key, existing);
+        }
       }
 
       if (recipients.size > MAX_EVENT_EMAIL_RECIPIENTS) {

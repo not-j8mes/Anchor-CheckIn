@@ -2317,6 +2317,10 @@ components:
           type: string
         message:
           type: string
+        recipients:
+          type: array
+          items:
+            type: string
 
     EventRegistrantEmailFailure:
       type: object

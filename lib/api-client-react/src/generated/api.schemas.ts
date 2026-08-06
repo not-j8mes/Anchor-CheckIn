@@ -802,6 +802,7 @@ export interface EventWithForm {
 export interface EventRegistrantEmailInput {
   subject: string;
   message: string;
+  recipients?: string[];
 }
 
 export interface EventRegistrantEmailFailure {

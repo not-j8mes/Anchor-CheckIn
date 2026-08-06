@@ -167,6 +167,7 @@ import {
 import { RegistrationExportDialog } from "./detail/RegistrationExportDialog";
 import { buildRegistrationEmbedCode } from "@/lib/embedCode";
 import { summarizeRoomAttendance } from "@/lib/roomAttendance";
+import { useAuth } from "@/lib/auth";
 import { defaultReportSessionDate } from "@/lib/report-session-selection";
 import {
   calculateEventOverview,
@@ -188,6 +189,19 @@ const DEFAULT_REGISTRATION_COMPLETE_MESSAGE =
 const DEFAULT_EVENT_UPDATE_EMAIL_SUBJECT = "Update for {{eventName}}";
 const DEFAULT_EVENT_UPDATE_EMAIL_MESSAGE =
   "Here is an update about {{eventName}}.";
+
+export function parseCustomEmailRecipients(value: string) {
+  const addresses = [...new Set(
+    value
+      .split(/[\s,;]+/)
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  )];
+  const invalid = addresses.filter(
+    (email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
+  );
+  return { addresses, invalid };
+}
 
 const BULK_CHECKOUT_REASONS = Object.entries(BULK_CHECKOUT_REASON_LABELS).map(
   ([value, label]) => ({ value, label }),
@@ -1870,6 +1884,8 @@ function ChildrenTabContent({
     useState<RegistrationFamilyGroup | null>(null);
   const [addRegOpen, setAddRegOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [customEmailDialogOpen, setCustomEmailDialogOpen] = useState(false);
+  const [customEmailRecipients, setCustomEmailRecipients] = useState("");
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [emailSubject, setEmailSubject] = useState(
     DEFAULT_EVENT_UPDATE_EMAIL_SUBJECT,
@@ -1879,6 +1895,13 @@ function ChildrenTabContent({
   );
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { organization } = useAuth();
+  const canSendCustomEmail =
+    organization?.role === "owner" || organization?.role === "admin";
+  const parsedCustomRecipients = useMemo(
+    () => parseCustomEmailRecipients(customEmailRecipients),
+    [customEmailRecipients],
+  );
 
   const { data: registrations = [], isLoading } = useListRegistrations(
     formId ?? 0,
@@ -1922,6 +1945,7 @@ function ChildrenTabContent({
     mutation: {
       onSuccess: (result) => {
         setEmailDialogOpen(false);
+        setCustomEmailDialogOpen(false);
         const skippedNotice =
           result.skippedCount > 0
             ? ` ${result.skippedCount} skipped because email is not configured.`
@@ -1951,6 +1975,16 @@ function ChildrenTabContent({
       data: {
         subject: emailSubject,
         message: emailMessage,
+      },
+    });
+  };
+  const handleSendCustomEmail = () => {
+    emailEventRegistrants.mutate({
+      eventId,
+      data: {
+        subject: emailSubject,
+        message: emailMessage,
+        recipients: parsedCustomRecipients.addresses,
       },
     });
   };
@@ -2082,6 +2116,18 @@ function ChildrenTabContent({
             <span className="hidden sm:inline">Email Registrants</span>
             <span className="sm:hidden">Email</span>
           </Button>
+          {canSendCustomEmail && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCustomEmailDialogOpen(true)}
+              className="gap-1.5"
+            >
+              <Mail className="w-4 h-4" />
+              <span className="hidden sm:inline">Custom Email</span>
+              <span className="sm:hidden">Custom</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -2555,6 +2601,61 @@ function ChildrenTabContent({
                 <Loader2 className="w-4 h-4 animate-spin" />
               )}
               Send Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={customEmailDialogOpen} onOpenChange={setCustomEmailDialogOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Custom Email</DialogTitle>
+            <DialogDescription>
+              Send an event email to addresses you enter manually. Separate addresses with commas, spaces, semicolons, or new lines.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="custom-email-recipients">Recipients</Label>
+              <Textarea
+                id="custom-email-recipients"
+                rows={4}
+                value={customEmailRecipients}
+                onChange={(event) => setCustomEmailRecipients(event.target.value)}
+                placeholder="person@example.com, another@example.com"
+                autoFocus
+              />
+              <p className={cn("text-xs", parsedCustomRecipients.invalid.length ? "text-destructive" : "text-muted-foreground")}>
+                {parsedCustomRecipients.invalid.length
+                  ? `Invalid: ${parsedCustomRecipients.invalid.join(", ")}`
+                  : `${parsedCustomRecipients.addresses.length} unique recipient${parsedCustomRecipients.addresses.length === 1 ? "" : "s"}`}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="custom-event-email-subject">Subject</Label>
+              <Input id="custom-event-email-subject" value={emailSubject} onChange={(event) => setEmailSubject(event.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="custom-event-email-message">Message</Label>
+              <Textarea id="custom-event-email-message" rows={8} value={emailMessage} onChange={(event) => setEmailMessage(event.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCustomEmailDialogOpen(false)} disabled={emailEventRegistrants.isPending}>Cancel</Button>
+            <Button
+              type="button"
+              onClick={handleSendCustomEmail}
+              disabled={
+                emailEventRegistrants.isPending ||
+                parsedCustomRecipients.addresses.length === 0 ||
+                parsedCustomRecipients.invalid.length > 0 ||
+                !emailSubject.trim() ||
+                !emailMessage.trim()
+              }
+              className="gap-2"
+            >
+              {emailEventRegistrants.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Send Custom Email
             </Button>
           </DialogFooter>
         </DialogContent>
