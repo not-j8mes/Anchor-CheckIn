@@ -55,6 +55,7 @@ import {
 } from "lucide-react";
 import { APP_NAME, DEFAULT_APP_LOGO } from "@/lib/branding";
 import { useToast } from "@/hooks/use-toast";
+import { navigateWithPageTransition } from "@/lib/pageTransition";
 import { useAuth } from "@/lib/auth";
 import { TrimmedLogo } from "@/components/branding/TrimmedLogo";
 import {
@@ -85,9 +86,10 @@ function statusBadge(status: string) {
 
 function registrationTypeBadge(type?: string | null) {
   if (!type) return null;
-  if (type === "child_checkin") return <Badge className="bg-purple-100 text-purple-800 border-purple-200">Child Check-In</Badge>;
-  if (type === "family_group") return <Badge className="bg-teal-100 text-teal-800 border-teal-200">Family / Group</Badge>;
-  if (type === "individual") return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Individual</Badge>;
+  const typeStyle = "rounded-full";
+  if (type === "child_checkin") return <Badge className={`${typeStyle} border-purple-200 bg-purple-100 text-purple-800 hover:bg-purple-100`}>Child Check-In</Badge>;
+  if (type === "family_group") return <Badge className={`${typeStyle} border-teal-200 bg-teal-50 text-teal-800 hover:bg-teal-50`}>Family / Group</Badge>;
+  if (type === "individual") return <Badge className={`${typeStyle} border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-50`}>Individual</Badge>;
   return null;
 }
 
@@ -530,7 +532,10 @@ function EventCard({ event, onEdit, categories }: {
   categories: EventCategory[];
 }) {
   const [, navigate] = useLocation();
-  const openEvent = () => navigate(`/events/${event.id}`);
+  const openEvent = () =>
+    navigateWithPageTransition(navigate, `/events/${event.id}`, "forward");
+  const openEventSection = (path: string) =>
+    navigateWithPageTransition(navigate, path, "forward");
   const trackAttendance = event.trackAttendance ?? (event.registrationType === "child_checkin" || !event.registrationType);
   const checkinBadge = trackAttendance
     ? <Badge className="bg-green-100 text-green-800 border-green-200 text-[10px]">Check-In On</Badge>
@@ -614,7 +619,14 @@ function EventCard({ event, onEdit, categories }: {
                 className="gap-1.5"
                 onClick={(e) => e.stopPropagation()}
               >
-                <Link href={`/events/${event.id}`}>
+                <Link
+                  href={`/events/${event.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openEvent();
+                  }}
+                >
                   Open Event <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </Button>
@@ -627,7 +639,14 @@ function EventCard({ event, onEdit, categories }: {
                   aria-label={`Open ${event.name} Check-In Desk`}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Link href={`/events/${event.id}/checkin`}>
+                  <Link
+                    href={`/events/${event.id}/checkin`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openEventSection(`/events/${event.id}/checkin`);
+                    }}
+                  >
                     <LogIn className="w-3.5 h-3.5" /> Check-In Desk
                   </Link>
                 </Button>
@@ -640,7 +659,14 @@ function EventCard({ event, onEdit, categories }: {
                   className="gap-1.5"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Link href={`/events/${event.id}/form`}>
+                  <Link
+                    href={`/events/${event.id}/form`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openEventSection(`/events/${event.id}/form`);
+                    }}
+                  >
                     <FileText className="w-3.5 h-3.5" /> Registration Form
                   </Link>
                 </Button>

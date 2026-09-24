@@ -1,4 +1,5 @@
 import { Link, useLocation, useParams } from "wouter";
+import { useEffect, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -28,7 +29,9 @@ import {
   LogOut,
   ContactRound,
   ChevronUp,
+  ChevronRight,
   ArrowRight,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,6 +44,7 @@ import {
   type OrganizationPermission,
 } from "@/lib/auth";
 import { APP_NAME, DEFAULT_APP_LOGO } from "@/lib/branding";
+import { navigateWithPageTransition } from "@/lib/pageTransition";
 
 function NavLink({
   href,
@@ -81,7 +85,13 @@ function NavLink({
 export function EventWorkspaceLayout({ children }: { children: React.ReactNode }) {
   const { id } = useParams<{ id: string }>();
   const eventId = Number(id);
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
+  const initialSetupRoute = [
+    `/events/${eventId}/rooms`,
+    `/events/${eventId}/form`,
+    `/events/${eventId}/settings`,
+  ].some((href) => location === href || location.startsWith(`${href}/`));
+  const [setupOpen, setSetupOpen] = useState(initialSetupRoute);
   const { setOpenMobile, state: sidebarState } = useSidebar();
   const { user, organization, logout } = useAuth();
 
@@ -147,6 +157,13 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
   if (can("event_settings")) {
     nav.push({ href: `${base}/settings`, icon: Settings, label: "Event Settings", permission: "event_settings", section: "Setup" });
   }
+  const isSetupRoute = nav.some(
+    (item) => item.section === "Setup" && can(item.permission) && isActive(item.href),
+  );
+  useEffect(() => {
+    if (isSetupRoute) setSetupOpen(true);
+  }, [location]);
+  const showSetupItems = setupOpen || sidebarState === "collapsed";
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -154,7 +171,16 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
         <SidebarHeader className="p-3">
           {/* Back to events */}
           <div className="flex items-center gap-1">
-            <Link href="/" onClick={close} className="min-w-0 flex-1">
+            <Link
+              href="/"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                close();
+                navigateWithPageTransition(navigate, "/", "back");
+              }}
+              className="min-w-0 flex-1"
+            >
               <Button
                 variant="ghost"
                 size="sm"
@@ -185,7 +211,10 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
             </div>
           )}
           {showCheckinEntry && (
-            <div className="mt-4 -mx-3 border-t border-sidebar-border" />
+            <div
+              aria-hidden="true"
+              className="mx-3 mt-4 border-t border-sidebar-foreground/30 group-data-[collapsible=icon]:hidden"
+            />
           )}
           {showCheckinEntry && (
             <Link
@@ -216,23 +245,92 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
             return (
               <SidebarGroup
                 key={section}
-                className={section === "Overview" ? "p-0" : "mt-6 p-0"}
+                className={
+                  section === "Overview"
+                    ? "p-0"
+                    : section === "Setup"
+                      ? "mt-auto mb-3 p-0 pt-5"
+                      : "mt-6 p-0"
+                }
               >
-                <SidebarGroupLabel className="mb-0 h-5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/65">
-                  {section}
-                </SidebarGroupLabel>
-                <SidebarMenu className="gap-0">
-                  {items.map((item) => (
-                    <NavLink
-                      key={item.href}
-                      href={item.href}
-                      icon={item.icon}
-                      label={item.label}
-                      active={isActive(item.href)}
-                      onClick={close}
-                    />
-                  ))}
-                </SidebarMenu>
+                {section === "Setup" && (
+                  <div
+                    aria-hidden="true"
+                    className="mx-3 mb-4 border-t border-sidebar-foreground/30 group-data-[collapsible=icon]:hidden"
+                  />
+                )}
+                {section === "Setup" ? (
+                  <>
+                    <button
+                      type="button"
+                      aria-expanded={setupOpen}
+                      aria-controls="event-setup-navigation"
+                      onClick={() => setSetupOpen((open) => !open)}
+                      className={`flex h-7 w-full items-center gap-2 rounded-md px-3 text-left text-[10px] uppercase tracking-[0.12em] transition-colors duration-150 hover:text-sidebar-foreground/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:hidden ${
+                        isSetupRoute && !setupOpen
+                          ? "font-semibold text-sidebar-foreground/85"
+                          : "font-medium text-sidebar-foreground/55"
+                      }`}
+                    >
+                      <SlidersHorizontal
+                        className={`h-3.5 w-3.5 shrink-0 ${isSetupRoute && !setupOpen ? "text-sidebar-primary" : ""}`}
+                        aria-hidden="true"
+                      />
+                      <span className="flex-1">Manage Event</span>
+                      <ChevronRight
+                        className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none ${setupOpen ? "rotate-90" : ""}`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <div
+                      className={`grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${
+                        showSetupItems ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                      }`}
+                    >
+                      <div className="min-h-0 overflow-hidden">
+                        <SidebarMenu
+                          id="event-setup-navigation"
+                          aria-hidden={!showSetupItems}
+                          inert={!showSetupItems}
+                          className={`mt-2 gap-0 transition-[opacity,transform] duration-200 ease-out motion-reduce:transform-none motion-reduce:transition-none ${
+                            showSetupItems
+                              ? "translate-y-0 opacity-100"
+                              : "-translate-y-1 pointer-events-none opacity-0"
+                          }`}
+                        >
+                        {items.map((item) => (
+                          <NavLink
+                            key={item.href}
+                            href={item.href}
+                            icon={item.icon}
+                            label={item.label}
+                            active={isActive(item.href)}
+                            onClick={close}
+                          />
+                        ))}
+                        </SidebarMenu>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <SidebarGroupLabel className="mb-0 h-5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/65">
+                      {section}
+                    </SidebarGroupLabel>
+                    <SidebarMenu className="gap-0">
+                      {items.map((item) => (
+                        <NavLink
+                          key={item.href}
+                          href={item.href}
+                          icon={item.icon}
+                          label={item.label}
+                          active={isActive(item.href)}
+                          onClick={close}
+                        />
+                      ))}
+                    </SidebarMenu>
+                  </>
+                )}
               </SidebarGroup>
             );
           })}

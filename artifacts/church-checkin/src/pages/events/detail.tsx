@@ -222,6 +222,16 @@ function normalizedAllergyValue(value: string | null | undefined) {
   return value?.trim() ?? "";
 }
 
+function hasRegistrationAlert(
+  registration: Pick<Registration, "allergies" | "medicalNotes" | "specialNeeds">,
+) {
+  return Boolean(
+    normalizedAllergyValue(registration.allergies) ||
+      normalizedAllergyValue(registration.medicalNotes) ||
+      normalizedAllergyValue(registration.specialNeeds),
+  );
+}
+
 function getLabelHeaderName(
   organizationName: string | null | undefined,
   eventName: string | null | undefined,
@@ -1936,13 +1946,7 @@ function ChildrenTabContent({
   }, [registrations]);
 
   const alertCount = useMemo(
-    () =>
-      registrations.filter(
-        (r) =>
-          normalizedAllergyValue(r.allergies) ||
-          r.medicalNotes ||
-          r.specialNeeds,
-      ).length,
+    () => registrations.filter(hasRegistrationAlert).length,
     [registrations],
   );
   const uniqueEmailRecipientCount = useMemo(() => {
@@ -2024,12 +2028,7 @@ function ChildrenTabContent({
     if (roomFilter !== "all")
       result = result.filter((r) => r.room === roomFilter);
     if (alertsOnly)
-      result = result.filter(
-        (r) =>
-          normalizedAllergyValue(r.allergies) ||
-          r.medicalNotes ||
-          r.specialNeeds,
-      );
+      result = result.filter(hasRegistrationAlert);
     result = [...result].sort((a, b) => {
       if (sort === "name") {
         return `${a.childLastName} ${a.childFirstName}`.localeCompare(
@@ -2181,7 +2180,7 @@ function ChildrenTabContent({
 
       {/* Filter row */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="inline-flex h-9 rounded-md border border-border bg-background p-0.5">
+        <div className="inline-flex items-center border border-border rounded-lg overflow-hidden shrink-0">
           {(["individuals", "families"] as RegistrationsViewMode[]).map(
             (mode) => {
               const active = viewMode === mode;
@@ -2190,12 +2189,13 @@ function ChildrenTabContent({
                   key={mode}
                   type="button"
                   className={cn(
-                    "h-8 rounded-[5px] px-3 text-sm font-medium transition-colors",
+                    "px-3 py-2 flex items-center gap-1.5 text-sm transition-colors",
                     active
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground",
                   )}
                   onClick={() => handleViewModeChange(mode)}
+                  aria-pressed={active}
                 >
                   {mode === "individuals" ? "Individuals" : "Families"}
                 </button>
@@ -2346,11 +2346,7 @@ function ChildrenTabContent({
 
               <div className="space-y-2 bg-muted/20 p-3">
                 {family.children.map((reg) => {
-                  const hasAlert = !!(
-                    normalizedAllergyValue(reg.allergies) ||
-                    reg.specialNeeds ||
-                    reg.medicalNotes
-                  );
+                  const hasAlert = hasRegistrationAlert(reg);
 
                   return (
                     <Card
@@ -2372,9 +2368,20 @@ function ChildrenTabContent({
                             <RegistrationAllergyBadge
                               allergies={reg.allergies}
                             />
-                            {reg.specialNeeds && (
-                              <Badge className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full">
+                            {normalizedAllergyValue(reg.medicalNotes) && (
+                              <Badge
+                                title={reg.medicalNotes!}
+                                className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full"
+                              >
                                 Medical
+                              </Badge>
+                            )}
+                            {normalizedAllergyValue(reg.specialNeeds) && (
+                              <Badge
+                                title={reg.specialNeeds!}
+                                className="text-[10px] h-5 bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100 rounded-full"
+                              >
+                                Special needs
                               </Badge>
                             )}
                           </div>
@@ -2445,6 +2452,22 @@ function ChildrenTabContent({
                         </Badge>
                       )}
                       <RegistrationAllergyBadge allergies={reg.allergies} />
+                      {normalizedAllergyValue(reg.medicalNotes) && (
+                        <Badge
+                          title={reg.medicalNotes!}
+                          className="text-[10px] h-5 bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100 rounded-full"
+                        >
+                          Medical
+                        </Badge>
+                      )}
+                      {normalizedAllergyValue(reg.specialNeeds) && (
+                        <Badge
+                          title={reg.specialNeeds!}
+                          className="text-[10px] h-5 bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100 rounded-full"
+                        >
+                          Special needs
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
                       <span>
@@ -6645,6 +6668,7 @@ function EventDashboardSection({
   const { toast } = useToast();
   const [selectedActivityRegistration, setSelectedActivityRegistration] =
     useState<Registration | null>(null);
+  const [selectedRoomKey, setSelectedRoomKey] = useState<number | "unassigned" | null>(null);
   const [activityTab, setActivityTab] = useState<"registrations" | "checkins">(
     "registrations",
   );
@@ -6691,6 +6715,27 @@ function EventDashboardSection({
         selectedSessionId,
       }),
     [checkins, registrations, rooms, selectedSessionId],
+  );
+  const selectedRoom = roomAttendance.rooms.find((room) =>
+    selectedRoomKey === "unassigned"
+      ? room.roomId == null
+      : room.roomId === selectedRoomKey,
+  );
+  const selectedRoomRegistrations = selectedRoom
+    ? (registrations ?? []).filter((registration) => {
+        const roomName = registration.room?.trim();
+        return selectedRoom.roomId == null
+          ? !roomName || !rooms.some((room) => room.name === roomName)
+          : roomName === selectedRoom.roomName;
+      })
+    : [];
+  const presentRegistrationIds = new Set(checkedIn.map((checkin) => checkin.registrationId));
+  const checkedOutRegistrationIds = new Set(checkedOut.map((checkin) => checkin.registrationId));
+  const presentRoomRegistrations = selectedRoomRegistrations.filter((registration) =>
+    presentRegistrationIds.has(registration.id),
+  );
+  const notPresentRoomRegistrations = selectedRoomRegistrations.filter((registration) =>
+    !presentRegistrationIds.has(registration.id),
   );
 
   // ── Dynamic stat cards ──────────────────────────────────────────────────────
@@ -7002,7 +7047,7 @@ function EventDashboardSection({
       {/* Event meta row */}
       <div className="flex items-center gap-2.5 flex-wrap -mt-2 pb-4 border-b border-border/60">
         <h2 className="text-base font-semibold">{event.name}</h2>
-        <Badge variant="secondary" className="text-xs">
+        <Badge className="rounded-full border-purple-200 bg-purple-100 text-purple-800 hover:bg-purple-100">
           {regTypeLabel}
         </Badge>
         {statusBadge(event.status)}
@@ -7099,9 +7144,11 @@ function EventDashboardSection({
           <Card className="overflow-hidden shadow-none">
             <CardContent className="divide-y divide-border p-0">
               {roomAttendance.rooms.map((room) => (
-                <div
+                <button
+                  type="button"
                   key={room.roomId ?? "unassigned"}
-                  className="flex min-h-12 items-center justify-between gap-4 px-4 py-2"
+                  onClick={() => setSelectedRoomKey(room.roomId ?? "unassigned")}
+                  className="flex min-h-12 w-full items-center justify-between gap-4 px-4 py-2 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   aria-label={`${room.roomName}: ${room.inNowCount} present, ${room.registeredCount} registered`}
                 >
                   <div className="min-w-0">
@@ -7135,7 +7182,7 @@ function EventDashboardSection({
                   >
                     {room.inNowCount} present
                   </p>
-                </div>
+                </button>
               ))}
             </CardContent>
           </Card>
@@ -7367,6 +7414,61 @@ function EventDashboardSection({
           eventId={eventId}
         />
       )}
+      <Dialog
+        open={selectedRoomKey !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedRoomKey(null);
+        }}
+      >
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl">
+          <DialogHeader className="border-b px-6 py-5 pr-12">
+            <DialogTitle>{selectedRoom?.roomName ?? "Room"}</DialogTitle>
+            <DialogDescription>
+              {selectedRoom?.registeredCount ?? 0} registered · {selectedRoom?.inNowCount ?? 0} present now
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 overflow-y-auto px-6 py-5">
+            {([
+              { title: "Present", people: presentRoomRegistrations, color: "text-green-700" },
+              { title: "Not present", people: notPresentRoomRegistrations, color: "text-muted-foreground" },
+            ] as const).map((group) => (
+              <section key={group.title} aria-label={group.title}>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold">{group.title}</h3>
+                  <span className={`text-sm font-semibold tabular-nums ${group.color}`}>{group.people.length}</span>
+                </div>
+                {group.people.length > 0 ? (
+                  <ul className="divide-y rounded-lg border">
+                    {group.people.map((registration) => (
+                      <li key={registration.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {registration.childFirstName} {registration.childLastName}
+                          </p>
+                          {registration.guardianName && (
+                            <p className="truncate text-xs text-muted-foreground">
+                              Parent/Guardian: {registration.guardianName}
+                            </p>
+                          )}
+                        </div>
+                        {group.title === "Not present" && (
+                          <span className="shrink-0 text-xs text-muted-foreground">
+                            {checkedOutRegistrationIds.has(registration.id) ? "Checked out" : "Not checked in"}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+                    No one in this group right now.
+                  </p>
+                )}
+              </section>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
