@@ -98,7 +98,7 @@ function registrationTypeStripe(_type?: string | null) {
 
 // ─── Edit Event Dialog ──────────────────────────────────────────────────────
 
-type EditScheduleType = "one_time" | "multi_day" | "repeating";
+type EditScheduleType = "one_time" | "multi_day" | "repeating" | "custom";
 
 const EDIT_DAY_NAMES = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
 const EDIT_DAY_ABBR = ["Su","Mo","Tu","We","Th","Fr","Sa"];
@@ -123,6 +123,7 @@ function inferScheduleType(event: {
   endDate?: string | null;
   repeatDayOfWeek?: number | null;
 }): EditScheduleType {
+  if (event.scheduleType === "custom") return "custom";
   if (event.scheduleType === "repeating" || event.repeatDayOfWeek != null) return "repeating";
   if (event.scheduleType === "multi_day" || (event.endDate && event.startDate && event.endDate !== event.startDate)) return "multi_day";
   return "one_time";
@@ -136,6 +137,7 @@ interface EditEventDialogProps {
     eventType: string;
     registrationType?: string | null;
     scheduleType?: string | null;
+    customDates?: string[];
     startDate?: string | null;
     endDate?: string | null;
     startTime?: string | null;
@@ -296,7 +298,9 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
           {/* Schedule type picker */}
           <div className="space-y-2">
             <Label>Event Schedule</Label>
-            <div className="grid grid-cols-3 gap-2">
+            {form.scheduleType === "custom" ? (
+              <div className="space-y-1"><p className="text-sm font-medium">Custom days</p><p className="text-sm text-muted-foreground">{(event.customDates ?? []).map(editFormatDate).join(" · ")}</p></div>
+            ) : <div className="grid grid-cols-3 gap-2">
               {([
                 { value: "one_time" as EditScheduleType, label: "One-time", Icon: Calendar },
                 { value: "multi_day" as EditScheduleType, label: "Multi-day", Icon: CalendarRange },
@@ -320,7 +324,7 @@ function EditEventDialog({ event, open, onOpenChange }: EditEventDialogProps) {
                   {form.scheduleType === value && <Check className="w-3 h-3 absolute" style={{ display: "none" }} />}
                 </button>
               ))}
-            </div>
+            </div>}
           </div>
 
           {/* One-time */}
@@ -558,7 +562,9 @@ function EventCard({ event, onEdit, categories }: {
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {categoryLabel(event.eventType, categories)}
-                  {event.scheduleType === "repeating" && event.repeatDayOfWeek != null ? (
+                  {event.scheduleType === "custom" ? (
+                    <span className="ml-3">Custom days · {event.customDates?.length ?? 0} dates{event.nextSessionDate && <> · Next: {format(new Date(event.nextSessionDate + "T00:00:00"), "MMM d")}</>}</span>
+                  ) : event.scheduleType === "repeating" && event.repeatDayOfWeek != null ? (
                     <span className="ml-3 inline-flex items-center gap-1">
                       <Repeat className="w-3 h-3 inline-block" />
                       Every {["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][event.repeatDayOfWeek]}
@@ -664,7 +670,9 @@ function CalendarView({ events, categories }: { events: ChurchEvent[]; categorie
     const end = event.endDate ? new Date(event.endDate + "T00:00:00") : start;
 
     let dates: Date[];
-    if (event.scheduleType === "repeating" && event.repeatDayOfWeek != null) {
+    if (event.scheduleType === "custom") {
+      dates = (event.customDates ?? []).map((date) => new Date(date + "T00:00:00"));
+    } else if (event.scheduleType === "repeating" && event.repeatDayOfWeek != null) {
       // Only show on days that match the repeat day of week
       dates = [];
       const cur = new Date(start);

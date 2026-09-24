@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useLayoutEffect, type CSSProperties } from "react";
 import { DEFAULT_APP_LOGO } from "@/lib/branding";
 import { Link, useLocation } from "wouter";
 import {
@@ -14,6 +14,8 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Calendar as DateCalendar } from "@/components/ui/calendar";
+import { format, parseISO } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -217,7 +219,7 @@ interface RoomDraft {
   sortOrder: number;
 }
 
-type ScheduleType = "one_time" | "multi_day" | "repeating";
+type ScheduleType = "one_time" | "multi_day" | "repeating" | "custom";
 
 interface WizardState {
   registrationType: string;
@@ -225,6 +227,7 @@ interface WizardState {
   description: string;
   eventType: string;
   scheduleType: ScheduleType;
+  customDates: string[];
   startDate: string;
   endDate: string;
   startTime: string;
@@ -256,6 +259,7 @@ const DEFAULTS: WizardState = {
   description: "",
   eventType: "general",
   scheduleType: "one_time",
+  customDates: [],
   startDate: "",
   endDate: "",
   startTime: "",
@@ -330,7 +334,7 @@ function registrationTypeLabel(type: string) {
 }
 
 function scheduleTypeLabel(type: string) {
-  return type === "one_time" ? "One-time" : type === "multi_day" ? "Multi-day" : "Repeating";
+  return type === "custom" ? "Custom days" : type === "one_time" ? "One-time" : type === "multi_day" ? "Multi-day" : "Repeating";
 }
 
 function wizardSummaryItems(state: WizardState) {
@@ -364,8 +368,35 @@ function Step1({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: categories = [] } = useListEventCategories();
+  const calendarRef = useRef<HTMLDivElement>(null);
+  const selectedDatesRef = useRef<HTMLDivElement>(null);
+  const [calendarHeight, setCalendarHeight] = useState<number>();
+  const [hiddenDatesBelow, setHiddenDatesBelow] = useState(0);
   const [createCatOpen, setCreateCatOpen] = useState(false);
   const [newCatName, setNewCatName] = useState("");
+  useLayoutEffect(() => {
+    if (state.scheduleType !== "custom" || !calendarRef.current) return;
+    const calendar = calendarRef.current;
+    const measure = () => setCalendarHeight(calendar.getBoundingClientRect().height);
+    const observer = new ResizeObserver(measure);
+    observer.observe(calendar);
+    measure();
+    return () => observer.disconnect();
+  }, [state.scheduleType]);
+  useLayoutEffect(() => {
+    const list = selectedDatesRef.current;
+    if (state.scheduleType !== "custom" || !list) return;
+    const updateHiddenDateCount = () => {
+      const visibleBottom = list.getBoundingClientRect().bottom - 44;
+      const hiddenCount = Array.from(list.querySelectorAll<HTMLElement>("[data-selected-date]"))
+        .filter((date) => date.getBoundingClientRect().bottom > visibleBottom).length;
+      setHiddenDatesBelow(hiddenCount);
+    };
+    const observer = new ResizeObserver(updateHiddenDateCount);
+    observer.observe(list);
+    updateHiddenDateCount();
+    return () => observer.disconnect();
+  }, [state.scheduleType, state.customDates, calendarHeight]);
   const createCategory = useCreateEventCategory({
     mutation: {
       onSuccess: (cat) => {
@@ -526,15 +557,17 @@ function Step1({
           <p className="text-sm text-muted-foreground mt-0.5 mb-3">
             How often does this event occur?
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {([
               { value: "one_time" as ScheduleType, label: "One-time", Icon: Calendar, description: "A single event on one day." },
               { value: "multi_day" as ScheduleType, label: "Multi-day", Icon: CalendarRange, description: "Spans consecutive days — VBS, retreat, conference." },
               { value: "repeating" as ScheduleType, label: "Repeating", Icon: Repeat, description: "Regular schedule — AWANA, youth group, weekly classes." },
+              { value: "custom" as ScheduleType, label: "Custom days", Icon: CalendarRange, description: "Choose individual dates for an irregular schedule." },
             ] as const).map(({ value, label, Icon, description }) => (
               <button
                 key={value}
                 type="button"
+                aria-pressed={state.scheduleType === value}
                 onClick={() => {
                   update("scheduleType", value);
                   if (value === "one_time") update("endDate", "");
@@ -559,6 +592,70 @@ function Step1({
             ))}
           </div>
         </div>
+
+        {state.scheduleType === "custom" && (
+          <div className="space-y-4">
+            <div>
+              <Label>Select event dates</Label>
+              <p className="text-sm text-muted-foreground mt-1">Choose any dates across months. Select a date again to remove it.</p>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)] gap-6 items-start">
+              <div ref={calendarRef} className="w-fit">
+                <DateCalendar
+                  mode="multiple"
+                  selected={state.customDates.map((date) => parseISO(date))}
+                  onSelect={(dates) => update("customDates", (dates ?? []).map((date) => format(date, "yyyy-MM-dd")).sort())}
+                  className="shrink-0 rounded-xl border border-border [--cell-size:clamp(2.5rem,4vw,3.25rem)]"
+                />
+              </div>
+              <div
+                className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden lg:h-(--calendar-height) lg:max-h-(--calendar-height)"
+                style={calendarHeight ? { "--calendar-height": `${calendarHeight}px` } as CSSProperties : undefined}
+              >
+                <p className="text-sm font-medium" aria-live="polite">{state.customDates.length} date{state.customDates.length !== 1 ? "s" : ""} selected</p>
+                {state.customDates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Select at least one date to continue.</p>
+                ) : (
+                  <>
+                    <div className="relative min-h-0 flex-1">
+                    <div ref={selectedDatesRef} aria-label="Selected event dates" onScroll={() => {
+                      const list = selectedDatesRef.current;
+                      if (!list) return;
+                      const visibleBottom = list.getBoundingClientRect().bottom - 44;
+                      setHiddenDatesBelow(Array.from(list.querySelectorAll<HTMLElement>("[data-selected-date]"))
+                        .filter((date) => date.getBoundingClientRect().bottom > visibleBottom).length);
+                    }} className="custom-date-scrollbar flex h-full min-h-0 flex-col gap-2 overflow-y-scroll overscroll-contain pr-2 pb-12">
+                      {state.customDates.map((date) => (
+                        <button key={date} type="button" aria-label={`Remove ${formatPreviewDate(date)}`}
+                          data-selected-date
+                          onClick={() => update("customDates", state.customDates.filter((selected) => selected !== date))}
+                          className="flex w-full shrink-0 items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-left text-sm hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                          <span>{format(parseISO(date), "EEE, MMM d, yyyy")}</span><span aria-hidden="true">×</span>
+                        </button>
+                      ))}
+                    </div>
+                    {hiddenDatesBelow > 0 && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-1 flex items-center justify-center gap-1.5 rounded-md border border-primary/20 bg-background/95 px-3 py-2 text-xs font-medium text-muted-foreground shadow-sm">
+                      <ChevronDown className="h-3.5 w-3.5 text-primary" />Scroll to see {hiddenDatesBelow} more date{hiddenDatesBelow === 1 ? "" : "s"}
+                    </div>}
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => update("customDates", [])}>Clear dates</Button>
+                  </>
+                )}
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">Optional times apply to every selected date.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="custom-start-time">Start Time <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                <Input id="custom-start-time" type="time" value={state.startTime} onChange={(e) => update("startTime", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="custom-end-time">End Time <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+                <Input id="custom-end-time" type="time" value={state.endTime} onChange={(e) => update("endTime", e.target.value)} />
+              </div>
+            </div>
+          </div>
+        )}
 
         {state.scheduleType === "one_time" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1921,8 +2018,9 @@ function Step5({
           <ReviewRow label="Category" value={categoryLabel} />
           <ReviewRow
             label="Schedule"
-            value={state.scheduleType === "one_time" ? "One-time" : state.scheduleType === "multi_day" ? "Multi-day" : "Repeating"}
+            value={scheduleTypeLabel(state.scheduleType)}
           />
+          {state.scheduleType === "custom" && <ReviewRow label="Dates" value={state.customDates.map(formatPreviewDate).join(" · ")} />}
           {state.scheduleType === "one_time" && state.startDate && (
             <ReviewRow label="Date" value={formatPreviewDate(state.startDate)} />
           )}
@@ -2053,7 +2151,7 @@ export default function EventSetupWizard() {
     setState((prev) => ({ ...prev, [k]: v }));
 
   const canProceed = () => {
-    if (step === 1) return !!state.registrationType && !!state.name.trim();
+    if (step === 1) return !!state.registrationType && !!state.name.trim() && (state.scheduleType !== "custom" || state.customDates.length > 0);
     if (step === 2) return state.useRooms !== null;
     return true;
   };
@@ -2139,6 +2237,7 @@ export default function EventSetupWizard() {
           eventType: state.eventType,
           registrationType: state.registrationType || undefined,
           scheduleType: state.scheduleType,
+          customDates: state.scheduleType === "custom" ? state.customDates : undefined,
           startDate: state.startDate || undefined,
           endDate: state.scheduleType !== "one_time" ? (state.endDate || undefined) : undefined,
           startTime: state.startTime || undefined,

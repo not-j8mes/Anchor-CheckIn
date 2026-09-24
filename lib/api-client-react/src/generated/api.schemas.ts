@@ -717,6 +717,7 @@ export interface Event {
   /** @nullable */
   scheduleType?: string | null;
   /** @nullable */
+  customDates?: string[];
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;
@@ -762,6 +763,7 @@ export interface EventWithForm {
   /** @nullable */
   scheduleType?: string | null;
   /** @nullable */
+  customDates?: string[];
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;
@@ -824,6 +826,7 @@ export interface CreateEventInput {
   eventType: string;
   registrationType?: string;
   scheduleType?: string;
+  customDates?: string[];
   startDate?: string;
   endDate?: string;
   startTime?: string;

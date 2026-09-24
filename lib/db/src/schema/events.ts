@@ -13,7 +13,7 @@ export const eventsTable = pgTable("events", {
   description: text("description"),
   eventType: text("event_type").notNull().default("general"),
   registrationType: text("registration_type"),
-  scheduleType: text("schedule_type").notNull().default("one_time"), // 'one_time' | 'multi_day' | 'repeating'
+  scheduleType: text("schedule_type").notNull().default("one_time"), // 'one_time' | 'multi_day' | 'repeating' | 'custom'
   startDate: text("start_date"),
   endDate: text("end_date"),
   startTime: text("start_time"),

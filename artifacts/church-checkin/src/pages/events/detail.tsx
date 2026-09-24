@@ -6504,6 +6504,16 @@ function EventDateCard({ event }: { event: EventWithForm }) {
     "Saturday",
   ];
 
+  if (scheduleType === "custom") {
+    return (
+      <Card><CardContent className="p-5">
+        <p className="text-sm text-muted-foreground">Custom days · {event.sessionCount ?? 0} dates</p>
+        <p className="text-xl font-bold font-serif mt-1">{nextSessionDate ? format(new Date(nextSessionDate + "T00:00:00"), "MMM d, yyyy") : "No upcoming dates"}</p>
+        {nextSessionDate && <p className="text-xs text-muted-foreground mt-0.5">Next session</p>}
+      </CardContent></Card>
+    );
+  }
+
   if (scheduleType === "repeating") {
     const dayLabel =
       repeatDayOfWeek != null ? DAY_NAMES[repeatDayOfWeek] : null;
@@ -6847,7 +6857,9 @@ function EventDashboardSection({
   const { scheduleType, startDate, endDate, repeatDayOfWeek, nextSessionDate } =
     event;
   let scheduleSummary: React.ReactNode = null;
-  if (scheduleType === "repeating") {
+  if (scheduleType === "custom") {
+    scheduleSummary = <span className="text-sm text-muted-foreground">Custom days · {event.sessionCount ?? 0} dates</span>;
+  } else if (scheduleType === "repeating") {
     const dayLabel =
       repeatDayOfWeek != null ? DAY_NAMES_FULL[repeatDayOfWeek] : null;
     scheduleSummary = (
@@ -8550,7 +8562,7 @@ function EventSettingsSection({
 
   const isChildCheckin =
     !event.registrationType || event.registrationType === "child_checkin";
-  const scheduleType =
+  const scheduleType = event.scheduleType === "custom" ? "custom" :
     event.scheduleType === "repeating" || event.repeatDayOfWeek != null
       ? "repeating"
       : event.scheduleType === "multi_day" ||
@@ -8742,7 +8754,12 @@ function EventSettingsSection({
             />
           </div>
           {/* Schedule display — varies by type */}
-          {scheduleType === "repeating" ? (
+          {scheduleType === "custom" ? (
+            <div className="space-y-2">
+              <Label>Custom days</Label>
+              <p className="text-sm text-muted-foreground">{(event.customDates ?? []).map((date) => format(new Date(date + "T00:00:00"), "EEE, MMM d, yyyy")).join(" · ")}</p>
+            </div>
+          ) : scheduleType === "repeating" ? (
             <div className="rounded-lg border border-border bg-muted/30 p-3.5 space-y-2">
               <div className="flex items-center gap-2">
                 <Repeat className="w-4 h-4 text-primary" />

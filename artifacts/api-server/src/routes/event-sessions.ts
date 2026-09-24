@@ -37,7 +37,7 @@ router.get("/events/:eventId/sessions", async (req, res) => {
     // For repeating events, only return dates that match the recurrence pattern.
     // This guards against stale daily sessions left over from before the event
     // was configured as repeating.
-    const validDates = new Set(getValidSessionDates(event));
+    const validDates = new Set(await getValidSessionDates(event));
     const sessions = allSessions.filter((s) => validDates.has(s.sessionDate));
 
     res.json(sessions.map((s) => ({
@@ -95,12 +95,18 @@ export function computeWeeklySessionDates(
   return sessions;
 }
 
-function getValidSessionDates(event: {
+async function getValidSessionDates(event: {
+  id: number;
   scheduleType: string;
   startDate: string | null;
   endDate: string | null;
   repeatDayOfWeek: number | null;
-}): string[] {
+}): Promise<string[]> {
+  if (event.scheduleType === "custom") {
+    const sessions = await db.select({ date: eventSessionsTable.sessionDate }).from(eventSessionsTable)
+      .where(eq(eventSessionsTable.eventId, event.id)).orderBy(asc(eventSessionsTable.sessionDate));
+    return sessions.map((session) => session.date);
+  }
   if (!event.startDate) return [];
   if (event.scheduleType === "repeating" && event.repeatDayOfWeek != null) {
     return computeWeeklySessionDates(event.startDate, event.endDate || event.startDate, event.repeatDayOfWeek);
@@ -138,9 +144,9 @@ export function computeDailySessionDates(startDate: string, endDate?: string | n
 
 export async function ensureEventDateSessions(eventId: number): Promise<void> {
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.id, eventId)).limit(1);
-  if (!event?.startDate) return;
+  if (!event?.startDate || event.scheduleType === "custom") return;
 
-  const dates = getValidSessionDates(event);
+  const dates = await getValidSessionDates(event);
   if (dates.length === 0) return;
 
   const existing = await db
@@ -169,7 +175,7 @@ export async function createOrGetTodaySession(eventId: number): Promise<typeof e
   if (!event?.startDate) throw new Error("Event has no start date");
 
   const today = toLocalDateKey(new Date());
-  const validDates = getValidSessionDates(event);
+  const validDates = await getValidSessionDates(event);
   const sessionDate = getDefaultSessionDate(validDates, today);
   if (!sessionDate) throw new Error("Event has no valid sessions");
   const [existing] = await db

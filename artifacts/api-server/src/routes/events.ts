@@ -1,3 +1,4 @@
+import { normalizeCustomDates, InvalidCustomDatesError } from "../lib/custom-schedule";
 import { Router } from "express";
 import { and, eq, sql, desc, inArray, asc } from "drizzle-orm";
 import {
@@ -376,6 +377,7 @@ interface CreateEventWithFormInput {
   eventType: string;
   registrationType?: string | null;
   scheduleType?: string | null;
+  customDates?: string[];
   startDate?: string | null;
   endDate?: string | null;
   startTime?: string | null;
@@ -405,8 +407,6 @@ export async function createEventWithForm(input: CreateEventWithFormInput) {
     formTitle,
     formDescription,
     addDefaultQuestions,
-    startDate,
-    endDate,
     startTime,
     endTime,
     repeatFrequency,
@@ -420,6 +420,9 @@ export async function createEventWithForm(input: CreateEventWithFormInput) {
   const { organizationId } = input;
 
   const resolvedScheduleType = input.scheduleType || "one_time";
+  const customDates = resolvedScheduleType === "custom" ? normalizeCustomDates(input.customDates) : [];
+  const startDate = resolvedScheduleType === "custom" ? customDates[0] : input.startDate;
+  const endDate = resolvedScheduleType === "custom" ? customDates[customDates.length - 1] : input.endDate;
 
   // Smart defaults based on registration type when caller doesn't specify
   const isChildCheckin =
@@ -481,8 +484,8 @@ export async function createEventWithForm(input: CreateEventWithFormInput) {
       endDate: endDate || null,
       startTime: startTime || null,
       endTime: endTime || null,
-      repeatFrequency: repeatFrequency || null,
-      repeatDayOfWeek: repeatDayOfWeek !== undefined ? repeatDayOfWeek : null,
+      repeatFrequency: resolvedScheduleType === "custom" ? null : repeatFrequency || null,
+      repeatDayOfWeek: resolvedScheduleType === "custom" ? null : repeatDayOfWeek !== undefined ? repeatDayOfWeek : null,
       status: computeStatus(startDate || null, endDate || null),
       formId: form.id,
       trackAttendance: resolvedTrackAttendance,
@@ -492,6 +495,13 @@ export async function createEventWithForm(input: CreateEventWithFormInput) {
       roomAssignmentMode: roomAssignmentMode || null,
     })
     .returning();
+
+  if (resolvedScheduleType === "custom") {
+    await db.insert(eventSessionsTable).values(customDates.map((sessionDate) => ({
+      eventId: event.id, organizationId, sessionDate,
+      startTime: startTime || null, endTime: endTime || null, status: "scheduled" as const,
+    })));
+  }
 
   // Generate sessions for repeating events
   if (
@@ -547,6 +557,7 @@ async function buildEventRow(event: typeof eventsTable.$inferSelect) {
   let registrationCount = 0;
   let sessionCount: number | null = null;
   let nextSessionDate: string | null = null;
+  let customDates: string[] | undefined;
 
   if (event.formId) {
     const form = await db
@@ -565,7 +576,7 @@ async function buildEventRow(event: typeof eventsTable.$inferSelect) {
     registrationCount = count;
   }
 
-  if (event.scheduleType === "repeating") {
+  if (event.scheduleType === "repeating" || event.scheduleType === "custom") {
     const sessions = await db
       .select({
         id: eventSessionsTable.id,
@@ -577,6 +588,7 @@ async function buildEventRow(event: typeof eventsTable.$inferSelect) {
       .orderBy(asc(eventSessionsTable.sessionDate));
 
     sessionCount = sessions.length;
+    if (event.scheduleType === "custom") customDates = sessions.map((session) => session.sessionDate);
     const today = new Date().toISOString().slice(0, 10);
     const upcoming = sessions.filter(
       (s) => s.sessionDate >= today && s.status !== "cancelled",
@@ -593,6 +605,7 @@ async function buildEventRow(event: typeof eventsTable.$inferSelect) {
     registrationCount,
     sessionCount,
     nextSessionDate,
+    customDates,
   };
 }
 
@@ -623,6 +636,7 @@ router.post(
       eventType,
       registrationType,
       scheduleType,
+      customDates,
       startDate,
       endDate,
       startTime,
@@ -653,6 +667,7 @@ router.post(
         eventType,
         registrationType,
         scheduleType,
+        customDates,
         startDate,
         endDate,
         startTime,
@@ -677,6 +692,10 @@ router.post(
         form: { ...form, submissionCount: 0, questions, formFields },
       });
     } catch (err) {
+      if (err instanceof InvalidCustomDatesError) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
       req.log.error({ err }, "Failed to create event");
       res.status(500).json({ error: "Internal server error" });
     }

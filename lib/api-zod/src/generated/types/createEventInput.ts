@@ -12,6 +12,7 @@ export interface CreateEventInput {
   eventType: string;
   registrationType?: string;
   scheduleType?: string;
+  customDates?: string[];
   startDate?: string;
   endDate?: string;
   startTime?: string;

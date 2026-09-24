@@ -1,4 +1,10 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import {
+  Switch,
+  Route,
+  Router as WouterRouter,
+  useLocation,
+  useParams,
+} from "wouter";
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -20,7 +26,15 @@ import PublicRegistrationForm from "@/pages/register";
 import SettingsPage from "@/pages/settings";
 import PlatformAdminPage from "@/pages/admin";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Keep recently loaded workspace data warm while moving between an
+      // event's sections. Mutations still invalidate their affected queries.
+      staleTime: 30_000,
+    },
+  },
+});
 
 function EventWorkspaceRoute() {
   return (
@@ -151,30 +165,25 @@ function EventWorkspaceWithPermission({
   );
 }
 
-const EventDashboardRoute = () => (
-  <EventWorkspaceWithPermission permission="events" />
-);
-const CheckinRoute = () => (
-  <EventWorkspaceWithPermission permission="checkin" />
-);
-const RegistrationsRoute = () => (
-  <EventWorkspaceWithPermission permission="registrations" />
-);
-const RoomsRoute = () => (
-  <EventWorkspaceWithPermission permission="rooms" />
-);
-const StaffRoute = () => (
-  <EventWorkspaceWithPermission permission="staff" />
-);
-const FormsRoute = () => (
-  <EventWorkspaceWithPermission permission="forms" />
-);
-const ReportsRoute = () => (
-  <EventWorkspaceWithPermission permission="reports" />
-);
-const EventSettingsRoute = () => (
-  <EventWorkspaceWithPermission permission="event_settings" />
-);
+const EVENT_SECTION_PERMISSIONS: Record<string, OrganizationPermission> = {
+  "": "events",
+  checkin: "checkin",
+  registrations: "registrations",
+  groups: "registrations",
+  rooms: "rooms",
+  staff: "staff",
+  form: "forms",
+  reports: "reports",
+  settings: "event_settings",
+};
+
+function EventWorkspaceSectionRoute() {
+  const { section = "" } = useParams<{ section?: string }>();
+  const permission = EVENT_SECTION_PERMISSIONS[section];
+
+  if (!permission) return <NotFound />;
+  return <EventWorkspaceWithPermission permission={permission} />;
+}
 
 function Router() {
   return (
@@ -186,16 +195,11 @@ function Router() {
       {/* New event setup wizard — must be before /:id routes */}
       <Route path="/events/new" component={ProtectedEventSetupWizard} />
 
-      {/* Event workspace — all sections under /events/:id/* */}
-      <Route path="/events/:id/checkin" component={CheckinRoute} />
-      <Route path="/events/:id/registrations" component={RegistrationsRoute} />
-      <Route path="/events/:id/groups" component={RegistrationsRoute} />
-      <Route path="/events/:id/rooms" component={RoomsRoute} />
-      <Route path="/events/:id/staff" component={StaffRoute} />
-      <Route path="/events/:id/form" component={FormsRoute} />
-      <Route path="/events/:id/reports" component={ReportsRoute} />
-      <Route path="/events/:id/settings" component={EventSettingsRoute} />
-      <Route path="/events/:id" component={EventDashboardRoute} />
+      {/* Keep one workspace mounted while switching event sections. */}
+      <Route
+        path="/events/:id/:section?"
+        component={EventWorkspaceSectionRoute}
+      />
 
       {/* Event selection home screen */}
       <Route path="/events" component={ProtectedEventSelectionScreen} />

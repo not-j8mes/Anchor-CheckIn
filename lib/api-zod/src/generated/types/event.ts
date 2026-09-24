@@ -17,6 +17,7 @@ export interface Event {
   /** @nullable */
   scheduleType?: string | null;
   /** @nullable */
+  customDates?: string[];
   startDate?: string | null;
   /** @nullable */
   endDate?: string | null;
