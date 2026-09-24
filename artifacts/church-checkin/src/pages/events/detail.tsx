@@ -803,6 +803,7 @@ function ManualRegistrationDialog({
                 formFields={formFields}
                 rooms={rooms}
                 isChildCheckin={isChildCheckin}
+                sectionTitles={form?.sectionTitles}
                 allowMultipleChildren={!existingFamily}
                 allowSecondGuardian={!existingFamily}
                 visibleSections={existingFamily ? ["child_info"] : undefined}

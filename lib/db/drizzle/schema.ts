@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, foreignKey, integer, boolean, unique } from "drizzle-orm/pg-core"
+import { pgTable, serial, text, timestamp, foreignKey, integer, boolean, unique, jsonb } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -60,6 +60,7 @@ export const forms = pgTable("forms", {
 	confirmationEmailSubject: text("confirmation_email_subject"),
 	confirmationEmailMessage: text("confirmation_email_message"),
 	registrationCompleteMessage: text("registration_complete_message"),
+	sectionTitles: jsonb("section_titles").$type<Record<string, string>>().default({}).notNull(),
 }, (table) => [
 	unique("forms_embed_slug_unique").on(table.embedSlug),
 ]);

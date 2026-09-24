@@ -52,6 +52,7 @@ import {
   Search,
   Check,
   CheckCircle2,
+  X,
   Pencil,
   Eye,
   Users,
@@ -466,6 +467,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     confirmationEmailSubject: DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
     confirmationEmailMessage: DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
     registrationCompleteMessage: DEFAULT_REGISTRATION_COMPLETE_MESSAGE,
+    sectionTitles: {} as Record<SectionKey, string>,
   });
 
   useEffect(() => {
@@ -485,6 +487,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         confirmationEmailSubject: form.confirmationEmailSubject ?? DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
         confirmationEmailMessage: form.confirmationEmailMessage ?? DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
         registrationCompleteMessage: form.registrationCompleteMessage ?? DEFAULT_REGISTRATION_COMPLETE_MESSAGE,
+        sectionTitles: (form.sectionTitles ?? {}) as Record<SectionKey, string>,
       });
     }
   }, [form]);
@@ -495,6 +498,8 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
   const [systemSearch, setSystemSearch] = useState("");
   const [pickerTargetSection, setPickerTargetSection] = useState<SectionKey | null>(null);
   const [pickerGuardianGroup, setPickerGuardianGroup] = useState<"primary" | "secondary" | null>(null);
+  const [editingSectionTitle, setEditingSectionTitle] = useState<SectionKey | null>(null);
+  const [sectionTitleDraft, setSectionTitleDraft] = useState("");
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
   const invalidateFields = () =>
@@ -504,6 +509,10 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
     mutation: {
       onSuccess: () => {
         toast({ title: "Form settings saved" });
+        queryClient.invalidateQueries({ queryKey: getGetFormQueryKey(formId) });
+      },
+      onError: () => {
+        toast({ title: "Failed to save form settings", variant: "destructive" });
         queryClient.invalidateQueries({ queryKey: getGetFormQueryKey(formId) });
       },
     },
@@ -617,8 +626,18 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
         confirmationEmailSubject: form.confirmationEmailSubject ?? DEFAULT_CONFIRMATION_EMAIL_SUBJECT,
         confirmationEmailMessage: form.confirmationEmailMessage ?? DEFAULT_CONFIRMATION_EMAIL_MESSAGE,
         registrationCompleteMessage: form.registrationCompleteMessage ?? DEFAULT_REGISTRATION_COMPLETE_MESSAGE,
+        sectionTitles: (form.sectionTitles ?? {}) as Record<SectionKey, string>,
       },
     });
+  };
+
+  const saveSectionTitle = (section: SectionDef) => {
+    if (!form) return;
+    const title = sectionTitleDraft.trim() || section.title;
+    const sectionTitles = { ...(formSettings.sectionTitles ?? {}), [section.key]: title };
+    setFormSettings((prev) => ({ ...prev, sectionTitles }));
+    setEditingSectionTitle(null);
+    updateForm.mutate({ formId, data: { title: form.title, sectionTitles } });
   };
 
   const handleAddSystemField = (def: SystemFieldDef) => {
@@ -813,7 +832,52 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                   <div className={`px-4 py-2.5 flex items-center justify-between ${section.headerClass}`}>
                     <div className="flex items-center gap-2.5">
                       <section.Icon className={`w-4 h-4 ${section.iconClass}`} />
-                      <span className={`font-semibold text-sm ${section.titleClass}`}>{section.title}</span>
+                      {editingSectionTitle === section.key ? (
+                        <form
+                          className="flex items-center gap-1.5"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            saveSectionTitle(section);
+                          }}
+                        >
+                          <Input
+                            autoFocus
+                            maxLength={80}
+                            value={sectionTitleDraft}
+                            aria-label={`Edit ${section.title} section heading`}
+                            className="h-8 w-56 bg-white text-sm"
+                            onChange={(event) => setSectionTitleDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Escape") setEditingSectionTitle(null);
+                            }}
+                          />
+                          <Button type="submit" size="icon" variant="ghost" className="h-8 w-8" aria-label="Save section heading">
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button type="button" size="icon" variant="ghost" className="h-8 w-8" aria-label="Cancel editing heading" onClick={() => setEditingSectionTitle(null)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </form>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className={`font-semibold text-sm ${section.titleClass}`}>
+                            {formSettings.sectionTitles?.[section.key]?.trim() || section.title}
+                          </span>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className={`h-7 w-7 opacity-50 hover:opacity-100 ${section.titleClass}`}
+                            aria-label={`Edit ${section.title} section heading`}
+                            onClick={() => {
+                              setSectionTitleDraft(formSettings.sectionTitles?.[section.key] || section.title);
+                              setEditingSectionTitle(section.key);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
                       {section.repeats && (
                         <span className={`flex items-center gap-1 text-xs opacity-70 ml-1 ${section.titleClass}`}>
                           <RefreshCw className="w-3 h-3" />
@@ -1584,7 +1648,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                     <div>
                       <div className="bg-amber-50 border-b border-amber-100 px-6 py-3.5 flex items-center gap-2">
                         <Users className="w-4 h-4 text-amber-700" />
-                        <span className="text-base font-semibold text-amber-900">Parent / Guardian Information</span>
+                        <span className="text-base font-semibold text-amber-900">{formSettings.sectionTitles?.guardian_info?.trim() || "Parent / Guardian Information"}</span>
                       </div>
                       <div className="px-6 py-5 space-y-5">
                         {fieldsBySection.guardian_info.map((field) => (
@@ -1599,7 +1663,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                     <div className="border-t border-border">
                       <div className="bg-orange-50 border-b border-orange-100 px-6 py-3.5 flex items-center gap-2">
                         <Baby className="w-4 h-4 text-orange-700" />
-                        <span className="text-base font-semibold text-orange-900">Child Information</span>
+                        <span className="text-base font-semibold text-orange-900">{formSettings.sectionTitles?.child_info?.trim() || "Child Information"}</span>
                       </div>
                       <div className="px-6 py-5 space-y-5">
                         {fieldsBySection.child_info.map((field) => (
@@ -1621,7 +1685,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                     <div className="border-t border-border">
                       <div className="bg-rose-50 border-b border-rose-100 px-6 py-3.5 flex items-center gap-2">
                         <Phone className="w-4 h-4 text-rose-700" />
-                        <span className="text-base font-semibold text-rose-900">Emergency Contact Information</span>
+                        <span className="text-base font-semibold text-rose-900">{formSettings.sectionTitles?.emergency_contact?.trim() || "Emergency Contact Information"}</span>
                       </div>
                       <div className="px-6 py-5 space-y-5">
                         {fieldsBySection.emergency_contact.map((field) => (
@@ -1636,7 +1700,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                     <div className="border-t border-border">
                       <div className="bg-slate-50 border-b border-slate-100 px-6 py-3.5 flex items-center gap-2">
                         <MessageSquare className="w-4 h-4 text-slate-500" />
-                        <span className="text-base font-semibold text-slate-800">Additional Questions</span>
+                        <span className="text-base font-semibold text-slate-800">{formSettings.sectionTitles?.additional_questions?.trim() || "Additional Questions"}</span>
                       </div>
                       <div className="px-6 py-5 space-y-5">
                         {fieldsBySection.additional_questions.map((field) => (
@@ -1651,7 +1715,7 @@ export function FormBuilderPanel({ formId, eventId: eventIdProp, hideAdditionalP
                     <div className="border-t border-border">
                       <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-3.5 flex items-center gap-2">
                         <FileText className="w-4 h-4 text-indigo-700" />
-                        <span className="text-base font-semibold text-indigo-900">Waivers</span>
+                        <span className="text-base font-semibold text-indigo-900">{formSettings.sectionTitles?.waivers?.trim() || "Waivers"}</span>
                       </div>
                       <div className="px-6 py-5 space-y-5">
                         {fieldsBySection.waivers.map((field) => (

@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { organizationsTable } from "./organizations";
@@ -22,6 +22,7 @@ export const formsTable = pgTable("forms", {
   confirmationEmailSubject: text("confirmation_email_subject"),
   confirmationEmailMessage: text("confirmation_email_message"),
   registrationCompleteMessage: text("registration_complete_message"),
+  sectionTitles: jsonb("section_titles").$type<Record<string, string>>().notNull().default({}),
   embedSlug: text("embed_slug").notNull().unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

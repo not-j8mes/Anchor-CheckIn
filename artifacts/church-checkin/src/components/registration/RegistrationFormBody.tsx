@@ -465,6 +465,7 @@ export interface RegistrationFormBodyProps {
   formFields: FormField[];
   rooms: Room[];
   isChildCheckin: boolean;
+  sectionTitles?: Record<string, string> | null;
   allowAdditionalPeople?: boolean;
   allowMultipleChildren?: boolean;
   allowSecondGuardian?: boolean;
@@ -487,6 +488,7 @@ export function RegistrationFormBody({
   formFields,
   rooms,
   isChildCheckin,
+  sectionTitles = {},
   allowAdditionalPeople = false,
   allowMultipleChildren = true,
   allowSecondGuardian = true,
@@ -535,7 +537,7 @@ export function RegistrationFormBody({
       {isSectionVisible("guardian_info") && guardianFields.length > 0 && (
         <SectionCard
           icon={Users}
-          title="Parent / Guardian Information"
+          title={sectionTitles?.guardian_info?.trim() || "Parent / Guardian Information"}
           description="Tell us who we should contact about this registration."
         >
           <div className="space-y-4 sm:space-y-5">
@@ -604,7 +606,7 @@ export function RegistrationFormBody({
       {isSectionVisible("child_info") && (
         <SectionCard
           icon={User}
-          title={isChildCheckin ? "Child Information" : "Attendee Information"}
+          title={sectionTitles?.child_info?.trim() || (isChildCheckin ? "Child Information" : "Attendee Information")}
           description={
             childrenAnswers.length > 1
               ? `Provide details about your ${isChildCheckin ? "children" : "attendees"}.`
@@ -683,7 +685,7 @@ export function RegistrationFormBody({
       {isSectionVisible("emergency_contact") && emergencyFields.length > 0 && (
         <SectionCard
           icon={Phone}
-          title="Emergency Contact Information"
+          title={sectionTitles?.emergency_contact?.trim() || "Emergency Contact Information"}
           description="Who should we contact in case of an emergency?"
           tone="rose"
         >
@@ -705,7 +707,7 @@ export function RegistrationFormBody({
       {isSectionVisible("additional_questions") && additionalFields.length > 0 && (
         <SectionCard
           icon={MessageSquare}
-          title="Additional Questions"
+          title={sectionTitles?.additional_questions?.trim() || "Additional Questions"}
           description="A few extra details to help us serve you well."
           tone="sky"
         >
@@ -727,7 +729,7 @@ export function RegistrationFormBody({
       {isSectionVisible("waivers") && waiverFields.length > 0 && (
         <SectionCard
           icon={FileText}
-          title="Waivers"
+          title={sectionTitles?.waivers?.trim() || "Waivers"}
           description="Please review and accept the required agreements."
           tone="indigo"
         >

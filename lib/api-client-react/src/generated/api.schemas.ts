@@ -60,6 +60,7 @@ export interface Form {
   confirmationEmailMessage?: string | null;
   /** @nullable */
   registrationCompleteMessage?: string | null;
+  sectionTitles?: Record<string, string>;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;
@@ -84,6 +85,7 @@ export interface FormInput {
   confirmationEmailMessage?: string | null;
   /** @nullable */
   registrationCompleteMessage?: string | null;
+  sectionTitles?: Record<string, string>;
 }
 
 export type QuestionType = typeof QuestionType[keyof typeof QuestionType];
@@ -181,6 +183,7 @@ export interface FormWithQuestions {
   confirmationEmailMessage?: string | null;
   /** @nullable */
   registrationCompleteMessage?: string | null;
+  sectionTitles?: Record<string, string>;
   embedSlug?: string;
   submissionCount?: number;
   createdAt?: string;

@@ -1317,6 +1317,10 @@ components:
           type: ["string", "null"]
         registrationCompleteMessage:
           type: ["string", "null"]
+        sectionTitles:
+          type: object
+          additionalProperties:
+            type: string
         embedSlug:
           type: string
         submissionCount:
@@ -1356,6 +1360,10 @@ components:
           type: ["string", "null"]
         registrationCompleteMessage:
           type: ["string", "null"]
+        sectionTitles:
+          type: object
+          additionalProperties:
+            type: string
 
     FormWithQuestions:
       type: object
@@ -1391,6 +1399,10 @@ components:
           type: ["string", "null"]
         registrationCompleteMessage:
           type: ["string", "null"]
+        sectionTitles:
+          type: object
+          additionalProperties:
+            type: string
         embedSlug:
           type: string
         submissionCount:
@@ -1440,6 +1452,10 @@ components:
           type: boolean
         registrationCompleteMessage:
           type: ["string", "null"]
+        sectionTitles:
+          type: object
+          additionalProperties:
+            type: string
         registrationType:
           type: ["string", "null"]
         eventId:

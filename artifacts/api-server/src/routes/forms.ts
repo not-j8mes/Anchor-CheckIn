@@ -103,6 +103,7 @@ router.get("/forms/by-slug/:embedSlug", async (req, res) => {
       hideOrgLogo: form[0].hideOrgLogo,
       hideOrgName: form[0].hideOrgName,
       registrationCompleteMessage: form[0].registrationCompleteMessage,
+      sectionTitles: form[0].sectionTitles,
       questions,
       formFields,
       registrationType,

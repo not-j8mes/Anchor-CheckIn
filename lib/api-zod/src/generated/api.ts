@@ -80,6 +80,7 @@ export const ListFormsResponseItem = zod.object({
   "confirmationEmailSubject": zod.string().nullish(),
   "confirmationEmailMessage": zod.string().nullish(),
   "registrationCompleteMessage": zod.string().nullish(),
+  "sectionTitles": zod.record(zod.string(), zod.string()).optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -104,7 +105,8 @@ export const CreateFormBody = zod.object({
   "confirmationEmailEnabled": zod.boolean().optional(),
   "confirmationEmailSubject": zod.string().nullish(),
   "confirmationEmailMessage": zod.string().nullish(),
-  "registrationCompleteMessage": zod.string().nullish()
+  "registrationCompleteMessage": zod.string().nullish(),
+  "sectionTitles": zod.record(zod.string(), zod.string()).optional()
 })
 
 export const CreateFormResponse = zod.object({
@@ -123,6 +125,7 @@ export const CreateFormResponse = zod.object({
   "confirmationEmailSubject": zod.string().nullish(),
   "confirmationEmailMessage": zod.string().nullish(),
   "registrationCompleteMessage": zod.string().nullish(),
+  "sectionTitles": zod.record(zod.string(), zod.string()).optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()
@@ -232,6 +235,7 @@ export const CreateEventResponse = zod.object({
   "confirmationEmailSubject": zod.string().nullish(),
   "confirmationEmailMessage": zod.string().nullish(),
   "registrationCompleteMessage": zod.string().nullish(),
+  "sectionTitles": zod.record(zod.string(), zod.string()).optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -384,6 +388,7 @@ export const GetEventResponse = zod.object({
   "confirmationEmailSubject": zod.string().nullish(),
   "confirmationEmailMessage": zod.string().nullish(),
   "registrationCompleteMessage": zod.string().nullish(),
+  "sectionTitles": zod.record(zod.string(), zod.string()).optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -508,6 +513,7 @@ export const GetFormBySlugResponse = zod.object({
   "confirmationEmailSubject": zod.string().nullish(),
   "confirmationEmailMessage": zod.string().nullish(),
   "registrationCompleteMessage": zod.string().nullish(),
+  "sectionTitles": zod.record(zod.string(), zod.string()).optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -565,6 +571,7 @@ export const GetFormResponse = zod.object({
   "confirmationEmailSubject": zod.string().nullish(),
   "confirmationEmailMessage": zod.string().nullish(),
   "registrationCompleteMessage": zod.string().nullish(),
+  "sectionTitles": zod.record(zod.string(), zod.string()).optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional(),
@@ -620,7 +627,8 @@ export const UpdateFormBody = zod.object({
   "confirmationEmailEnabled": zod.boolean().optional(),
   "confirmationEmailSubject": zod.string().nullish(),
   "confirmationEmailMessage": zod.string().nullish(),
-  "registrationCompleteMessage": zod.string().nullish()
+  "registrationCompleteMessage": zod.string().nullish(),
+  "sectionTitles": zod.record(zod.string(), zod.string()).optional()
 })
 
 export const UpdateFormResponse = zod.object({
@@ -639,6 +647,7 @@ export const UpdateFormResponse = zod.object({
   "confirmationEmailSubject": zod.string().nullish(),
   "confirmationEmailMessage": zod.string().nullish(),
   "registrationCompleteMessage": zod.string().nullish(),
+  "sectionTitles": zod.record(zod.string(), zod.string()).optional(),
   "embedSlug": zod.string().optional(),
   "submissionCount": zod.number().optional(),
   "createdAt": zod.string().optional()

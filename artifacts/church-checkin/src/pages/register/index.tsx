@@ -112,15 +112,28 @@ export default function PublicRegistrationForm() {
       ? `Thank you! ${childrenAnswers.length} ${isChildCheckin ? "children" : "people"} have been registered successfully.`
       : DEFAULT_REGISTRATION_COMPLETE_MESSAGE;
   const completeMessage = form?.registrationCompleteMessage?.trim() || defaultCompleteMessage;
+  const sectionTitles = form?.sectionTitles ?? {};
   const sectionMeta: Record<FieldSection, { title: string; shortTitle: string }> = {
-    guardian_info: { title: "Parent / Guardian", shortTitle: "Parent / Guardian" },
-    child_info: {
-      title: isChildCheckin ? "Child Information" : "Attendee Information",
-      shortTitle: isChildCheckin ? "Child Info" : "Attendee Info",
+    guardian_info: {
+      title: sectionTitles.guardian_info?.trim() || "Parent / Guardian Information",
+      shortTitle: sectionTitles.guardian_info?.trim() || "Parent / Guardian",
     },
-    emergency_contact: { title: "Emergency Contact", shortTitle: "Emergency Contact" },
-    additional_questions: { title: "Additional Questions", shortTitle: "Additional Questions" },
-    waivers: { title: "Waivers", shortTitle: "Waivers" },
+    child_info: {
+      title: sectionTitles.child_info?.trim() || (isChildCheckin ? "Child Information" : "Attendee Information"),
+      shortTitle: sectionTitles.child_info?.trim() || (isChildCheckin ? "Child Info" : "Attendee Info"),
+    },
+    emergency_contact: {
+      title: sectionTitles.emergency_contact?.trim() || "Emergency Contact Information",
+      shortTitle: sectionTitles.emergency_contact?.trim() || "Emergency Contact",
+    },
+    additional_questions: {
+      title: sectionTitles.additional_questions?.trim() || "Additional Questions",
+      shortTitle: sectionTitles.additional_questions?.trim() || "Additional Questions",
+    },
+    waivers: {
+      title: sectionTitles.waivers?.trim() || "Waivers",
+      shortTitle: sectionTitles.waivers?.trim() || "Waivers",
+    },
   };
   const stepSections = ([
     "guardian_info",
@@ -480,6 +493,7 @@ export default function PublicRegistrationForm() {
               formFields={formFields}
               rooms={rooms}
               isChildCheckin={isChildCheckin}
+              sectionTitles={sectionTitles}
               allowAdditionalPeople={form.allowAdditionalPeople}
               allowSecondGuardian={allowSecondGuardian}
               guardianAnswers={guardianAnswers}
