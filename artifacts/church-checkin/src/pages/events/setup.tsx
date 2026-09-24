@@ -572,7 +572,7 @@ function Step1({
                   update("scheduleType", value);
                   if (value === "one_time") update("endDate", "");
                 }}
-                className={`group text-left rounded-xl border-2 p-4 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                className={`group flex h-full flex-col items-start justify-start text-left rounded-xl border-2 p-4 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   state.scheduleType === value
                     ? "border-primary bg-primary/5"
                     : "border-border hover:border-primary/50 hover:bg-muted/40"
@@ -583,8 +583,8 @@ function Step1({
                 }`}>
                   <Icon className="w-4 h-4 text-primary" />
                 </div>
-                <div className="flex items-center gap-1.5 mb-1">
-                  <p className="font-semibold text-sm">{label}</p>
+                <div className="flex min-h-10 w-full items-start gap-1.5 mb-1">
+                  <p className="font-semibold text-sm leading-5">{label}</p>
                   {state.scheduleType === value && <Check className="w-3.5 h-3.5 text-primary ml-auto" />}
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
