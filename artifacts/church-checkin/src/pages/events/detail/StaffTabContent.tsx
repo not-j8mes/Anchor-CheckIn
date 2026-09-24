@@ -232,12 +232,13 @@ export function StaffTabContent({
 
   const createRole = useMutation({
     mutationFn: () =>
-      staffRequest(`/api/events/${eventId}/staff/roles`, {
+      staffRequest<StaffRole>(`/api/events/${eventId}/staff/roles`, {
         method: "POST",
         body: JSON.stringify({ name: roleName }),
       }),
-    onSuccess: () => {
+    onSuccess: (createdRole) => {
       refresh();
+      setRoleId(String(createdRole.id));
       setRoleName("");
       toast({ title: "Staff role added" });
     },
@@ -856,13 +857,29 @@ export function StaffTabContent({
             </div>
             <div className="col-span-2 space-y-2">
               <Label>Role (optional)</Label>
-              <Select value={roleId} onValueChange={setRoleId}>
+              <Select
+                value={roleId}
+                onValueChange={(value) => {
+                  if (value === "__add_role__") {
+                    setRoleDialogOpen(true);
+                    return;
+                  }
+                  setRoleId(value);
+                }}
+              >
                 <SelectTrigger><SelectValue placeholder="Choose a role" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No role</SelectItem>
                   {roles.map((role) => (
                     <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>
                   ))}
+                  {!editingMember && (
+                    <SelectItem value="__add_role__">
+                      <span className="flex items-center gap-2 font-medium text-primary">
+                        <Plus className="h-4 w-4" /> Add role
+                      </span>
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

@@ -1872,6 +1872,7 @@ function ChildrenTabContent({
   embedSlug?: string | null;
   isChildCheckin?: boolean;
 }) {
+  const [location, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [roomFilter, setRoomFilter] = useState("all");
   const [alertsOnly, setAlertsOnly] = useState(false);
@@ -1893,6 +1894,7 @@ function ChildrenTabContent({
   const [emailMessage, setEmailMessage] = useState(
     DEFAULT_EVENT_UPDATE_EMAIL_MESSAGE,
   );
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { organization } = useAuth();
@@ -1912,6 +1914,16 @@ function ChildrenTabContent({
       },
     },
   );
+
+  useEffect(() => {
+    const query = location.split("?")[1] ?? "";
+    const registrationId = Number(
+      new URLSearchParams(query).get("registrationId"),
+    );
+    if (!Number.isInteger(registrationId) || registrationId <= 0) return;
+    const registration = registrations.find((reg) => reg.id === registrationId);
+    if (registration) setSelectedReg(registration);
+  }, [location, registrations]);
   const { data: configuredRooms = [] } = useListRooms(eventId, {
     query: { enabled: !!eventId, queryKey: getListRoomsQueryKey(eventId) },
   });
@@ -2466,7 +2478,14 @@ function ChildrenTabContent({
           reg={selectedReg}
           open={!!selectedReg}
           onOpenChange={(v) => {
-            if (!v) setSelectedReg(null);
+            if (!v) {
+              setSelectedReg(null);
+              const [path, query = ""] = location.split("?");
+              const params = new URLSearchParams(query);
+              params.delete("registrationId");
+              const nextQuery = params.toString();
+              setLocation(nextQuery ? `${path}?${nextQuery}` : path);
+            }
           }}
           isChildCheckin={isChildCheckin}
           formId={formId}
@@ -6624,6 +6643,8 @@ function EventDashboardSection({
   isExporting: boolean;
 }) {
   const { toast } = useToast();
+  const [selectedActivityRegistration, setSelectedActivityRegistration] =
+    useState<Registration | null>(null);
   const [activityTab, setActivityTab] = useState<"registrations" | "checkins">(
     "registrations",
   );
@@ -6991,10 +7012,11 @@ function EventDashboardSection({
       {/* 2 — Stat Cards */}
       {statsSection}
 
-      {/* 3 — Primary Hero Action */}
-      <div
-        className={`relative overflow-hidden rounded-2xl border ${heroColors.border} ${heroColors.bg} p-5`}
-      >
+      {/* Keep the form-sharing prompt for events without attendance tracking. */}
+      {!trackAttendance && (
+        <div
+          className={`relative overflow-hidden rounded-2xl border ${heroColors.border} ${heroColors.bg} p-5`}
+        >
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex items-center gap-4 flex-1 min-w-0">
             <div
@@ -7060,7 +7082,8 @@ function EventDashboardSection({
             )}
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
       {/* 4 — Room Attendance */}
       {trackAttendance && rooms.length > 0 && (
@@ -7174,29 +7197,69 @@ function EventDashboardSection({
           {activityTab === "registrations" ? (
             recentRegistrations.length > 0 ? (
               <CardContent className="divide-y divide-border p-0">
-                {recentRegistrations.map((reg) => (
-                  <div
-                    key={reg.id}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-serif text-sm font-bold text-primary">
-                      {reg.childFirstName[0]}
-                      {reg.childLastName[0]}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium">
-                        {reg.childFirstName} {reg.childLastName}
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {reg.guardianName}
-                        {reg.guardianPhone ? ` · ${reg.guardianPhone}` : ""}
-                      </p>
-                    </div>
-                    <p className="shrink-0 text-xs text-muted-foreground">
-                      {format(new Date(reg.createdAt), "MMM d")}
-                    </p>
-                  </div>
-                ))}
+                {recentRegistrations.map((reg) => {
+                  const registrantName =
+                    `${reg.childFirstName} ${reg.childLastName}`.trim();
+                  const contactParts = isChildCheckin
+                    ? [reg.guardianName || "—", reg.guardianPhone]
+                    : [
+                        reg.guardianName && reg.guardianName !== registrantName
+                          ? reg.guardianName
+                          : null,
+                        reg.guardianPhone,
+                        reg.guardianEmail,
+                      ];
+                  const contactText =
+                    contactParts.filter(Boolean).join(" · ") || "—";
+
+                  return (
+                    <button
+                      type="button"
+                      key={reg.id}
+                      onClick={() => setSelectedActivityRegistration(reg)}
+                      className="group block w-full text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    >
+                      <div className="flex items-start gap-4 px-4 py-3.5">
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold leading-tight">
+                              {reg.childFirstName} {reg.childLastName}
+                            </span>
+                            {reg.room && (
+                              <Badge className="h-5 rounded-full border-[#E5BE57] bg-[#FFF9EF] text-[10px] font-semibold text-[#A85B00] hover:bg-[#FFF9EF]">
+                                {reg.room}
+                              </Badge>
+                            )}
+                            <RegistrationAllergyBadge
+                              allergies={reg.allergies}
+                            />
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                            <span>
+                              <span className="font-medium text-foreground/80">
+                                {isChildCheckin
+                                  ? "Parent/Guardian:"
+                                  : "Contact:"}
+                              </span>{" "}
+                              {contactText}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(reg.createdAt), "MMM d")}
+                          </span>
+                          <div className="flex items-center gap-1 text-muted-foreground transition-colors group-hover:text-foreground">
+                            <span className="hidden text-xs opacity-0 transition-opacity group-hover:opacity-60 sm:block">
+                              View
+                            </span>
+                            <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
               </CardContent>
             ) : (
               <CardContent className="flex min-h-20 items-center justify-center py-4 text-center">
@@ -7207,27 +7270,23 @@ function EventDashboardSection({
             )
           ) : recentCheckins.length > 0 ? (
             <CardContent className="divide-y divide-border p-0">
-              {recentCheckins.map((checkin) => (
-                <div
-                  key={checkin.id}
-                  className="flex items-center gap-3 px-4 py-3"
-                >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 font-serif text-sm font-bold text-green-800">
-                    {checkin.childFirstName[0]}
-                    {checkin.childLastName[0]}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
-                      {checkin.childFirstName} {checkin.childLastName}
+                {recentCheckins.map((checkin) => (
+                  <div
+                    key={checkin.id}
+                    className="flex items-start gap-4 px-4 py-3.5"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="text-sm font-semibold leading-tight">
+                        {checkin.childFirstName} {checkin.childLastName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {checkin.guardianName}
+                        {checkin.room ? ` · ${checkin.room}` : ""}
+                      </p>
+                    </div>
+                    <p className="shrink-0 pt-0.5 text-xs font-medium text-green-700">
+                      {format(new Date(checkin.checkinAt), "h:mm a")}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {checkin.guardianName}
-                      {checkin.room ? ` · ${checkin.room}` : ""}
-                    </p>
-                  </div>
-                  <p className="shrink-0 text-xs font-medium text-green-700">
-                    {format(new Date(checkin.checkinAt), "h:mm a")}
-                  </p>
                 </div>
               ))}
             </CardContent>
@@ -7296,6 +7355,18 @@ function EventDashboardSection({
           </DropdownMenu>
         </div>
       </section>
+      {selectedActivityRegistration && (
+        <RegistrationDetailSheet
+          reg={selectedActivityRegistration}
+          open={!!selectedActivityRegistration}
+          onOpenChange={(open) => {
+            if (!open) setSelectedActivityRegistration(null);
+          }}
+          isChildCheckin={isChildCheckin}
+          formId={event.formId}
+          eventId={eventId}
+        />
+      )}
     </div>
   );
 }

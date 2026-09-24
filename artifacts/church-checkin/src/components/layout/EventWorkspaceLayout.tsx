@@ -6,6 +6,8 @@ import {
   SidebarHeader,
   SidebarMenuItem,
   SidebarMenu,
+  SidebarGroup,
+  SidebarGroupLabel,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -25,22 +27,20 @@ import {
   Users,
   LogOut,
   ContactRound,
+  ChevronUp,
+  ArrowRight,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   useAuth,
   type OrganizationPermission,
 } from "@/lib/auth";
 import { APP_NAME, DEFAULT_APP_LOGO } from "@/lib/branding";
-
-function registrationTypeBadge(type?: string | null) {
-  if (!type || type === "child_checkin")
-    return <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-[10px]">Child Check-In</Badge>;
-  if (type === "family_group")
-    return <Badge className="bg-teal-100 text-teal-800 border-teal-200 text-[10px]">Family / Group</Badge>;
-  if (type === "individual")
-    return <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px]">Individual</Badge>;
-  return null;
-}
 
 function NavLink({
   href,
@@ -56,13 +56,14 @@ function NavLink({
   onClick: () => void;
 }) {
   return (
-    <SidebarMenuItem className="mb-0.5">
+    <SidebarMenuItem className="mb-0">
       <Link
         href={href}
-        className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full text-sm ${
+        aria-current={active ? "page" : undefined}
+        className={`flex min-h-10 w-full items-center gap-3 px-3 py-2 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring ${
           active
-            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-            : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+            ? "text-sidebar-foreground font-semibold"
+            : "rounded-md text-sidebar-foreground/85 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
         }`}
         onClick={onClick}
       >
@@ -113,43 +114,44 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
     icon: React.ComponentType<{ className?: string }>;
     label: string;
     permission: OrganizationPermission;
+    section: "Overview" | "People" | "Insights" | "Setup";
   };
   const nav: NavItem[] = [];
   const can = (permission: OrganizationPermission) =>
     organization?.role === "owner" ||
     organization?.permissions.includes(permission);
+  const showCheckinEntry =
+    (isChildCheckin || trackAttendance) && can("checkin");
 
-  nav.push({ href: base, icon: LayoutDashboard, label: "Dashboard", permission: "events" });
-  nav.push({ href: `${base}/staff`, icon: ContactRound, label: "Staff", permission: "staff" });
+  nav.push({ href: base, icon: LayoutDashboard, label: "Dashboard", permission: "events", section: "Overview" });
 
   if (isChildCheckin) {
-    nav.push({ href: `${base}/checkin`, icon: CheckSquare, label: "Check-In Desk", permission: "checkin" });
-    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations", permission: "registrations" });
-    nav.push({ href: `${base}/rooms`, icon: DoorOpen, label: "Rooms", permission: "rooms" });
-    nav.push({ href: `${base}/form`, icon: FileEdit, label: "Registration Form", permission: "forms" });
-    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports", permission: "reports" });
+    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations", permission: "registrations", section: "People" });
+    nav.push({ href: `${base}/staff`, icon: ContactRound, label: "Staff", permission: "staff", section: "People" });
+    nav.push({ href: `${base}/rooms`, icon: DoorOpen, label: "Rooms", permission: "rooms", section: "Setup" });
+    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports", permission: "reports", section: "Insights" });
   } else if (isFamilyGroup) {
-    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations", permission: "registrations" });
-    nav.push({ href: `${base}/groups`, icon: Users, label: "Groups", permission: "registrations" });
-    if (trackAttendance) {
-      nav.push({ href: `${base}/checkin`, icon: CheckSquare, label: "Check-In Desk", permission: "checkin" });
-    }
-    nav.push({ href: `${base}/form`, icon: FileEdit, label: "Registration Form", permission: "forms" });
-    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports", permission: "reports" });
+    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations", permission: "registrations", section: "People" });
+    nav.push({ href: `${base}/groups`, icon: Users, label: "Groups", permission: "registrations", section: "People" });
+    nav.push({ href: `${base}/staff`, icon: ContactRound, label: "Staff", permission: "staff", section: "People" });
+    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports", permission: "reports", section: "Insights" });
   } else {
     // Individual
-    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations", permission: "registrations" });
-    if (trackAttendance) {
-      nav.push({ href: `${base}/checkin`, icon: CheckSquare, label: "Check-In Desk", permission: "checkin" });
-    }
-    nav.push({ href: `${base}/form`, icon: FileEdit, label: "Registration Form", permission: "forms" });
-    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports", permission: "reports" });
+    nav.push({ href: `${base}/registrations`, icon: ClipboardList, label: "Registrations", permission: "registrations", section: "People" });
+    nav.push({ href: `${base}/staff`, icon: ContactRound, label: "Staff", permission: "staff", section: "People" });
+    nav.push({ href: `${base}/reports`, icon: BarChart2, label: "Reports", permission: "reports", section: "Insights" });
+  }
+  if (can("forms")) {
+    nav.push({ href: `${base}/form`, icon: FileEdit, label: "Registration Form", permission: "forms", section: "Setup" });
+  }
+  if (can("event_settings")) {
+    nav.push({ href: `${base}/settings`, icon: Settings, label: "Event Settings", permission: "event_settings", section: "Setup" });
   }
 
   return (
     <div className="flex min-h-screen w-full bg-background">
       <Sidebar>
-        <SidebarHeader className="p-3 border-b border-sidebar-border">
+        <SidebarHeader className="p-3">
           {/* Back to events */}
           <div className="flex items-center gap-1">
             <Link href="/" onClick={close} className="min-w-0 flex-1">
@@ -172,10 +174,9 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
           {/* Event identity */}
           {event ? (
             <div className="mt-2 px-2">
-              <p className="font-serif font-bold text-sidebar-foreground text-base leading-tight line-clamp-2">
+              <p className="font-serif font-bold text-sidebar-foreground text-lg leading-tight line-clamp-2">
                 {event.name}
               </p>
-              <div className="mt-1">{registrationTypeBadge(event.registrationType)}</div>
             </div>
           ) : (
             <div className="mt-2 px-2 space-y-1.5">
@@ -183,43 +184,95 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
               <div className="h-3 bg-sidebar-accent/30 rounded w-2/3 animate-pulse" />
             </div>
           )}
+          {showCheckinEntry && (
+            <div className="mt-4 -mx-3 border-t border-sidebar-border" />
+          )}
+          {showCheckinEntry && (
+            <Link
+              href={`${base}/checkin`}
+              onClick={close}
+              title="Check-In Desk"
+              aria-current={isActive(`${base}/checkin`) ? "page" : undefined}
+              className={`mt-3 flex min-h-12 items-center gap-3 rounded-lg bg-primary px-3 py-1.5 text-primary-foreground shadow-sm transition-colors duration-150 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2 ${
+                isActive(`${base}/checkin`) ? "ring-2 ring-primary-foreground/25" : ""
+              }`}
+            >
+              <CheckSquare className="h-5 w-5 shrink-0" />
+              <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                <span className="block text-[15px] font-semibold leading-5">Check-In Desk</span>
+                <span className="mt-0.5 block text-xs leading-4 text-primary-foreground/75">Open attendance</span>
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-primary-foreground/75 group-data-[collapsible=icon]:hidden" />
+            </Link>
+          )}
         </SidebarHeader>
 
-        <SidebarContent className="px-2 mt-3">
-          <SidebarMenu>
-            {nav.filter((item) => can(item.permission)).map((item) => (
-              <NavLink
-                key={item.href}
-                href={item.href}
-                icon={item.icon}
-                label={item.label}
-                active={isActive(item.href)}
-                onClick={close}
-              />
-            ))}
-          </SidebarMenu>
+        <SidebarContent className="gap-0 px-2 py-2">
+          {(["Overview", "People", "Insights", "Setup"] as const).map((section) => {
+            const items = nav.filter(
+              (item) => item.section === section && can(item.permission),
+            );
+            if (!items.length) return null;
+            return (
+              <SidebarGroup
+                key={section}
+                className={section === "Overview" ? "p-0" : "mt-6 p-0"}
+              >
+                <SidebarGroupLabel className="mb-0 h-5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/65">
+                  {section}
+                </SidebarGroupLabel>
+                <SidebarMenu className="gap-0">
+                  {items.map((item) => (
+                    <NavLink
+                      key={item.href}
+                      href={item.href}
+                      icon={item.icon}
+                      label={item.label}
+                      active={isActive(item.href)}
+                      onClick={close}
+                    />
+                  ))}
+                </SidebarMenu>
+              </SidebarGroup>
+            );
+          })}
         </SidebarContent>
 
         <SidebarFooter className="p-2">
-          <SidebarMenu>
-            {user && (
-              <SidebarMenuItem className="mb-2 px-3 py-2 rounded-md border border-sidebar-border bg-sidebar-accent/20">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">
-                  {user.firstName} {user.lastName}
-                </p>
-                <p className="text-xs text-sidebar-foreground/60 truncate">{user.email || user.username}</p>
-              </SidebarMenuItem>
-            )}
-            {can("event_settings") && (
-              <NavLink
-                href={`${base}/settings`}
-                icon={Settings}
-                label="Event Settings"
-                active={isActive(`${base}/settings`)}
-                onClick={close}
-              />
-            )}
-            <SidebarMenuItem className="mt-1">
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-3 rounded-lg border border-sidebar-foreground/10 bg-sidebar-accent/35 px-3 py-2 text-left outline-none transition-colors duration-150 hover:bg-sidebar-accent/60 focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+                  aria-label={`Account menu for ${user.firstName} ${user.lastName}`}
+                >
+                  <ContactRound className="h-4 w-4 shrink-0 text-sidebar-foreground/70" />
+                  <span className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+                    <span className="block truncate text-sm font-medium text-sidebar-foreground">
+                      {user.firstName} {user.lastName}
+                    </span>
+                    <span className="block truncate text-xs text-sidebar-foreground/60">
+                      {user.email || user.username}
+                    </span>
+                  </span>
+                  <ChevronUp className="h-4 w-4 shrink-0 text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" className="w-56">
+                <div className="px-2 py-1.5">
+                  <p className="truncate text-sm font-medium">{user.firstName} {user.lastName}</p>
+                  <p className="truncate text-xs text-muted-foreground">{user.email || user.username}</p>
+                </div>
+                <DropdownMenuItem onSelect={handleLogout} className="text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <SidebarMenu>
+              <SidebarMenuItem>
               <button
                 type="button"
                 className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors w-full text-sm text-sidebar-foreground hover:bg-sidebar-accent/50"
@@ -228,8 +281,9 @@ export function EventWorkspaceLayout({ children }: { children: React.ReactNode }
                 <LogOut className="w-4 h-4 shrink-0 text-sidebar-foreground/70" />
                 <span>Logout</span>
               </button>
-            </SidebarMenuItem>
-          </SidebarMenu>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          )}
         </SidebarFooter>
       </Sidebar>
 
